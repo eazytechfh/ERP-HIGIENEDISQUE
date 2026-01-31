@@ -40,6 +40,7 @@ import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-heade
 import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
+import { ConsumoEstoqueCard, getEstoqueMock, type ConsumoItem, type ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -245,6 +246,10 @@ export default function ServicosPage() {
   })
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
 
+  // Estados para consumo de estoque (OS Vetores)
+  const [estoqueSimulado, setEstoqueSimulado] = useState<ItemEstoque[]>(() => getEstoqueMock())
+  const [consumos, setConsumos] = useState<ConsumoItem[]>([])
+
   // Determinar tipo de OS baseado no tipo de servico
   const getTipoOS = (): TipoOS => {
     if (serviceRequest.serviceType === "reservatorio_potavel") {
@@ -434,13 +439,28 @@ export default function ServicosPage() {
     }
   }
 
-  const handleConfirmarAgendamentoFinal = () => {
-    setToastMessage("Agendamento confirmado. OS pronta para execução em campo.")
-    setShowToast(true)
-    setTimeout(() => {
-      setShowToast(false)
-      router.push("/dashboard/servicos/agendados")
-    }, 2000)
+const handleConfirmarAgendamentoFinal = () => {
+    // Aviso não bloqueante se for Vetores e não houver consumo registrado
+    if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
+      setToastMessage("Aviso: Voce ainda nao registrou consumo de produtos. Isso pode ser preenchido apos a execucao.")
+      setShowToast(true)
+      setTimeout(() => {
+        setShowToast(false)
+        setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+        setShowToast(true)
+        setTimeout(() => {
+          setShowToast(false)
+          router.push("/dashboard/servicos/agendados")
+        }, 2000)
+      }, 3000)
+    } else {
+      setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+      setShowToast(true)
+      setTimeout(() => {
+        setShowToast(false)
+        router.push("/dashboard/servicos/agendados")
+      }, 2000)
+    }
   }
 
   // Verificar se precisa mostrar campo de veículo
@@ -1296,6 +1316,16 @@ export default function ServicosPage() {
               </Card>
             )}
 
+            {/* CARD 4.5 - Consumo de Produtos (Estoque) - Somente para Vetores */}
+            {serviceRequest.serviceType === "pragas" && (
+              <ConsumoEstoqueCard
+                consumos={consumos}
+                onConsumosChange={setConsumos}
+                estoqueSimulado={estoqueSimulado}
+                onEstoqueSimuladoChange={setEstoqueSimulado}
+              />
+            )}
+
             {/* CARD 5 - Financeiro (somente leitura) */}
             <Card>
               <CardHeader className="pb-4">
@@ -1372,6 +1402,7 @@ export default function ServicosPage() {
               dadosTecnicos={getTipoOS() === "vetores" ? dadosTecnicosVetores : undefined}
               dadosTecnicosLimpeza={getTipoOS() === "limpeza" ? dadosTecnicosLimpeza : undefined}
               dataServico={serviceRequest.schedule.date ? new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR') : undefined}
+              consumos={getTipoOS() === "vetores" ? consumos : []}
             />
 
             {/* CARD 7 - Upload da OS Assinada (pós-execução) */}

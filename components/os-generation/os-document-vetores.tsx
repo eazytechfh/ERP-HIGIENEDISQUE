@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react"
 import type { DadosTecnicosVetores, PragaAlvo } from "./vetores-form"
+import type { ConsumoItem } from "./consumo-estoque-card"
 
 // Empresa Info (mock - pode vir de configurações do sistema)
 const empresaInfo = {
@@ -53,10 +54,11 @@ type OSDocumentVetoresProps = {
   dataServico: string
   tecnicoResponsavel?: string
   registroTecnico?: string
+  consumos?: ConsumoItem[]
 }
 
 export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresProps>(
-  ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico }, ref) => {
+  ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico, consumos = [] }, ref) => {
     return (
       <div ref={ref} className="bg-white text-black p-8 max-w-4xl mx-auto text-xs print:text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
         {/* Header */}
@@ -307,9 +309,42 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
                 </td>
               </tr>
             </tbody>
-          </table>
+</table>
         </div>
 
+        {/* Produtos e Materiais Consumidos (OS Vetores) */}
+        <div className="border border-black mb-4">
+          <div className="bg-gray-200 px-2 py-1 font-bold border-b border-black">
+            PRODUTOS E MATERIAIS CONSUMIDOS (OS VETORES)
+          </div>
+          <div className="p-2 text-[10px]">
+            {consumos.length > 0 ? (
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border-r border-b border-black p-1 text-left">Produto</th>
+                    <th className="border-r border-b border-black p-1 text-left">Categoria</th>
+                    <th className="border-r border-b border-black p-1 text-right">Quantidade</th>
+                    <th className="border-b border-black p-1 text-left">Unidade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {consumos.map((consumo, index) => (
+                    <tr key={consumo.id || index}>
+                      <td className="border-r border-b border-black p-1">{consumo.produtoNome}</td>
+                      <td className="border-r border-b border-black p-1">{consumo.categoria}</td>
+                      <td className="border-r border-b border-black p-1 text-right">{consumo.quantidade}</td>
+                      <td className="border-b border-black p-1">{consumo.unidade}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-gray-500 text-center py-2">Nenhum consumo registrado.</p>
+            )}
+          </div>
+        </div>
+        
         {/* Assinaturas */}
         <div className="border border-black">
           <div className="grid grid-cols-4 text-[10px]">

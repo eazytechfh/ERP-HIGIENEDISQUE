@@ -9,6 +9,7 @@ import { OSDocumentVetores } from "./os-document-vetores"
 import { OSDocumentLimpeza } from "./os-document-limpeza"
 import type { DadosTecnicosVetores } from "./vetores-form"
 import type { DadosTecnicosLimpeza } from "./limpeza-form"
+import type { ConsumoItem } from "./consumo-estoque-card"
 
 type ClienteInfo = {
   nome: string
@@ -40,6 +41,7 @@ type PdfPreviewMockProps = {
   dadosTecnicos?: DadosTecnicosVetores
   dadosTecnicosLimpeza?: DadosTecnicosLimpeza
   dataServico?: string
+  consumos?: ConsumoItem[]
 }
 
 export function PdfPreviewMock({ 
@@ -50,7 +52,8 @@ export function PdfPreviewMock({
   local, 
   dadosTecnicos,
   dadosTecnicosLimpeza,
-  dataServico 
+  dataServico,
+  consumos = []
 }: PdfPreviewMockProps) {
   const printRef = useRef<HTMLDivElement>(null)
   const isGenerated = status !== "a_gerar"
@@ -206,13 +209,14 @@ export function PdfPreviewMock({
                   dataServico={dataServico || new Date().toLocaleDateString('pt-BR')}
                 />
               ) : (
-                <OSDocumentVetores
-                  osNumber={osNumber}
-                  cliente={defaultCliente}
-                  local={defaultLocal}
-                  dadosTecnicos={defaultDadosTecnicos}
-                  dataServico={dataServico || new Date().toLocaleDateString('pt-BR')}
-                />
+<OSDocumentVetores
+                osNumber={osNumber}
+                cliente={defaultCliente}
+                local={defaultLocal}
+                dadosTecnicos={defaultDadosTecnicos}
+                dataServico={dataServico || new Date().toLocaleDateString('pt-BR')}
+                consumos={consumos}
+              />
               )}
             </div>
           </div>
