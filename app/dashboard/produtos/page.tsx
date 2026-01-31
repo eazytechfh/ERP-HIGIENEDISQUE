@@ -831,14 +831,21 @@ export default function EstoquePage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="fornecedor">Fornecedor *</Label>
-                      <Input
-                        id="fornecedor"
-                        name="fornecedor"
-                        placeholder="Ex: Distribuidora Quimica SA"
+                      <Select
                         value={formData.fornecedor}
-                        onChange={handleInputChange}
-                        required
-                      />
+                        onValueChange={(value) => setFormData({ ...formData, fornecedor: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o fornecedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fornecedores.filter(f => f.ativo).map((fornecedor) => (
+                            <SelectItem key={fornecedor.id} value={fornecedor.razaoSocial}>
+                              {fornecedor.razaoSocial}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
