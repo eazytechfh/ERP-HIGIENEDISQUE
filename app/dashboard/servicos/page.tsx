@@ -32,8 +32,13 @@ import {
   ClipboardList,
   User,
   Clock,
-  Truck
+  Truck,
+  Printer,
+  Eye
 } from 'lucide-react'
+import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
+import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
+import { PdfPreviewMock } from "@/components/os-generation/pdf-preview-mock"
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -217,6 +222,22 @@ export default function ServicosPage() {
   // Observações de acesso
   const [observacoesAcesso, setObservacoesAcesso] = useState("")
 
+  // Estados para etapa 3 - Geração da OS
+  const [osStatus, setOsStatus] = useState<OSStatus>("a_gerar")
+  const [osNumber] = useState("OS-2026-000123")
+  const [dataGeracao, setDataGeracao] = useState<string | null>(null)
+  const [dadosTecnicosVetores, setDadosTecnicosVetores] = useState<DadosTecnicosVetores>({
+    pragasAlvo: ["baratas"],
+    tipoAtividade: "quimico",
+    descricaoServico: "",
+    produtos: [],
+    medidasPreventivas: "",
+    aplicador: "FERNANDO",
+    tecnicoResponsavel: "Renato Luiz Leal Gomes",
+    registroTecnico: "55953/02 RJ"
+  })
+  const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
+
   // Filtrar clientes
   const filteredClientes = clientesMock.filter(cliente =>
     cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -354,6 +375,59 @@ export default function ServicosPage() {
     }
   }
 
+  // Handlers da etapa 3 - OS
+  const handleGerarOS = () => {
+    setOsStatus("gerada")
+    setDataGeracao(new Date().toLocaleDateString('pt-BR'))
+    setToastMessage("OS gerada com sucesso!")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
+  }
+
+  const handleVisualizarPDF = () => {
+    // Já está sendo exibido na prévia
+    setToastMessage("Visualizando prévia da OS")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleImprimirOS = () => {
+    window.print()
+    if (osStatus === "gerada") {
+      setOsStatus("impressa")
+    }
+    setToastMessage("Enviando OS para impressão...")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleMarcarEntregue = () => {
+    setOsStatus("entregue_tecnico")
+    setToastMessage("OS marcada como entregue ao técnico!")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
+  }
+
+  const handleUploadAssinado = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setArquivoAssinado(file)
+      setOsStatus("assinada_digitalizada")
+      setToastMessage("OS assinada anexada com sucesso!")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+    }
+  }
+
+  const handleConfirmarAgendamentoFinal = () => {
+    setToastMessage("Agendamento confirmado. OS pronta para execução em campo.")
+    setShowToast(true)
+    setTimeout(() => {
+      setShowToast(false)
+      router.push("/dashboard/servicos/agendados")
+    }, 2000)
+  }
+
   // Verificar se precisa mostrar campo de veículo
   const equipeSelecionada = equipesMock.find(e => e.id === serviceRequest.schedule.teamId)
   const mostrarVeiculo = serviceRequest.serviceType === "esgotamento" || equipeSelecionada?.tipo === "equipe_caminhao"
@@ -379,7 +453,7 @@ export default function ServicosPage() {
           {[
             { step: 1, label: "Dados do Serviço" },
             { step: 2, label: "Agendamento" },
-            { step: 3, label: "OS (rascunho)" }
+            { step: 3, label: "Geração da OS (oficial)" }
           ].map((item, index) => (
             <div key={item.step} className="flex items-center">
               <div className="flex items-center gap-2">
@@ -987,7 +1061,7 @@ export default function ServicosPage() {
           <Card>
             <CardHeader>
               <CardTitle>Confirmação do Agendamento</CardTitle>
-              <CardDescription>Revise as informações antes de gerar a OS</CardDescription>
+              <CardDescription>Revise as informações antes de avançar para a geração da OS</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1080,11 +1154,244 @@ export default function ServicosPage() {
 
               <div className="flex items-center justify-center pt-4">
                 <Badge variant="outline" className="text-lg px-4 py-2">
-                  OS será gerada após execução do serviço
+                  Clique em "Confirmar Agendamento" para gerar a OS
                 </Badge>
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* ETAPA 3 - Geração da OS (oficial) */}
+        {currentStep === 3 && (
+          <div className="space-y-6">
+            {/* CARD 1 - Identificação e Status da OS */}
+            <OSHeaderCard
+              osNumber={osNumber}
+              osType="Vetores (Dedetização)"
+              status={osStatus}
+              dataGeracao={dataGeracao}
+              onGerarOS={handleGerarOS}
+              onVisualizarPDF={handleVisualizarPDF}
+              onImprimir={handleImprimirOS}
+              onMarcarEntregue={handleMarcarEntregue}
+              clienteSelecionado={!!clienteSelecionado}
+              agendamentoCompleto={!!serviceRequest.schedule.date && !!serviceRequest.schedule.teamId}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* CARD 2 - Dados do Cliente (somente leitura) */}
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary" />
+                    Dados do Cliente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Nome/Razão Social</span>
+                      <span className="font-medium">{clienteSelecionado?.nome}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">CPF/CNPJ</span>
+                      <span className="font-medium">{clienteSelecionado?.cpfCnpj}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Telefone</span>
+                      <span className="font-medium">{clienteSelecionado?.telefone}</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-muted-foreground">E-mail</span>
+                      <span className="font-medium">{clienteSelecionado?.email}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* CARD 3 - Local e Serviço (somente leitura) */}
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    Local e Serviço
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Local de Atendimento</span>
+                      <span className="font-medium">{localSelecionado?.nome}</span>
+                    </div>
+                    <div className="py-2 border-b">
+                      <span className="text-muted-foreground block mb-1">Endereço Completo</span>
+                      <span className="font-medium text-xs">
+                        {localSelecionado?.endereco}, {localSelecionado?.numero} - {localSelecionado?.bairro}, {localSelecionado?.cidade}/{localSelecionado?.estado} - CEP: {localSelecionado?.cep}
+                      </span>
+                    </div>
+                    {observacoesAcesso && (
+                      <div className="py-2 border-b">
+                        <span className="text-muted-foreground block mb-1">Observações de Acesso</span>
+                        <span className="font-medium">{observacoesAcesso}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Tipo de Serviço</span>
+                      <span className="font-medium">
+                        {serviceRequest.serviceType === "pragas" ? "Controle de Pragas" :
+                         serviceRequest.serviceType === "reservatorio_potavel" ? "Limpeza de Reservatório" :
+                         serviceRequest.serviceType === "esgotamento" ? "Esgotamento" :
+                         serviceRequest.serviceType === "desentupimento" ? "Desentupimento" : "Outro"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Nome do Serviço</span>
+                      <span className="font-medium">{serviceRequest.serviceName}</span>
+                    </div>
+                    {serviceRequest.warrantyDays && (
+                      <div className="flex justify-between py-2">
+                        <span className="text-muted-foreground">Garantia</span>
+                        <span className="font-medium">{serviceRequest.warrantyDays} dias</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* CARD 4 - Dados Técnicos da OS Vetores (editável) */}
+            {serviceRequest.serviceType === "pragas" ? (
+              <VetoresForm
+                dados={dadosTecnicosVetores}
+                onChange={setDadosTecnicosVetores}
+              />
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-300">
+                    <AlertTriangle className="h-5 w-5" />
+                    <span>Template de OS ainda não configurado para este tipo de serviço. O modelo Vetores será utilizado como padrão.</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* CARD 5 - Financeiro (somente leitura) */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  Financeiro
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Cobrança</p>
+                    <p className="font-semibold">
+                      {serviceRequest.billing.mode === "contrato" ? "Incluso em contrato" :
+                       serviceRequest.billing.mode === "avulso" ? "Avulso" : "Adicional"}
+                    </p>
+                  </div>
+                  {serviceRequest.billing.mode === "contrato" && contratoSelecionado && (
+                    <>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Contrato</p>
+                        <p className="font-semibold">{contratoSelecionado.numero}</p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Item</p>
+                        <p className="font-semibold">
+                          {contratoSelecionado.itens.find(i => i.id === serviceRequest.billing.contractItemId)?.nome || "-"}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {(serviceRequest.billing.mode === "avulso" || serviceRequest.billing.mode === "adicional") && (
+                    <>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Valor</p>
+                        <p className="font-semibold">{serviceRequest.billing.price || "-"}</p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Forma de Pagamento</p>
+                        <p className="font-semibold capitalize">{serviceRequest.billing.paymentMethod || "-"}</p>
+                      </div>
+                    </>
+                  )}
+                  {serviceRequest.billing.mode === "adicional" && (
+                    <div className="p-4 bg-muted/50 rounded-lg md:col-span-3">
+                      <p className="text-sm text-muted-foreground mb-1">Aprovado?</p>
+                      <Badge variant={serviceRequest.billing.approved ? "default" : "secondary"}>
+                        {serviceRequest.billing.approved ? "Sim, aprovado" : "Pendente de aprovação"}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* CARD 6 - Prévia do Documento (PDF Preview) */}
+            <PdfPreviewMock
+              status={osStatus}
+              osNumber={osNumber}
+              cliente={clienteSelecionado ? {
+                nome: clienteSelecionado.nome,
+                cpfCnpj: clienteSelecionado.cpfCnpj,
+                telefone: clienteSelecionado.telefone,
+                email: clienteSelecionado.email
+              } : undefined}
+              local={localSelecionado ? {
+                endereco: `${localSelecionado.endereco}, ${localSelecionado.numero}`,
+                bairro: localSelecionado.bairro,
+                cidade: localSelecionado.cidade,
+                estado: localSelecionado.estado,
+                cep: localSelecionado.cep
+              } : undefined}
+              dadosTecnicos={dadosTecnicosVetores}
+              dataServico={serviceRequest.schedule.date ? new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR') : undefined}
+            />
+
+            {/* CARD 7 - Upload da OS Assinada (pós-execução) */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Upload className="h-5 w-5 text-primary" />
+                  Upload da OS Assinada (Pós-execução)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Após a execução, faça upload da OS assinada e digitalizada
+                  </p>
+                  <Input
+                    id="osAssinada"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleUploadAssinado}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById('osAssinada')?.click()}
+                    className="gap-2 bg-transparent"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Selecionar arquivo (PDF/JPG/PNG)
+                  </Button>
+                  {arquivoAssinado && (
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                      <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="font-medium">{arquivoAssinado.name}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Modal Novo Local */}
@@ -1206,9 +1513,22 @@ export default function ServicosPage() {
                 Avançar para Agendamento
                 <ArrowRight className="h-4 w-4" />
               </Button>
-            ) : (
-              <Button onClick={() => setCurrentStep(3)} className="gap-2">
+            ) : currentStep === 2 ? (
+              <Button onClick={() => {
+                setCurrentStep(3)
+                // Auto-gerar OS ao avançar para etapa 3
+                handleGerarOS()
+              }} className="gap-2">
                 Confirmar Agendamento
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleConfirmarAgendamentoFinal} 
+                className="gap-2"
+                disabled={osStatus === "a_gerar"}
+              >
+                Finalizar e Confirmar
                 <CheckCircle className="h-4 w-4" />
               </Button>
             )}
