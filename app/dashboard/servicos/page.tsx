@@ -1,6 +1,6 @@
 "use client"
 
-import React, { Suspense } from "react"
+import React from "react"
 
 import { ErpHeader } from "@/components/erp-header"
 import { Button } from "@/components/ui/button"
@@ -170,7 +170,7 @@ const contratosMock: Contrato[] = [
   },
 ]
 
-function ServicosPageContent() {
+export default function ServicosPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const clienteIdParam = searchParams.get("clienteId")
@@ -1536,22 +1536,5 @@ function ServicosPageContent() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function ServicosPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-muted/30">
-        <ErpHeader />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-muted-foreground">Carregando...</div>
-          </div>
-        </main>
-      </div>
-    }>
-      <ServicosPageContent />
-    </Suspense>
   )
 }
