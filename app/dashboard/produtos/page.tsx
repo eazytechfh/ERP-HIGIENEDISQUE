@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Package, Plus, Search, Pencil, Trash2, FileText, X } from 'lucide-react'
+import { Package, Plus, Search, Pencil, Trash2, FileText, X, Truck } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 // Tipos
 type Categoria = "Produto Químico" | "Diluente" | "Consumível" | "EPI"
@@ -57,6 +58,24 @@ interface ItemNF {
   quantidade: number
   unidade: Unidade
   custoUnitario: number
+}
+
+interface Fornecedor {
+  id: number
+  razaoSocial: string
+  cnpj: string
+  telefone: string
+  email: string
+  endereco: {
+    rua: string
+    numero: string
+    bairro: string
+    cidade: string
+    uf: string
+  }
+  nomeContato: string
+  observacoes: string
+  ativo: boolean
 }
 
 // Mock database com produtos de dedetização
@@ -185,13 +204,60 @@ const mockProdutos: Produto[] = [
 
 const categorias: Categoria[] = ["Produto Químico", "Diluente", "Consumível", "EPI"]
 const unidades: Unidade[] = ["L", "ml", "g", "kg", "unid"]
+const ufs = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
 
-const fornecedoresMock = [
-  "Distribuidora Química SA",
-  "Bayer CropScience",
-  "Citromax Ind. Química",
-  "EPI Center",
-  "Agro Peças Ltda",
+const mockFornecedores: Fornecedor[] = [
+  {
+    id: 1,
+    razaoSocial: "Distribuidora Quimica SA",
+    cnpj: "12.345.678/0001-90",
+    telefone: "(11) 3456-7890",
+    email: "contato@distquimica.com.br",
+    endereco: {
+      rua: "Av. Industrial",
+      numero: "1500",
+      bairro: "Distrito Industrial",
+      cidade: "Sao Paulo",
+      uf: "SP",
+    },
+    nomeContato: "Carlos Silva",
+    observacoes: "Fornecedor principal de inseticidas",
+    ativo: true,
+  },
+  {
+    id: 2,
+    razaoSocial: "EPI Center Equipamentos Ltda",
+    cnpj: "98.765.432/0001-10",
+    telefone: "(21) 2222-3333",
+    email: "vendas@epicenter.com.br",
+    endereco: {
+      rua: "Rua da Seguranca",
+      numero: "250",
+      bairro: "Centro",
+      cidade: "Rio de Janeiro",
+      uf: "RJ",
+    },
+    nomeContato: "Ana Costa",
+    observacoes: "Especializado em EPIs e equipamentos de seguranca",
+    ativo: true,
+  },
+  {
+    id: 3,
+    razaoSocial: "Agro Pecas e Equipamentos Ltda",
+    cnpj: "45.678.901/0001-23",
+    telefone: "(19) 3344-5566",
+    email: "comercial@agropecas.com.br",
+    endereco: {
+      rua: "Rod. Campinas",
+      numero: "KM 45",
+      bairro: "Zona Rural",
+      cidade: "Campinas",
+      uf: "SP",
+    },
+    nomeContato: "Roberto Almeida",
+    observacoes: "Pulverizadores e equipamentos agricolas",
+    ativo: true,
+  },
 ]
 
 function calcularStatus(estoqueAtual: number, estoqueMinimo: number): Status {
@@ -226,10 +292,35 @@ function EstoqueBadge({ quantidade, status }: { quantidade: number; status: Stat
   )
 }
 
+// Mascaras de formatacao
+function formatCNPJ(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 14)
+  return digits
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2")
+}
+
+function formatTelefone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11)
+  if (digits.length <= 10) {
+    return digits
+      .replace(/^(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d)/, "$1-$2")
+  }
+  return digits
+    .replace(/^(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d)/, "$1-$2")
+}
+
 export default function EstoquePage() {
   const [produtos, setProdutos] = useState<Produto[]>(mockProdutos)
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(mockFornecedores)
   const [searchTerm, setSearchTerm] = useState("")
+  const [searchFornecedor, setSearchFornecedor] = useState("")
   const [editingProduct, setEditingProduct] = useState<Produto | null>(null)
+  const [editingFornecedor, setEditingFornecedor] = useState<Fornecedor | null>(null)
   const [isNFModalOpen, setIsNFModalOpen] = useState(false)
   
   // Formulário Cadastro
@@ -243,9 +334,25 @@ export default function EstoquePage() {
     ativo: true,
   })
 
+  // Formulário Fornecedor
+  const [fornecedorForm, setFornecedorForm] = useState({
+    razaoSocial: "",
+    cnpj: "",
+    telefone: "",
+    email: "",
+    rua: "",
+    numero: "",
+    bairro: "",
+    cidade: "",
+    uf: "",
+    nomeContato: "",
+    observacoes: "",
+    ativo: true,
+  })
+
   // Formulário Nota Fiscal
   const [nfData, setNfData] = useState({
-    fornecedor: "",
+    fornecedorId: null as number | null,
     numeroNF: "",
     dataNF: "",
     itens: [{ produtoId: null, quantidade: 0, unidade: "unid" as Unidade, custoUnitario: 0 }] as ItemNF[],
@@ -332,6 +439,102 @@ export default function EstoquePage() {
     setProdutos(produtos.filter((p) => p.id !== id))
   }
 
+  // Fornecedor handlers
+  const resetFornecedorForm = () => {
+    setFornecedorForm({
+      razaoSocial: "",
+      cnpj: "",
+      telefone: "",
+      email: "",
+      rua: "",
+      numero: "",
+      bairro: "",
+      cidade: "",
+      uf: "",
+      nomeContato: "",
+      observacoes: "",
+      ativo: true,
+    })
+    setEditingFornecedor(null)
+  }
+
+  const handleCadastrarFornecedor = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!fornecedorForm.razaoSocial || !fornecedorForm.cnpj || !fornecedorForm.telefone || !fornecedorForm.email) return
+
+    const novoFornecedor: Fornecedor = {
+      id: Math.max(0, ...fornecedores.map(f => f.id)) + 1,
+      razaoSocial: fornecedorForm.razaoSocial,
+      cnpj: fornecedorForm.cnpj,
+      telefone: fornecedorForm.telefone,
+      email: fornecedorForm.email,
+      endereco: {
+        rua: fornecedorForm.rua,
+        numero: fornecedorForm.numero,
+        bairro: fornecedorForm.bairro,
+        cidade: fornecedorForm.cidade,
+        uf: fornecedorForm.uf,
+      },
+      nomeContato: fornecedorForm.nomeContato,
+      observacoes: fornecedorForm.observacoes,
+      ativo: fornecedorForm.ativo,
+    }
+    setFornecedores([...fornecedores, novoFornecedor])
+    resetFornecedorForm()
+  }
+
+  const handleEditarFornecedor = (fornecedor: Fornecedor) => {
+    setEditingFornecedor(fornecedor)
+    setFornecedorForm({
+      razaoSocial: fornecedor.razaoSocial,
+      cnpj: fornecedor.cnpj,
+      telefone: fornecedor.telefone,
+      email: fornecedor.email,
+      rua: fornecedor.endereco.rua,
+      numero: fornecedor.endereco.numero,
+      bairro: fornecedor.endereco.bairro,
+      cidade: fornecedor.endereco.cidade,
+      uf: fornecedor.endereco.uf,
+      nomeContato: fornecedor.nomeContato,
+      observacoes: fornecedor.observacoes,
+      ativo: fornecedor.ativo,
+    })
+  }
+
+  const handleSalvarFornecedor = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingFornecedor) return
+
+    setFornecedores(
+      fornecedores.map((f) =>
+        f.id === editingFornecedor.id
+          ? {
+              ...f,
+              razaoSocial: fornecedorForm.razaoSocial,
+              cnpj: fornecedorForm.cnpj,
+              telefone: fornecedorForm.telefone,
+              email: fornecedorForm.email,
+              endereco: {
+                rua: fornecedorForm.rua,
+                numero: fornecedorForm.numero,
+                bairro: fornecedorForm.bairro,
+                cidade: fornecedorForm.cidade,
+                uf: fornecedorForm.uf,
+              },
+              nomeContato: fornecedorForm.nomeContato,
+              observacoes: fornecedorForm.observacoes,
+              ativo: fornecedorForm.ativo,
+            }
+          : f
+      )
+    )
+    resetFornecedorForm()
+  }
+
+  const handleExcluirFornecedor = (id: number) => {
+    setFornecedores(fornecedores.filter((f) => f.id !== id))
+  }
+
   // Nota Fiscal
   const handleAddItemNF = () => {
     setNfData({
@@ -369,13 +572,23 @@ export default function EstoquePage() {
     
     setProdutos(updatedProdutos)
     setNfData({
-      fornecedor: "",
+      fornecedorId: null,
       numeroNF: "",
       dataNF: "",
       itens: [{ produtoId: null, quantidade: 0, unidade: "unid", custoUnitario: 0 }],
     })
     setIsNFModalOpen(false)
   }
+
+  const filteredFornecedores = fornecedores.filter(
+    (f) =>
+      f.razaoSocial.toLowerCase().includes(searchFornecedor.toLowerCase()) ||
+      f.cnpj.includes(searchFornecedor) ||
+      f.telefone.includes(searchFornecedor) ||
+      f.email.toLowerCase().includes(searchFornecedor.toLowerCase())
+  )
+
+  const fornecedoresAtivos = fornecedores.filter(f => f.ativo)
 
   const filteredProdutos = produtos.filter(
     (p) =>
@@ -400,10 +613,11 @@ export default function EstoquePage() {
         </div>
 
         <Tabs defaultValue="visualizar" className="space-y-6">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="visualizar">Visualizar Estoque</TabsTrigger>
             <TabsTrigger value="cadastrar">Cadastrar Produto</TabsTrigger>
             <TabsTrigger value="nf">Entrada de Nota Fiscal</TabsTrigger>
+            <TabsTrigger value="fornecedor">Cadastro de Fornecedor</TabsTrigger>
           </TabsList>
 
           {/* Visualizar Estoque */}
@@ -687,16 +901,17 @@ export default function EstoquePage() {
                   <div className="space-y-2">
                     <Label htmlFor="nf-fornecedor">Fornecedor *</Label>
                     <Select
-                      value={nfData.fornecedor}
-                      onValueChange={(value) => setNfData({ ...nfData, fornecedor: value })}
+                      value={nfData.fornecedorId?.toString() || ""}
+                      onValueChange={(value) => setNfData({ ...nfData, fornecedorId: parseInt(value) })}
+                      disabled={fornecedoresAtivos.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o fornecedor" />
+                        <SelectValue placeholder={fornecedoresAtivos.length === 0 ? "Cadastre um fornecedor primeiro" : "Selecione o fornecedor"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {fornecedoresMock.map((f) => (
-                          <SelectItem key={f} value={f}>
-                            {f}
+                        {fornecedoresAtivos.map((f) => (
+                          <SelectItem key={f.id} value={f.id.toString()}>
+                            {f.razaoSocial}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -815,7 +1030,7 @@ export default function EstoquePage() {
                 <div className="flex gap-2 pt-4">
                   <Button
                     onClick={handleEntradaNF}
-                    disabled={!nfData.fornecedor || !nfData.numeroNF || !nfData.dataNF || nfData.itens.every(i => !i.produtoId)}
+                    disabled={!nfData.fornecedorId || !nfData.numeroNF || !nfData.dataNF || nfData.itens.every(i => !i.produtoId)}
                     className="flex-1"
                   >
                     <Package className="h-4 w-4 mr-2" />
@@ -824,6 +1039,265 @@ export default function EstoquePage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Cadastro de Fornecedor */}
+          <TabsContent value="fornecedor" className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Formulário de Cadastro */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Truck className="h-5 w-5" />
+                    {editingFornecedor ? "Editar Fornecedor" : "Cadastrar Novo Fornecedor"}
+                  </CardTitle>
+                  <CardDescription>
+                    {editingFornecedor
+                      ? "Atualize as informacoes do fornecedor"
+                      : "Preencha os dados do fornecedor"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={editingFornecedor ? handleSalvarFornecedor : handleCadastrarFornecedor} className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="razaoSocial">Razao Social *</Label>
+                        <Input
+                          id="razaoSocial"
+                          placeholder="Ex: Distribuidora Quimica SA"
+                          value={fornecedorForm.razaoSocial}
+                          onChange={(e) => setFornecedorForm({ ...fornecedorForm, razaoSocial: e.target.value })}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cnpj">CNPJ *</Label>
+                        <Input
+                          id="cnpj"
+                          placeholder="00.000.000/0000-00"
+                          value={fornecedorForm.cnpj}
+                          onChange={(e) => setFornecedorForm({ ...fornecedorForm, cnpj: formatCNPJ(e.target.value) })}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="telefone">Telefone *</Label>
+                        <Input
+                          id="telefone"
+                          placeholder="(00) 00000-0000"
+                          value={fornecedorForm.telefone}
+                          onChange={(e) => setFornecedorForm({ ...fornecedorForm, telefone: formatTelefone(e.target.value) })}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="email">E-mail *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="contato@empresa.com.br"
+                          value={fornecedorForm.email}
+                          onChange={(e) => setFornecedorForm({ ...fornecedorForm, email: e.target.value })}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="nomeContato">Nome do Contato</Label>
+                        <Input
+                          id="nomeContato"
+                          placeholder="Ex: Joao Silva"
+                          value={fornecedorForm.nomeContato}
+                          onChange={(e) => setFornecedorForm({ ...fornecedorForm, nomeContato: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Endereço */}
+                    <div className="pt-4 border-t">
+                      <Label className="text-base font-semibold mb-3 block">Endereco</Label>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="rua">Rua/Avenida</Label>
+                          <Input
+                            id="rua"
+                            placeholder="Ex: Av. Industrial"
+                            value={fornecedorForm.rua}
+                            onChange={(e) => setFornecedorForm({ ...fornecedorForm, rua: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="numero">Numero</Label>
+                          <Input
+                            id="numero"
+                            placeholder="Ex: 1500"
+                            value={fornecedorForm.numero}
+                            onChange={(e) => setFornecedorForm({ ...fornecedorForm, numero: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="bairro">Bairro</Label>
+                          <Input
+                            id="bairro"
+                            placeholder="Ex: Centro"
+                            value={fornecedorForm.bairro}
+                            onChange={(e) => setFornecedorForm({ ...fornecedorForm, bairro: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="cidade">Cidade</Label>
+                          <Input
+                            id="cidade"
+                            placeholder="Ex: Sao Paulo"
+                            value={fornecedorForm.cidade}
+                            onChange={(e) => setFornecedorForm({ ...fornecedorForm, cidade: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="uf">UF</Label>
+                          <Select
+                            value={fornecedorForm.uf}
+                            onValueChange={(value) => setFornecedorForm({ ...fornecedorForm, uf: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ufs.map((uf) => (
+                                <SelectItem key={uf} value={uf}>
+                                  {uf}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="observacoes">Observacoes</Label>
+                      <Textarea
+                        id="observacoes"
+                        placeholder="Informacoes adicionais sobre o fornecedor..."
+                        value={fornecedorForm.observacoes}
+                        onChange={(e) => setFornecedorForm({ ...fornecedorForm, observacoes: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-2">
+                      <Switch
+                        id="fornecedor-ativo"
+                        checked={fornecedorForm.ativo}
+                        onCheckedChange={(checked) => setFornecedorForm({ ...fornecedorForm, ativo: checked })}
+                      />
+                      <Label htmlFor="fornecedor-ativo" className="cursor-pointer">
+                        Fornecedor Ativo
+                      </Label>
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <Button type="submit" className="flex-1">
+                        <Plus className="h-4 w-4 mr-2" />
+                        {editingFornecedor ? "Salvar Alteracoes" : "Cadastrar Fornecedor"}
+                      </Button>
+                      {editingFornecedor && (
+                        <Button type="button" variant="outline" onClick={resetFornecedorForm}>
+                          Cancelar
+                        </Button>
+                      )}
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+
+              {/* Lista de Fornecedores */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Fornecedores Cadastrados</CardTitle>
+                  <CardDescription>
+                    {fornecedores.length} fornecedor(es) cadastrado(s)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Pesquisar por razao social, CNPJ, telefone ou e-mail..."
+                        className="pl-10"
+                        value={searchFornecedor}
+                        onChange={(e) => setSearchFornecedor(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                    {filteredFornecedores.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        Nenhum fornecedor encontrado
+                      </div>
+                    ) : (
+                      filteredFornecedores.map((fornecedor) => (
+                        <div
+                          key={fornecedor.id}
+                          className={`p-4 rounded-lg border ${!fornecedor.ativo ? "opacity-50 bg-muted/50" : "bg-card"}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium text-sm truncate">{fornecedor.razaoSocial}</h4>
+                                {!fornecedor.ativo && (
+                                  <Badge variant="secondary" className="text-xs">Inativo</Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mb-2">{fornecedor.cnpj}</p>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                <span>{fornecedor.telefone}</span>
+                                <span>{fornecedor.email}</span>
+                              </div>
+                              {fornecedor.endereco.cidade && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {fornecedor.endereco.cidade}/{fornecedor.endereco.uf}
+                                </p>
+                              )}
+                              {fornecedor.nomeContato && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Contato: {fornecedor.nomeContato}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditarFornecedor(fornecedor)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleExcluirFornecedor(fornecedor.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>
