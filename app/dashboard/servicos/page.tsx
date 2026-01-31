@@ -1,6 +1,6 @@
 "use client"
 
-import React, { Suspense } from "react"
+import React from "react"
 
 import { ErpHeader } from "@/components/erp-header"
 import { Button } from "@/components/ui/button"
@@ -38,7 +38,8 @@ import {
 } from 'lucide-react'
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
 import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
-import { PdfPreviewMock } from "@/components/os-generation/pdf-preview-mock"
+import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
+import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -170,7 +171,7 @@ const contratosMock: Contrato[] = [
   },
 ]
 
-function ServicosPageContent() {
+export default function ServicosPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const clienteIdParam = searchParams.get("clienteId")
@@ -236,7 +237,21 @@ function ServicosPageContent() {
     tecnicoResponsavel: "Renato Luiz Leal Gomes",
     registroTecnico: "55953/02 RJ"
   })
+  const [dadosTecnicosLimpeza, setDadosTecnicosLimpeza] = useState<DadosTecnicosLimpeza>({
+    reservatorios: [],
+    aplicador: "Eryck Guimaraes",
+    tecnicoResponsavel: "Renato Luiz Leal Gomes",
+    registroTecnico: "55953/02 RJ"
+  })
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
+
+  // Determinar tipo de OS baseado no tipo de servico
+  const getTipoOS = (): TipoOS => {
+    if (serviceRequest.serviceType === "reservatorio_potavel") {
+      return "limpeza"
+    }
+    return "vetores"
+  }
 
   // Filtrar clientes
   const filteredClientes = clientesMock.filter(cliente =>
@@ -1165,10 +1180,10 @@ function ServicosPageContent() {
         {currentStep === 3 && (
           <div className="space-y-6">
             {/* CARD 1 - Identificação e Status da OS */}
-            <OSHeaderCard
-              osNumber={osNumber}
-              osType="Vetores (Dedetização)"
-              status={osStatus}
+<OSHeaderCard
+  osNumber={osNumber}
+  osType={getTipoOS() === "limpeza" ? "Limpeza de Reservatorios" : "Vetores (Dedetizacao)"}
+  status={osStatus}
               dataGeracao={dataGeracao}
               onGerarOS={handleGerarOS}
               onVisualizarPDF={handleVisualizarPDF}
@@ -1259,18 +1274,23 @@ function ServicosPageContent() {
               </Card>
             </div>
 
-            {/* CARD 4 - Dados Técnicos da OS Vetores (editável) */}
+            {/* CARD 4 - Dados Técnicos da OS (editável) */}
             {serviceRequest.serviceType === "pragas" ? (
               <VetoresForm
                 dados={dadosTecnicosVetores}
                 onChange={setDadosTecnicosVetores}
+              />
+            ) : serviceRequest.serviceType === "reservatorio_potavel" ? (
+              <LimpezaForm
+                dados={dadosTecnicosLimpeza}
+                onChange={setDadosTecnicosLimpeza}
               />
             ) : (
               <Card>
                 <CardContent className="py-8">
                   <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-300">
                     <AlertTriangle className="h-5 w-5" />
-                    <span>Template de OS ainda não configurado para este tipo de serviço. O modelo Vetores será utilizado como padrão.</span>
+                    <span>Template de OS ainda nao configurado para este tipo de servico. O modelo Vetores sera utilizado como padrao.</span>
                   </div>
                 </CardContent>
               </Card>
@@ -1335,6 +1355,7 @@ function ServicosPageContent() {
             <PdfPreviewMock
               status={osStatus}
               osNumber={osNumber}
+              tipoOS={getTipoOS()}
               cliente={clienteSelecionado ? {
                 nome: clienteSelecionado.nome,
                 cpfCnpj: clienteSelecionado.cpfCnpj,
@@ -1348,7 +1369,8 @@ function ServicosPageContent() {
                 estado: localSelecionado.estado,
                 cep: localSelecionado.cep
               } : undefined}
-              dadosTecnicos={dadosTecnicosVetores}
+              dadosTecnicos={getTipoOS() === "vetores" ? dadosTecnicosVetores : undefined}
+              dadosTecnicosLimpeza={getTipoOS() === "limpeza" ? dadosTecnicosLimpeza : undefined}
               dataServico={serviceRequest.schedule.date ? new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR') : undefined}
             />
 
@@ -1536,22 +1558,5 @@ function ServicosPageContent() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function ServicosPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-muted/30">
-        <ErpHeader />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-muted-foreground">Carregando...</div>
-          </div>
-        </main>
-      </div>
-    }>
-      <ServicosPageContent />
-    </Suspense>
   )
 }

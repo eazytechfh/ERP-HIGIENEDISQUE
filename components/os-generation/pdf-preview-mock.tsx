@@ -2,11 +2,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, AlertCircle, Printer, Download } from "lucide-react"
+import { FileText, AlertCircle, Printer } from "lucide-react"
 import { useRef } from "react"
 import type { OSStatus } from "./os-header-card"
 import { OSDocumentVetores } from "./os-document-vetores"
+import { OSDocumentLimpeza } from "./os-document-limpeza"
 import type { DadosTecnicosVetores } from "./vetores-form"
+import type { DadosTecnicosLimpeza } from "./limpeza-form"
 
 type ClienteInfo = {
   nome: string
@@ -15,6 +17,8 @@ type ClienteInfo = {
   telefone: string
   email: string
   tipoAtividade?: string
+  contato?: string
+  funcaoContato?: string
 }
 
 type LocalInfo = {
@@ -25,21 +29,27 @@ type LocalInfo = {
   cep: string
 }
 
+export type TipoOS = "vetores" | "limpeza"
+
 type PdfPreviewMockProps = {
   status: OSStatus
   osNumber: string
+  tipoOS?: TipoOS
   cliente?: ClienteInfo
   local?: LocalInfo
   dadosTecnicos?: DadosTecnicosVetores
+  dadosTecnicosLimpeza?: DadosTecnicosLimpeza
   dataServico?: string
 }
 
 export function PdfPreviewMock({ 
   status, 
   osNumber, 
+  tipoOS = "vetores",
   cliente, 
   local, 
   dadosTecnicos,
+  dadosTecnicosLimpeza,
   dataServico 
 }: PdfPreviewMockProps) {
   const printRef = useRef<HTMLDivElement>(null)
@@ -141,6 +151,13 @@ export function PdfPreviewMock({
     registroTecnico: "55953/02 RJ"
   }
 
+  const defaultDadosTecnicosLimpeza: DadosTecnicosLimpeza = dadosTecnicosLimpeza || {
+    reservatorios: [],
+    aplicador: "Eryck Guimaraes",
+    tecnicoResponsavel: "Renato Luiz Leal Gomes",
+    registroTecnico: "55953/02 RJ"
+  }
+
   const defaultCliente: ClienteInfo = cliente || {
     nome: "Cliente",
     cpfCnpj: "",
@@ -155,6 +172,8 @@ export function PdfPreviewMock({
     estado: "",
     cep: ""
   }
+
+  const tipoOSLabel = tipoOS === "limpeza" ? "Limpeza de Reservatorios" : "Vetores (Dedetizacao)"
 
   return (
     <Card>
@@ -178,28 +197,40 @@ export function PdfPreviewMock({
         {isGenerated ? (
           <div className="border rounded-lg overflow-auto max-h-[800px] bg-gray-100 p-4">
             <div ref={printRef}>
-              <OSDocumentVetores
-                osNumber={osNumber}
-                cliente={defaultCliente}
-                local={defaultLocal}
-                dadosTecnicos={defaultDadosTecnicos}
-                dataServico={dataServico || new Date().toLocaleDateString('pt-BR')}
-              />
+              {tipoOS === "limpeza" ? (
+                <OSDocumentLimpeza
+                  osNumber={osNumber}
+                  cliente={defaultCliente}
+                  local={defaultLocal}
+                  dadosTecnicos={defaultDadosTecnicosLimpeza}
+                  dataServico={dataServico || new Date().toLocaleDateString('pt-BR')}
+                />
+              ) : (
+                <OSDocumentVetores
+                  osNumber={osNumber}
+                  cliente={defaultCliente}
+                  local={defaultLocal}
+                  dadosTecnicos={defaultDadosTecnicos}
+                  dataServico={dataServico || new Date().toLocaleDateString('pt-BR')}
+                />
+              )}
             </div>
           </div>
         ) : (
           <div className="border-2 border-dashed rounded-lg min-h-[400px] flex flex-col items-center justify-center p-8 border-muted-foreground/30 bg-muted/30">
             <FileText className="h-16 w-16 text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-semibold text-center mb-2">
-              Previa - OS Vetores (Modelo Oficial)
+              Previa - OS {tipoOSLabel} (Modelo Oficial)
             </h3>
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <AlertCircle className="h-4 w-4" />
-              A OS sera gerada em PDF no modelo oficial Vetores
+              A OS sera gerada em PDF no modelo oficial {tipoOSLabel}
             </div>
             <p className="text-xs text-muted-foreground mt-4 text-center max-w-md">
-              Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Controle de Vetores / Dedetizacao, 
-              pronto para impressao e assinatura presencial do cliente.
+              {tipoOS === "limpeza" 
+                ? "Apos clicar em \"Gerar OS\", o documento sera criado no formato padrao para Limpeza e Higienizacao de Reservatorios de Agua, pronto para impressao e assinatura presencial do cliente."
+                : "Apos clicar em \"Gerar OS\", o documento sera criado no formato padrao para Controle de Vetores / Dedetizacao, pronto para impressao e assinatura presencial do cliente."
+              }
             </p>
           </div>
         )}
