@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Search, 
   ArrowRight, 
@@ -32,8 +33,15 @@ import {
   ClipboardList,
   User,
   Clock,
-  Truck
+  Truck,
+  Printer,
+  Eye
 } from 'lucide-react'
+import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
+import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
+import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
+import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
+import { ConsumoEstoqueCard, getEstoqueMock, type ConsumoItem, type ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -165,12 +173,182 @@ const contratosMock: Contrato[] = [
   },
 ]
 
+// Mock data de serviços agendados
+const servicosAgendadosMock = [
+  {
+    id: "1",
+    osNumber: "OS-2026-000123",
+    cliente: "Joao Silva",
+    servico: "Dedetizacao Residencial",
+    tipo: "Controle de Pragas",
+    local: "Residencia Principal - Av. Paulista, 1000",
+    data: "05/02/2026",
+    horario: "09:00 - 11:00",
+    tecnico: "Carlos - Tecnico",
+    status: "agendado" as const,
+    osStatus: "gerada" as const
+  },
+  {
+    id: "2",
+    osNumber: "OS-2026-000122",
+    cliente: "Empresa ABC Ltda",
+    servico: "Dedetizacao Comercial",
+    tipo: "Controle de Pragas",
+    local: "Fabrica - Rua das Industrias, 200",
+    data: "04/02/2026",
+    horario: "14:00 - 17:00",
+    tecnico: "Ana - Tecnica",
+    status: "em_execucao" as const,
+    osStatus: "entregue_tecnico" as const
+  },
+  {
+    id: "3",
+    osNumber: "OS-2026-000121",
+    cliente: "Maria Santos",
+    servico: "Controle de Cupins",
+    tipo: "Controle de Pragas",
+    local: "Matriz - Av. Berrini, 1500",
+    data: "03/02/2026",
+    horario: "08:00 - 12:00",
+    tecnico: "Carlos - Tecnico",
+    status: "concluido" as const,
+    osStatus: "assinada_digitalizada" as const
+  }
+]
+
+const agendadosStatusConfig = {
+  agendado: { label: "Agendado", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
+  em_execucao: { label: "Em Execucao", color: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
+  concluido: { label: "Concluido", color: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" }
+}
+
+const osStatusConfigMap = {
+  gerada: { label: "OS Gerada", variant: "secondary" as const },
+  impressa: { label: "OS Impressa", variant: "default" as const },
+  entregue_tecnico: { label: "Entregue ao Tecnico", variant: "default" as const },
+  assinada_digitalizada: { label: "OS Assinada", variant: "default" as const }
+}
+
+function ServicosAgendadosContent() {
+  return (
+    <div className="space-y-6">
+      {/* Estatísticas rápidas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Agendados</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {servicosAgendadosMock.filter(s => s.status === "agendado").length}
+                </p>
+              </div>
+              <Calendar className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Em Execucao</p>
+                <p className="text-2xl font-bold text-amber-600">
+                  {servicosAgendadosMock.filter(s => s.status === "em_execucao").length}
+                </p>
+              </div>
+              <Clock className="h-8 w-8 text-amber-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Concluidos</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {servicosAgendadosMock.filter(s => s.status === "concluido").length}
+                </p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Lista de serviços */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista de Servicos</CardTitle>
+          <CardDescription>Todos os servicos agendados com suas ordens de servico</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {servicosAgendadosMock.map((servico) => (
+              <div 
+                key={servico.id} 
+                className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-primary">{servico.osNumber}</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${agendadosStatusConfig[servico.status].color}`}>
+                        {agendadosStatusConfig[servico.status].label}
+                      </span>
+                      <Badge variant={osStatusConfigMap[servico.osStatus]?.variant || "secondary"}>
+                        {osStatusConfigMap[servico.osStatus]?.label || servico.osStatus}
+                      </Badge>
+                    </div>
+                    <h3 className="font-semibold text-lg">{servico.servico}</h3>
+                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <User className="h-4 w-4" />
+                        <span>{servico.cliente}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4" />
+                        <span>{servico.local}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        <span>{servico.data}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        <span>{servico.horario}</span>
+                      </div>
+                    </div>
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">Tecnico:</span> {servico.tecnico}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+                      <Eye className="h-4 w-4" />
+                      Ver OS
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+                      <Printer className="h-4 w-4" />
+                      Imprimir
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function ServicosPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const clienteIdParam = searchParams.get("clienteId")
 
   // Estados principais
+  const [activeTab, setActiveTab] = useState("nova-solicitacao")
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
   const [searchTerm, setSearchTerm] = useState("")
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(
@@ -216,6 +394,40 @@ export default function ServicosPage() {
 
   // Observações de acesso
   const [observacoesAcesso, setObservacoesAcesso] = useState("")
+
+  // Estados para etapa 3 - Geração da OS
+  const [osStatus, setOsStatus] = useState<OSStatus>("a_gerar")
+  const [osNumber] = useState("OS-2026-000123")
+  const [dataGeracao, setDataGeracao] = useState<string | null>(null)
+  const [dadosTecnicosVetores, setDadosTecnicosVetores] = useState<DadosTecnicosVetores>({
+    pragasAlvo: ["baratas"],
+    tipoAtividade: "quimico",
+    descricaoServico: "",
+    produtos: [],
+    medidasPreventivas: "",
+    aplicador: "FERNANDO",
+    tecnicoResponsavel: "Renato Luiz Leal Gomes",
+    registroTecnico: "55953/02 RJ"
+  })
+  const [dadosTecnicosLimpeza, setDadosTecnicosLimpeza] = useState<DadosTecnicosLimpeza>({
+    reservatorios: [],
+    aplicador: "Eryck Guimaraes",
+    tecnicoResponsavel: "Renato Luiz Leal Gomes",
+    registroTecnico: "55953/02 RJ"
+  })
+  const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
+
+  // Estados para consumo de estoque (OS Vetores)
+  const [estoqueSimulado, setEstoqueSimulado] = useState<ItemEstoque[]>(() => getEstoqueMock())
+  const [consumos, setConsumos] = useState<ConsumoItem[]>([])
+
+  // Determinar tipo de OS baseado no tipo de servico
+  const getTipoOS = (): TipoOS => {
+    if (serviceRequest.serviceType === "reservatorio_potavel") {
+      return "limpeza"
+    }
+    return "vetores"
+  }
 
   // Filtrar clientes
   const filteredClientes = clientesMock.filter(cliente =>
@@ -354,6 +566,74 @@ export default function ServicosPage() {
     }
   }
 
+  // Handlers da etapa 3 - OS
+  const handleGerarOS = () => {
+    setOsStatus("gerada")
+    setDataGeracao(new Date().toLocaleDateString('pt-BR'))
+    setToastMessage("OS gerada com sucesso!")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
+  }
+
+  const handleVisualizarPDF = () => {
+    // Já está sendo exibido na prévia
+    setToastMessage("Visualizando prévia da OS")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleImprimirOS = () => {
+    window.print()
+    if (osStatus === "gerada") {
+      setOsStatus("impressa")
+    }
+    setToastMessage("Enviando OS para impressão...")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleMarcarEntregue = () => {
+    setOsStatus("entregue_tecnico")
+    setToastMessage("OS marcada como entregue ao técnico!")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
+  }
+
+  const handleUploadAssinado = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setArquivoAssinado(file)
+      setOsStatus("assinada_digitalizada")
+      setToastMessage("OS assinada anexada com sucesso!")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+    }
+  }
+
+const handleConfirmarAgendamentoFinal = () => {
+    // Aviso não bloqueante se for Vetores e não houver consumo registrado
+    if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
+      setToastMessage("Aviso: Voce ainda nao registrou consumo de produtos. Isso pode ser preenchido apos a execucao.")
+      setShowToast(true)
+      setTimeout(() => {
+        setShowToast(false)
+        setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+        setShowToast(true)
+        setTimeout(() => {
+          setShowToast(false)
+          router.push("/dashboard/servicos/agendados")
+        }, 2000)
+      }, 3000)
+    } else {
+      setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+      setShowToast(true)
+      setTimeout(() => {
+        setShowToast(false)
+        router.push("/dashboard/servicos/agendados")
+      }, 2000)
+    }
+  }
+
   // Verificar se precisa mostrar campo de veículo
   const equipeSelecionada = equipesMock.find(e => e.id === serviceRequest.schedule.teamId)
   const mostrarVeiculo = serviceRequest.serviceType === "esgotamento" || equipeSelecionada?.tipo === "equipe_caminhao"
@@ -370,16 +650,24 @@ export default function ServicosPage() {
       <main className="container mx-auto px-4 py-8 pb-32">
         {/* Cabeçalho */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Solicitação / Agendamento de Serviço</h1>
-          <p className="text-muted-foreground">Cadastre o serviço e programe o atendimento. A OS será gerada após execução.</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Servicos</h1>
+          <p className="text-muted-foreground">Gerencie solicitacoes, agendamentos e ordens de servico.</p>
         </div>
 
-        {/* Stepper */}
+        {/* Abas superiores */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="nova-solicitacao">Nova Solicitacao</TabsTrigger>
+            <TabsTrigger value="agendados">Servicos Agendados</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="nova-solicitacao" className="mt-0">
+            {/* Stepper */}
         <div className="flex items-center justify-center gap-4 mb-8">
           {[
             { step: 1, label: "Dados do Serviço" },
             { step: 2, label: "Agendamento" },
-            { step: 3, label: "OS (rascunho)" }
+            { step: 3, label: "Geração da OS (oficial)" }
           ].map((item, index) => (
             <div key={item.step} className="flex items-center">
               <div className="flex items-center gap-2">
@@ -987,7 +1275,7 @@ export default function ServicosPage() {
           <Card>
             <CardHeader>
               <CardTitle>Confirmação do Agendamento</CardTitle>
-              <CardDescription>Revise as informações antes de gerar a OS</CardDescription>
+              <CardDescription>Revise as informações antes de avançar para a geração da OS</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1080,11 +1368,262 @@ export default function ServicosPage() {
 
               <div className="flex items-center justify-center pt-4">
                 <Badge variant="outline" className="text-lg px-4 py-2">
-                  OS será gerada após execução do serviço
+                  Clique em "Confirmar Agendamento" para gerar a OS
                 </Badge>
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* ETAPA 3 - Geração da OS (oficial) */}
+        {currentStep === 3 && (
+          <div className="space-y-6">
+            {/* CARD 1 - Identificação e Status da OS */}
+<OSHeaderCard
+  osNumber={osNumber}
+  osType={getTipoOS() === "limpeza" ? "Limpeza de Reservatorios" : "Vetores (Dedetizacao)"}
+  status={osStatus}
+              dataGeracao={dataGeracao}
+              onGerarOS={handleGerarOS}
+              onVisualizarPDF={handleVisualizarPDF}
+              onImprimir={handleImprimirOS}
+              onMarcarEntregue={handleMarcarEntregue}
+              clienteSelecionado={!!clienteSelecionado}
+              agendamentoCompleto={!!serviceRequest.schedule.date && !!serviceRequest.schedule.teamId}
+            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* CARD 2 - Dados do Cliente (somente leitura) */}
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary" />
+                    Dados do Cliente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Nome/Razão Social</span>
+                      <span className="font-medium">{clienteSelecionado?.nome}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">CPF/CNPJ</span>
+                      <span className="font-medium">{clienteSelecionado?.cpfCnpj}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Telefone</span>
+                      <span className="font-medium">{clienteSelecionado?.telefone}</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-muted-foreground">E-mail</span>
+                      <span className="font-medium">{clienteSelecionado?.email}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* CARD 3 - Local e Serviço (somente leitura) */}
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    Local e Serviço
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Local de Atendimento</span>
+                      <span className="font-medium">{localSelecionado?.nome}</span>
+                    </div>
+                    <div className="py-2 border-b">
+                      <span className="text-muted-foreground block mb-1">Endereço Completo</span>
+                      <span className="font-medium text-xs">
+                        {localSelecionado?.endereco}, {localSelecionado?.numero} - {localSelecionado?.bairro}, {localSelecionado?.cidade}/{localSelecionado?.estado} - CEP: {localSelecionado?.cep}
+                      </span>
+                    </div>
+                    {observacoesAcesso && (
+                      <div className="py-2 border-b">
+                        <span className="text-muted-foreground block mb-1">Observações de Acesso</span>
+                        <span className="font-medium">{observacoesAcesso}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Tipo de Serviço</span>
+                      <span className="font-medium">
+                        {serviceRequest.serviceType === "pragas" ? "Controle de Pragas" :
+                         serviceRequest.serviceType === "reservatorio_potavel" ? "Limpeza de Reservatório" :
+                         serviceRequest.serviceType === "esgotamento" ? "Esgotamento" :
+                         serviceRequest.serviceType === "desentupimento" ? "Desentupimento" : "Outro"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Nome do Serviço</span>
+                      <span className="font-medium">{serviceRequest.serviceName}</span>
+                    </div>
+                    {serviceRequest.warrantyDays && (
+                      <div className="flex justify-between py-2">
+                        <span className="text-muted-foreground">Garantia</span>
+                        <span className="font-medium">{serviceRequest.warrantyDays} dias</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* CARD 4 - Dados Técnicos da OS (editável) */}
+            {serviceRequest.serviceType === "pragas" ? (
+              <VetoresForm
+                dados={dadosTecnicosVetores}
+                onChange={setDadosTecnicosVetores}
+              />
+            ) : serviceRequest.serviceType === "reservatorio_potavel" ? (
+              <LimpezaForm
+                dados={dadosTecnicosLimpeza}
+                onChange={setDadosTecnicosLimpeza}
+              />
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-300">
+                    <AlertTriangle className="h-5 w-5" />
+                    <span>Template de OS ainda nao configurado para este tipo de servico. O modelo Vetores sera utilizado como padrao.</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* CARD 4.5 - Consumo de Produtos (Estoque) - Somente para Vetores */}
+            {serviceRequest.serviceType === "pragas" && (
+              <ConsumoEstoqueCard
+                consumos={consumos}
+                onConsumosChange={setConsumos}
+                estoqueSimulado={estoqueSimulado}
+                onEstoqueSimuladoChange={setEstoqueSimulado}
+              />
+            )}
+
+            {/* CARD 5 - Financeiro (somente leitura) */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  Financeiro
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Cobrança</p>
+                    <p className="font-semibold">
+                      {serviceRequest.billing.mode === "contrato" ? "Incluso em contrato" :
+                       serviceRequest.billing.mode === "avulso" ? "Avulso" : "Adicional"}
+                    </p>
+                  </div>
+                  {serviceRequest.billing.mode === "contrato" && contratoSelecionado && (
+                    <>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Contrato</p>
+                        <p className="font-semibold">{contratoSelecionado.numero}</p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Item</p>
+                        <p className="font-semibold">
+                          {contratoSelecionado.itens.find(i => i.id === serviceRequest.billing.contractItemId)?.nome || "-"}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {(serviceRequest.billing.mode === "avulso" || serviceRequest.billing.mode === "adicional") && (
+                    <>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Valor</p>
+                        <p className="font-semibold">{serviceRequest.billing.price || "-"}</p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Forma de Pagamento</p>
+                        <p className="font-semibold capitalize">{serviceRequest.billing.paymentMethod || "-"}</p>
+                      </div>
+                    </>
+                  )}
+                  {serviceRequest.billing.mode === "adicional" && (
+                    <div className="p-4 bg-muted/50 rounded-lg md:col-span-3">
+                      <p className="text-sm text-muted-foreground mb-1">Aprovado?</p>
+                      <Badge variant={serviceRequest.billing.approved ? "default" : "secondary"}>
+                        {serviceRequest.billing.approved ? "Sim, aprovado" : "Pendente de aprovação"}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* CARD 6 - Prévia do Documento (PDF Preview) */}
+            <PdfPreviewMock
+              status={osStatus}
+              osNumber={osNumber}
+              tipoOS={getTipoOS()}
+              cliente={clienteSelecionado ? {
+                nome: clienteSelecionado.nome,
+                cpfCnpj: clienteSelecionado.cpfCnpj,
+                telefone: clienteSelecionado.telefone,
+                email: clienteSelecionado.email
+              } : undefined}
+              local={localSelecionado ? {
+                endereco: `${localSelecionado.endereco}, ${localSelecionado.numero}`,
+                bairro: localSelecionado.bairro,
+                cidade: localSelecionado.cidade,
+                estado: localSelecionado.estado,
+                cep: localSelecionado.cep
+              } : undefined}
+              dadosTecnicos={getTipoOS() === "vetores" ? dadosTecnicosVetores : undefined}
+              dadosTecnicosLimpeza={getTipoOS() === "limpeza" ? dadosTecnicosLimpeza : undefined}
+              dataServico={serviceRequest.schedule.date ? new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR') : undefined}
+              consumos={getTipoOS() === "vetores" ? consumos : []}
+            />
+
+            {/* CARD 7 - Upload da OS Assinada (pós-execução) */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Upload className="h-5 w-5 text-primary" />
+                  Upload da OS Assinada (Pós-execução)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border-2 border-dashed rounded-lg p-6 text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Após a execução, faça upload da OS assinada e digitalizada
+                  </p>
+                  <Input
+                    id="osAssinada"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleUploadAssinado}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById('osAssinada')?.click()}
+                    className="gap-2 bg-transparent"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Selecionar arquivo (PDF/JPG/PNG)
+                  </Button>
+                  {arquivoAssinado && (
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                      <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="font-medium">{arquivoAssinado.name}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Modal Novo Local */}
@@ -1185,6 +1724,13 @@ export default function ServicosPage() {
             {toastMessage}
           </div>
         )}
+          </TabsContent>
+
+          {/* Aba Servicos Agendados */}
+          <TabsContent value="agendados" className="mt-0">
+            <ServicosAgendadosContent />
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Rodapé Fixo com Ações */}
@@ -1206,9 +1752,22 @@ export default function ServicosPage() {
                 Avançar para Agendamento
                 <ArrowRight className="h-4 w-4" />
               </Button>
-            ) : (
-              <Button onClick={() => setCurrentStep(3)} className="gap-2">
+            ) : currentStep === 2 ? (
+              <Button onClick={() => {
+                setCurrentStep(3)
+                // Auto-gerar OS ao avançar para etapa 3
+                handleGerarOS()
+              }} className="gap-2">
                 Confirmar Agendamento
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleConfirmarAgendamentoFinal} 
+                className="gap-2"
+                disabled={osStatus === "a_gerar"}
+              >
+                Finalizar e Confirmar
                 <CheckCircle className="h-4 w-4" />
               </Button>
             )}
