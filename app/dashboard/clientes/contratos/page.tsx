@@ -26,7 +26,8 @@ import {
   Save,
   X,
   Building2,
-  Search
+  Search,
+  Printer
 } from "lucide-react"
 import Link from "next/link"
 
@@ -595,17 +596,25 @@ export default function NovoContratoPage() {
               <X className="h-4 w-4 mr-2" />
               Cancelar
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.print()}
+              className="sm:order-2 bg-transparent"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir / PDF
+            </Button>
             <Button 
               variant="outline"
               onClick={handleSalvarECadastrarServico}
-              className="sm:order-2 bg-transparent"
+              className="sm:order-3 bg-transparent"
             >
               <ClipboardList className="h-4 w-4 mr-2" />
               Salvar e Cadastrar Serviço
             </Button>
             <Button 
               onClick={handleSalvar}
-              className="sm:order-3"
+              className="sm:order-4"
             >
               <Save className="h-4 w-4 mr-2" />
               Salvar Contrato

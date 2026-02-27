@@ -1,10 +1,10 @@
-"use client"
+﻿"use client"
 
 import { forwardRef } from "react"
 import type { DadosTecnicosVetores, PragaAlvo } from "./vetores-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
 
-// Empresa Info (mock - pode vir de configurações do sistema)
+// Empresa Info (mock - pode vir de configuraÃ§Ãµes do sistema)
 const empresaInfo = {
   nome: "Higiene Disque Higienizacoes Ltda",
   endereco: "Av Sao Gualter, 200, lote 71 B - Piratininga",
@@ -55,10 +55,12 @@ type OSDocumentVetoresProps = {
   tecnicoResponsavel?: string
   registroTecnico?: string
   consumos?: ConsumoItem[]
+  veiculo?: string
+  showDeclaracaoCupim?: boolean
 }
 
 export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresProps>(
-  ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico, consumos = [] }, ref) => {
+  ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico, consumos = [], veiculo, showDeclaracaoCupim = false }, ref) => {
     return (
       <div ref={ref} className="bg-white text-black p-8 max-w-4xl mx-auto text-xs print:text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
         {/* Header */}
@@ -158,7 +160,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
                 <span>{local.cep}</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
               <div>
                 <span className="font-bold">Telefones: </span>
                 <span>{cliente.telefone}</span>
@@ -167,6 +169,10 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
                 <span className="font-bold">E-Mail: </span>
                 <span>{cliente.email}</span>
               </div>
+            </div>
+            <div>
+              <span className="font-bold">Veiculo associado: </span>
+              <span>{veiculo || "-"}</span>
             </div>
           </div>
         </div>
@@ -344,7 +350,20 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
             )}
           </div>
         </div>
-        
+        {showDeclaracaoCupim && (
+          <div className="border border-black mb-4">
+            <div className="bg-gray-200 px-2 py-1 font-bold border-b border-black">
+              DECLARACAO PARA ASSINATURA DO CLIENTE - TRATAMENTO DE CUPIM
+            </div>
+            <div className="p-2 text-[10px] leading-tight">
+              <p>
+                Declaro que fui orientado(a) sobre os cuidados necessarios apos o tratamento de cupim,
+                incluindo tempo de reentrada, ventilacao do ambiente e manutencao preventiva para evitar reinfestacao.
+              </p>
+              <p className="mt-2 font-bold">Assinatura do cliente: _______________________________________</p>
+            </div>
+          </div>
+        )}
         {/* Assinaturas */}
         <div className="border border-black">
           <div className="grid grid-cols-4 text-[10px]">
@@ -382,3 +401,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
 )
 
 OSDocumentVetores.displayName = "OSDocumentVetores"
+
+
+
+

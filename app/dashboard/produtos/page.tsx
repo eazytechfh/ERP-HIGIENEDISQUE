@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { ErpHeader } from "@/components/erp-header"
 import { useState } from "react"
@@ -36,9 +36,9 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 
 // Tipos
-type Categoria = "Produto Químico" | "Diluente" | "Consumível" | "EPI"
+type Categoria = "Item Quimico" | "Diluente" | "Consumivel" | "Equipamentos" | "EPIs"
 type Unidade = "L" | "ml" | "g" | "kg" | "unid"
-type Status = "OK" | "Alerta" | "Crítico"
+type Status = "OK" | "Alerta" | "Critico"
 
 interface Produto {
   id: number
@@ -78,17 +78,17 @@ interface Fornecedor {
   ativo: boolean
 }
 
-// Mock database com produtos de dedetização
+// Mock database com produtos de dedetizaÃ§Ã£o
 const mockProdutos: Produto[] = [
   {
     id: 1,
     nome: "Cipermetrina 25% CE",
     marca: "Rogama",
-    fornecedor: "Distribuidora Química SA",
+    fornecedor: "Distribuidora QuÃ­mica SA",
     estoqueAtual: 45,
     estoqueMinimo: 20,
     unidade: "L",
-    categoria: "Produto Químico",
+    categoria: "Item Quimico",
     custoUnitario: 189.90,
     ativo: true,
   },
@@ -100,7 +100,7 @@ const mockProdutos: Produto[] = [
     estoqueAtual: 12,
     estoqueMinimo: 15,
     unidade: "L",
-    categoria: "Produto Químico",
+    categoria: "Item Quimico",
     custoUnitario: 245.00,
     ativo: true,
   },
@@ -112,7 +112,7 @@ const mockProdutos: Produto[] = [
     estoqueAtual: 8,
     estoqueMinimo: 25,
     unidade: "unid",
-    categoria: "Produto Químico",
+    categoria: "Item Quimico",
     custoUnitario: 78.50,
     ativo: true,
   },
@@ -120,11 +120,11 @@ const mockProdutos: Produto[] = [
     id: 4,
     nome: "Raticida Granulado",
     marca: "Citromax",
-    fornecedor: "Citromax Ind. Química",
+    fornecedor: "Citromax Ind. QuÃ­mica",
     estoqueAtual: 30,
     estoqueMinimo: 10,
     unidade: "kg",
-    categoria: "Produto Químico",
+    categoria: "Item Quimico",
     custoUnitario: 65.00,
     ativo: true,
   },
@@ -132,7 +132,7 @@ const mockProdutos: Produto[] = [
     id: 5,
     nome: "Diluente Querosene",
     marca: "Petrobras",
-    fornecedor: "Distribuidora Química SA",
+    fornecedor: "Distribuidora QuÃ­mica SA",
     estoqueAtual: 100,
     estoqueMinimo: 50,
     unidade: "L",
@@ -142,25 +142,25 @@ const mockProdutos: Produto[] = [
   },
   {
     id: 6,
-    nome: "Luva Nitrílica (Caixa 100un)",
+    nome: "Luva NitrÃ­lica (Caixa 100un)",
     marca: "Descarpack",
     fornecedor: "EPI Center",
     estoqueAtual: 15,
     estoqueMinimo: 10,
     unidade: "unid",
-    categoria: "EPI",
+    categoria: "EPIs",
     custoUnitario: 89.90,
     ativo: true,
   },
   {
     id: 7,
-    nome: "Máscara PFF2",
+    nome: "MÃ¡scara PFF2",
     marca: "3M",
     fornecedor: "EPI Center",
     estoqueAtual: 5,
     estoqueMinimo: 20,
     unidade: "unid",
-    categoria: "EPI",
+    categoria: "EPIs",
     custoUnitario: 8.50,
     ativo: true,
   },
@@ -168,11 +168,11 @@ const mockProdutos: Produto[] = [
     id: 8,
     nome: "Pulverizador Costal 20L",
     marca: "Guarany",
-    fornecedor: "Agro Peças Ltda",
+    fornecedor: "Agro PeÃ§as Ltda",
     estoqueAtual: 6,
     estoqueMinimo: 3,
     unidade: "unid",
-    categoria: "Consumível",
+    categoria: "Consumivel",
     custoUnitario: 285.00,
     ativo: true,
   },
@@ -180,11 +180,11 @@ const mockProdutos: Produto[] = [
     id: 9,
     nome: "Armadilha Adesiva Rateiro",
     marca: "Colly",
-    fornecedor: "Citromax Ind. Química",
+    fornecedor: "Citromax Ind. QuÃ­mica",
     estoqueAtual: 200,
     estoqueMinimo: 100,
     unidade: "unid",
-    categoria: "Consumível",
+    categoria: "Consumivel",
     custoUnitario: 4.50,
     ativo: true,
   },
@@ -196,13 +196,13 @@ const mockProdutos: Produto[] = [
     estoqueAtual: 18,
     estoqueMinimo: 20,
     unidade: "L",
-    categoria: "Produto Químico",
+    categoria: "Item Quimico",
     custoUnitario: 320.00,
     ativo: true,
   },
 ]
 
-const categorias: Categoria[] = ["Produto Químico", "Diluente", "Consumível", "EPI"]
+const categorias: Categoria[] = ["Item Quimico", "Diluente", "Consumivel", "Equipamentos", "EPIs"]
 const unidades: Unidade[] = ["L", "ml", "g", "kg", "unid"]
 const ufs = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
 
@@ -261,7 +261,7 @@ const mockFornecedores: Fornecedor[] = [
 ]
 
 function calcularStatus(estoqueAtual: number, estoqueMinimo: number): Status {
-  if (estoqueAtual < estoqueMinimo) return "Crítico"
+  if (estoqueAtual < estoqueMinimo) return "Critico"
   if (estoqueAtual <= estoqueMinimo * 1.2) return "Alerta"
   return "OK"
 }
@@ -270,7 +270,7 @@ function StatusBadge({ status }: { status: Status }) {
   const styles = {
     OK: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
     Alerta: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-    Crítico: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    Critico: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   }
   return (
     <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}>
@@ -283,7 +283,7 @@ function EstoqueBadge({ quantidade, status }: { quantidade: number; status: Stat
   const styles = {
     OK: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
     Alerta: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-    Crítico: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    Critico: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   }
   return (
     <span className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-sm font-medium ${styles[status]}`}>
@@ -323,7 +323,7 @@ export default function EstoquePage() {
   const [editingFornecedor, setEditingFornecedor] = useState<Fornecedor | null>(null)
   const [isNFModalOpen, setIsNFModalOpen] = useState(false)
   
-  // Formulário Cadastro
+  // FormulÃ¡rio Cadastro
   const [formData, setFormData] = useState({
     nome: "",
     marca: "",
@@ -334,7 +334,7 @@ export default function EstoquePage() {
     ativo: true,
   })
 
-  // Formulário Fornecedor
+  // FormulÃ¡rio Fornecedor
   const [fornecedorForm, setFornecedorForm] = useState({
     razaoSocial: "",
     cnpj: "",
@@ -350,7 +350,7 @@ export default function EstoquePage() {
     ativo: true,
   })
 
-  // Formulário Nota Fiscal
+  // FormulÃ¡rio Nota Fiscal
   const [nfData, setNfData] = useState({
     fornecedorId: null as number | null,
     numeroNF: "",
@@ -371,11 +371,11 @@ export default function EstoquePage() {
       nome: formData.nome,
       marca: formData.marca,
       fornecedor: formData.fornecedor,
-      estoqueAtual: 0, // Estoque começa zerado
+      estoqueAtual: 0, // Estoque comeÃ§a zerado
       estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
       unidade: formData.unidade,
       categoria: formData.categoria,
-      custoUnitario: 0, // Será definido na entrada de NF
+      custoUnitario: 0, // SerÃ¡ definido na entrada de NF
       ativo: formData.ativo,
     }
     setProdutos([...produtos, novoProduto])
@@ -585,7 +585,8 @@ export default function EstoquePage() {
       f.razaoSocial.toLowerCase().includes(searchFornecedor.toLowerCase()) ||
       f.cnpj.includes(searchFornecedor) ||
       f.telefone.includes(searchFornecedor) ||
-      f.email.toLowerCase().includes(searchFornecedor.toLowerCase())
+      f.email.toLowerCase().includes(searchFornecedor.toLowerCase()) ||
+      f.nomeContato.toLowerCase().includes(searchFornecedor.toLowerCase())
   )
 
   const fornecedoresAtivos = fornecedores.filter(f => f.ativo)
@@ -608,14 +609,14 @@ export default function EstoquePage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-foreground">Estoque</h1>
-            <p className="text-muted-foreground">Gestao completa de produtos e insumos para dedetizacao</p>
+            <p className="text-muted-foreground">Gestao completa de itens e insumos para dedetizacao</p>
           </div>
         </div>
 
         <Tabs defaultValue="visualizar" className="space-y-6">
           <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="visualizar">Visualizar Estoque</TabsTrigger>
-            <TabsTrigger value="cadastrar">Cadastrar Produto</TabsTrigger>
+            <TabsTrigger value="cadastrar">Cadastrar Item</TabsTrigger>
             <TabsTrigger value="nf">Entrada de Nota Fiscal</TabsTrigger>
             <TabsTrigger value="fornecedor">Cadastro de Fornecedor</TabsTrigger>
           </TabsList>
@@ -624,9 +625,9 @@ export default function EstoquePage() {
           <TabsContent value="visualizar" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Produtos em Estoque</CardTitle>
+                <CardTitle>Itens em Estoque</CardTitle>
                 <CardDescription>
-                  Visualize e gerencie todos os produtos cadastrados
+                  Visualize e gerencie todos os itens cadastrados
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -662,7 +663,7 @@ export default function EstoquePage() {
                       {filteredProdutos.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                            Nenhum produto encontrado
+                            Nenhum item encontrado
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -738,24 +739,24 @@ export default function EstoquePage() {
             </Card>
           </TabsContent>
 
-          {/* Cadastrar Produto */}
+          {/* Cadastrar Item */}
           <TabsContent value="cadastrar">
             <Card>
               <CardHeader>
                 <CardTitle>
-                  {editingProduct ? "Editar Produto" : "Cadastrar Novo Produto"}
+                  {editingProduct ? "Editar Item" : "Cadastrar Novo Item"}
                 </CardTitle>
                 <CardDescription>
                   {editingProduct
-                    ? "Atualize as informacoes do produto"
-                    : "Preencha os dados do produto. A quantidade sera definida via entrada de nota fiscal."}
+                    ? "Atualize as informacoes do item"
+                    : "Preencha os dados do item. A quantidade sera definida via entrada de nota fiscal."}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={editingProduct ? handleSalvarEdicao : handleCadastrar} className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="nome">Nome do Produto *</Label>
+                      <Label htmlFor="nome">Nome do Item *</Label>
                       <Input
                         id="nome"
                         name="nome"
@@ -856,14 +857,14 @@ export default function EstoquePage() {
                       onCheckedChange={(checked) => setFormData({ ...formData, ativo: checked })}
                     />
                     <Label htmlFor="ativo" className="cursor-pointer">
-                      Produto Ativo
+                      Item Ativo
                     </Label>
                   </div>
 
                   <div className="flex gap-2 pt-4">
                     <Button type="submit" className="flex-1">
                       <Plus className="h-4 w-4 mr-2" />
-                      {editingProduct ? "Salvar Alteracoes" : "Cadastrar Produto"}
+                      {editingProduct ? "Salvar Alteracoes" : "Cadastrar Item"}
                     </Button>
                     {editingProduct && (
                       <Button
@@ -900,7 +901,7 @@ export default function EstoquePage() {
                   Entrada de Nota Fiscal
                 </CardTitle>
                 <CardDescription>
-                  Registre a entrada de produtos via nota fiscal
+                  Registre a entrada de itens via nota fiscal
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -959,7 +960,7 @@ export default function EstoquePage() {
                     {nfData.itens.map((item, index) => (
                       <div key={index} className="grid gap-3 md:grid-cols-5 items-end p-4 rounded-lg border bg-muted/30">
                         <div className="space-y-2 md:col-span-1">
-                          <Label>Produto *</Label>
+                          <Label>Item *</Label>
                           <Select
                             value={item.produtoId?.toString() || ""}
                             onValueChange={(value) => handleItemNFChange(index, "produtoId", parseInt(value))}
@@ -1051,7 +1052,7 @@ export default function EstoquePage() {
           {/* Cadastro de Fornecedor */}
           <TabsContent value="fornecedor" className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
-              {/* Formulário de Cadastro */}
+              {/* FormulÃ¡rio de Cadastro */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1123,7 +1124,7 @@ export default function EstoquePage() {
                       </div>
                     </div>
 
-                    {/* Endereço */}
+                    {/* EndereÃ§o */}
                     <div className="pt-4 border-t">
                       <Label className="text-base font-semibold mb-3 block">Endereco</Label>
                       <div className="grid gap-4 md:grid-cols-2">
@@ -1246,61 +1247,54 @@ export default function EstoquePage() {
                     </div>
                   </div>
 
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    {filteredFornecedores.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        Nenhum fornecedor encontrado
-                      </div>
-                    ) : (
-                      filteredFornecedores.map((fornecedor) => (
-                        <div
-                          key={fornecedor.id}
-                          className={`p-4 rounded-lg border ${!fornecedor.ativo ? "opacity-50 bg-muted/50" : "bg-card"}`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-medium text-sm truncate">{fornecedor.razaoSocial}</h4>
-                                {!fornecedor.ativo && (
-                                  <Badge variant="secondary" className="text-xs">Inativo</Badge>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground mb-2">{fornecedor.cnpj}</p>
-                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                <span>{fornecedor.telefone}</span>
-                                <span>{fornecedor.email}</span>
-                              </div>
-                              {fornecedor.endereco.cidade && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {fornecedor.endereco.cidade}/{fornecedor.endereco.uf}
-                                </p>
-                              )}
-                              {fornecedor.nomeContato && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Contato: {fornecedor.nomeContato}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditarFornecedor(fornecedor)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleExcluirFornecedor(fornecedor.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                                    <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome</TableHead>
+                          <TableHead>CNPJ</TableHead>
+                          <TableHead>Contato</TableHead>
+                          <TableHead>Telefone</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Acoes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredFornecedores.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              Nenhum fornecedor encontrado
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredFornecedores.map((fornecedor) => (
+                            <TableRow key={fornecedor.id} className={!fornecedor.ativo ? "opacity-60" : ""}>
+                              <TableCell className="font-medium">{fornecedor.razaoSocial}</TableCell>
+                              <TableCell>{fornecedor.cnpj}</TableCell>
+                              <TableCell>{fornecedor.nomeContato || "-"}</TableCell>
+                              <TableCell>{fornecedor.telefone}</TableCell>
+                              <TableCell>{fornecedor.email}</TableCell>
+                              <TableCell>
+                                <Badge variant={fornecedor.ativo ? "default" : "secondary"}>
+                                  {fornecedor.ativo ? "Ativo" : "Inativo"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => handleEditarFornecedor(fornecedor)}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleExcluirFornecedor(fornecedor.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
@@ -1309,7 +1303,7 @@ export default function EstoquePage() {
         </Tabs>
       </main>
 
-      {/* Modal de confirmação (mantido para possível uso futuro) */}
+      {/* Modal de confirmaÃ§Ã£o (mantido para possÃ­vel uso futuro) */}
       <Dialog open={isNFModalOpen} onOpenChange={setIsNFModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1331,3 +1325,7 @@ export default function EstoquePage() {
     </div>
   )
 }
+
+
+
+

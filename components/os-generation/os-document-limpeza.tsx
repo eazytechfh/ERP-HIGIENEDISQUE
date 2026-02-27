@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { forwardRef } from "react"
 import type { DadosTecnicosLimpeza, Reservatorio } from "./limpeza-form"
@@ -42,6 +42,7 @@ type OSDocumentLimpezaProps = {
   local: LocalInfo
   dadosTecnicos: DadosTecnicosLimpeza
   dataServico: string
+  veiculo?: string
 }
 
 const materialLabels: Record<string, string> = {
@@ -63,7 +64,7 @@ const coberturaLabels: Record<string, string> = {
 }
 
 export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaProps>(
-  ({ osNumber, cliente, local, dadosTecnicos, dataServico }, ref) => {
+  ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo }, ref) => {
     const cisternas = dadosTecnicos.reservatorios.filter(r => r.tipo === "cisterna")
     const caixasDagua = dadosTecnicos.reservatorios.filter(r => r.tipo === "caixa_dagua")
 
@@ -177,7 +178,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
                 <span>{cliente.email}</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
               <div>
                 <span className="font-bold">Contatos: </span>
                 <span>{cliente.contato || "-"}</span>
@@ -186,6 +187,10 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
                 <span className="font-bold">Funcao: </span>
                 <span>{cliente.funcaoContato || "-"}</span>
               </div>
+            </div>
+            <div>
+              <span className="font-bold">Veiculo associado: </span>
+              <span>{veiculo || "-"}</span>
             </div>
           </div>
         </div>
@@ -390,3 +395,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 )
 
 OSDocumentLimpeza.displayName = "OSDocumentLimpeza"
+
+
+
+

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { ErpHeader } from "@/components/erp-header"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,12 @@ type Membro = {
   telefone: string
   cargo: string
   endereco: string
+  cpf: string
+  cnh: 'Sim' | 'Nao'
+  cnhValidade: string
+  nr33Validade: string
+  nr35Validade: string
+  asoValidade: string
   situacao: 'Ativo' | 'Inativo'
 }
 
@@ -24,27 +30,45 @@ export default function EquipePage() {
   const [membros, setMembros] = useState<Membro[]>([
     {
       id: 1,
-      nome: "João Silva",
+      nome: "Joao Silva",
       telefone: "(11) 98765-4321",
-      cargo: "Técnico em Dedetização",
-      endereco: "Rua das Flores, 123 - São Paulo/SP",
-      situacao: "Ativo"
+      cargo: "Tecnico em Dedetizacao",
+      endereco: "Rua das Flores, 123 - Sao Paulo/SP",
+      cpf: "123.456.789-00",
+      cnh: "Sim",
+      cnhValidade: "2027-10-31",
+      nr33Validade: "2026-09-15",
+      nr35Validade: "2026-11-20",
+      asoValidade: "2026-12-01",
+      situacao: "Ativo",
     },
     {
       id: 2,
       nome: "Maria Santos",
       telefone: "(11) 97654-3210",
       cargo: "Auxiliar de Limpeza",
-      endereco: "Av. Paulista, 456 - São Paulo/SP",
-      situacao: "Ativo"
+      endereco: "Av. Paulista, 456 - Sao Paulo/SP",
+      cpf: "987.654.321-00",
+      cnh: "Nao",
+      cnhValidade: "",
+      nr33Validade: "2026-06-30",
+      nr35Validade: "",
+      asoValidade: "2026-08-10",
+      situacao: "Ativo",
     },
     {
       id: 3,
       nome: "Pedro Costa",
       telefone: "(11) 96543-2109",
       cargo: "Supervisor de Equipe",
-      endereco: "Rua dos Jardins, 789 - São Paulo/SP",
-      situacao: "Ativo"
+      endereco: "Rua dos Jardins, 789 - Sao Paulo/SP",
+      cpf: "741.852.963-00",
+      cnh: "Sim",
+      cnhValidade: "2028-01-15",
+      nr33Validade: "2026-10-10",
+      nr35Validade: "2026-10-10",
+      asoValidade: "2026-07-25",
+      situacao: "Ativo",
     }
   ])
 
@@ -55,27 +79,35 @@ export default function EquipePage() {
     telefone: "",
     cargo: "",
     endereco: "",
+    cpf: "",
+    cnh: "Nao",
+    cnhValidade: "",
+    nr33Validade: "",
+    nr35Validade: "",
+    asoValidade: "",
     situacao: "Ativo"
   })
 
   const handleInputChange = (field: keyof Omit<Membro, 'id'>, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+      ...(field === 'cnh' && value === 'Nao' ? { cnhValidade: '' } : {}),
+    }))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (editingId) {
-      setMembros(prev => prev.map(m => 
-        m.id === editingId ? { ...formData, id: editingId } : m
-      ))
+      setMembros((prev) => prev.map((m) => (m.id === editingId ? { ...formData, id: editingId } : m)))
       setEditingId(null)
     } else {
       const novoMembro: Membro = {
-        id: Math.max(0, ...membros.map(m => m.id)) + 1,
-        ...formData
+        id: Math.max(0, ...membros.map((m) => m.id)) + 1,
+        ...formData,
       }
-      setMembros(prev => [...prev, novoMembro])
+      setMembros((prev) => [...prev, novoMembro])
     }
 
     setFormData({
@@ -83,6 +115,12 @@ export default function EquipePage() {
       telefone: "",
       cargo: "",
       endereco: "",
+      cpf: "",
+      cnh: "Nao",
+      cnhValidade: "",
+      nr33Validade: "",
+      nr35Validade: "",
+      asoValidade: "",
       situacao: "Ativo"
     })
   }
@@ -93,21 +131,28 @@ export default function EquipePage() {
       telefone: membro.telefone,
       cargo: membro.cargo,
       endereco: membro.endereco,
-      situacao: membro.situacao
+      cpf: membro.cpf,
+      cnh: membro.cnh,
+      cnhValidade: membro.cnhValidade,
+      nr33Validade: membro.nr33Validade,
+      nr35Validade: membro.nr35Validade,
+      asoValidade: membro.asoValidade,
+      situacao: membro.situacao,
     })
     setEditingId(membro.id)
   }
 
   const handleDelete = (id: number) => {
     if (confirm("Tem certeza que deseja excluir este membro?")) {
-      setMembros(prev => prev.filter(m => m.id !== id))
+      setMembros((prev) => prev.filter((m) => m.id !== id))
     }
   }
 
-  const filteredMembros = membros.filter(membro =>
+  const filteredMembros = membros.filter((membro) =>
     membro.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     membro.telefone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    membro.cargo.toLowerCase().includes(searchTerm.toLowerCase())
+    membro.cargo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    membro.cpf.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -130,11 +175,11 @@ export default function EquipePage() {
               <CardHeader>
                 <CardTitle>Membros da Equipe</CardTitle>
                 <CardDescription>Visualize e gerencie todos os membros cadastrados</CardDescription>
-                
+
                 <div className="relative mt-4">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Pesquisar por nome, telefone ou cargo..."
+                    placeholder="Pesquisar por nome, telefone, CPF ou cargo..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -150,9 +195,9 @@ export default function EquipePage() {
                           <th className="px-4 py-3 text-left text-sm font-medium">Nome</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Telefone</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Cargo</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Endereço</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Situação</th>
-                          <th className="px-4 py-3 text-center text-sm font-medium">Ações</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Endereco</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Situacao</th>
+                          <th className="px-4 py-3 text-center text-sm font-medium">Acoes</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -176,18 +221,10 @@ export default function EquipePage() {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-center gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEdit(membro)}
-                                  >
+                                  <Button variant="outline" size="sm" onClick={() => handleEdit(membro)}>
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDelete(membro.id)}
-                                  >
+                                  <Button variant="outline" size="sm" onClick={() => handleDelete(membro.id)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
                                 </div>
@@ -215,7 +252,7 @@ export default function EquipePage() {
                   {editingId ? 'Editar Membro' : 'Cadastrar Novo Membro'}
                 </CardTitle>
                 <CardDescription>
-                  {editingId ? 'Atualize as informações do membro' : 'Preencha os dados do novo membro da equipe'}
+                  {editingId ? 'Atualize as informacoes do membro' : 'Preencha os dados do novo membro da equipe'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -223,43 +260,47 @@ export default function EquipePage() {
                   <div className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="nome">Nome Completo *</Label>
-                      <Input
-                        id="nome"
-                        placeholder="Digite o nome completo"
-                        value={formData.nome}
-                        onChange={(e) => handleInputChange('nome', e.target.value)}
-                        required
-                      />
+                      <Input id="nome" placeholder="Digite o nome completo" value={formData.nome} onChange={(e) => handleInputChange('nome', e.target.value)} required />
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="telefone">Telefone *</Label>
-                      <Input
-                        id="telefone"
-                        placeholder="(00) 00000-0000"
-                        value={formData.telefone}
-                        onChange={(e) => handleInputChange('telefone', e.target.value)}
-                        required
-                      />
+                      <Input id="telefone" placeholder="(00) 00000-0000" value={formData.telefone} onChange={(e) => handleInputChange('telefone', e.target.value)} required />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cpf">CPF *</Label>
+                      <Input id="cpf" placeholder="000.000.000-00" value={formData.cpf} onChange={(e) => handleInputChange('cpf', e.target.value)} required />
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="cargo">Cargo *</Label>
-                      <Input
-                        id="cargo"
-                        placeholder="Digite o cargo"
-                        value={formData.cargo}
-                        onChange={(e) => handleInputChange('cargo', e.target.value)}
-                        required
-                      />
+                      <Input id="cargo" placeholder="Digite o cargo" value={formData.cargo} onChange={(e) => handleInputChange('cargo', e.target.value)} required />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="situacao">Situação *</Label>
-                      <Select
-                        value={formData.situacao}
-                        onValueChange={(value) => handleInputChange('situacao', value as 'Ativo' | 'Inativo')}
-                      >
+                      <Label htmlFor="cnh">CNH</Label>
+                      <Select value={formData.cnh} onValueChange={(value) => handleInputChange('cnh', value as 'Sim' | 'Nao')}>
+                        <SelectTrigger id="cnh">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Sim">Sim</SelectItem>
+                          <SelectItem value="Nao">Nao</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {formData.cnh === 'Sim' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="cnhValidade">Validade da CNH *</Label>
+                        <Input id="cnhValidade" type="date" value={formData.cnhValidade} onChange={(e) => handleInputChange('cnhValidade', e.target.value)} required />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="situacao">Situacao *</Label>
+                      <Select value={formData.situacao} onValueChange={(value) => handleInputChange('situacao', value as 'Ativo' | 'Inativo')}>
                         <SelectTrigger id="situacao">
                           <SelectValue />
                         </SelectTrigger>
@@ -271,14 +312,26 @@ export default function EquipePage() {
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="endereco">Endereço Completo *</Label>
-                      <Input
-                        id="endereco"
-                        placeholder="Rua, número, bairro, cidade/estado"
-                        value={formData.endereco}
-                        onChange={(e) => handleInputChange('endereco', e.target.value)}
-                        required
-                      />
+                      <Label htmlFor="endereco">Endereco Completo *</Label>
+                      <Input id="endereco" placeholder="Rua, numero, bairro, cidade/estado" value={formData.endereco} onChange={(e) => handleInputChange('endereco', e.target.value)} required />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-2">
+                    <h3 className="text-sm font-semibold text-foreground">Treinamentos e Validades</h3>
+                    <div className="grid gap-6 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="nr33">NR33 - Validade</Label>
+                        <Input id="nr33" type="date" value={formData.nr33Validade} onChange={(e) => handleInputChange('nr33Validade', e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="nr35">NR35 - Validade</Label>
+                        <Input id="nr35" type="date" value={formData.nr35Validade} onChange={(e) => handleInputChange('nr35Validade', e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="aso">ASO - Validade</Label>
+                        <Input id="aso" type="date" value={formData.asoValidade} onChange={(e) => handleInputChange('asoValidade', e.target.value)} />
+                      </div>
                     </div>
                   </div>
 
@@ -297,7 +350,13 @@ export default function EquipePage() {
                             telefone: "",
                             cargo: "",
                             endereco: "",
-                            situacao: "Ativo"
+                            cpf: "",
+                            cnh: "Nao",
+                            cnhValidade: "",
+                            nr33Validade: "",
+                            nr35Validade: "",
+                            asoValidade: "",
+                            situacao: "Ativo",
                           })
                         }}
                       >

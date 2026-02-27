@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import React from "react"
 
@@ -85,7 +85,7 @@ type Contrato = {
   itens: { id: string; nome: string }[]
 }
 
-type BillingMode = "contrato" | "avulso" | "adicional"
+type BillingMode = "contrato" | "adicional"
 
 type ServiceRequest = {
   clientId: string
@@ -97,7 +97,7 @@ type ServiceRequest = {
     date: string
     startTime: string
     endTime: string
-    teamId: string
+    teamIds: string[]
     vehicleId: string
   }
   billing: {
@@ -106,6 +106,7 @@ type ServiceRequest = {
     contractItemId?: string
     price?: string
     paymentMethod?: string
+    billingDocument?: "recibo" | "nota_fiscal"
     additionalReason?: string
     approved?: boolean
   }
@@ -174,7 +175,36 @@ const contratosMock: Contrato[] = [
 ]
 
 // Mock data de serviços agendados
-const servicosAgendadosMock = [
+
+type StatusAgendado = "agendado" | "em_execucao" | "concluido"
+
+type ServicoAgendado = {
+  id: string
+  osNumber: string
+  cliente: string
+  servico: string
+  tipo: string
+  local: string
+  data: string
+  horario: string
+  tecnico: string
+  status: StatusAgendado
+  osStatus: Exclude<OSStatus, "a_gerar">
+}
+
+type OSViewerData = {
+  osNumber: string
+  servico: string
+  cliente: string
+  local: string
+  data: string
+  horario: string
+  tecnico: string
+  status: StatusAgendado
+  osStatus: Exclude<OSStatus, "a_gerar">
+}
+
+const servicosAgendadosMock: ServicoAgendado[] = [
   {
     id: "1",
     osNumber: "OS-2026-000123",
@@ -185,8 +215,8 @@ const servicosAgendadosMock = [
     data: "05/02/2026",
     horario: "09:00 - 11:00",
     tecnico: "Carlos - Tecnico",
-    status: "agendado" as const,
-    osStatus: "gerada" as const
+    status: "agendado",
+    osStatus: "gerada",
   },
   {
     id: "2",
@@ -198,8 +228,8 @@ const servicosAgendadosMock = [
     data: "04/02/2026",
     horario: "14:00 - 17:00",
     tecnico: "Ana - Tecnica",
-    status: "em_execucao" as const,
-    osStatus: "entregue_tecnico" as const
+    status: "em_execucao",
+    osStatus: "entregue_tecnico",
   },
   {
     id: "3",
@@ -211,37 +241,44 @@ const servicosAgendadosMock = [
     data: "03/02/2026",
     horario: "08:00 - 12:00",
     tecnico: "Carlos - Tecnico",
-    status: "concluido" as const,
-    osStatus: "assinada_digitalizada" as const
-  }
+    status: "concluido",
+    osStatus: "assinada_digitalizada",
+  },
 ]
 
 const agendadosStatusConfig = {
   agendado: { label: "Agendado", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
   em_execucao: { label: "Em Execucao", color: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
-  concluido: { label: "Concluido", color: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" }
+  concluido: { label: "Concluido", color: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" },
 }
 
 const osStatusConfigMap = {
   gerada: { label: "OS Gerada", variant: "secondary" as const },
   impressa: { label: "OS Impressa", variant: "default" as const },
   entregue_tecnico: { label: "Entregue ao Tecnico", variant: "default" as const },
-  assinada_digitalizada: { label: "OS Assinada", variant: "default" as const }
+  assinada_digitalizada: { label: "OS Assinada", variant: "default" as const },
 }
 
-function ServicosAgendadosContent() {
+function ServicosAgendadosContent({
+  servicos,
+  onVerOS,
+  onImprimirOS,
+  onAtualizarStatus,
+}: {
+  servicos: ServicoAgendado[]
+  onVerOS: (servico: ServicoAgendado) => void
+  onImprimirOS: (servico: ServicoAgendado) => void
+  onAtualizarStatus: (id: string, status: StatusAgendado) => void
+}) {
   return (
     <div className="space-y-6">
-      {/* Estatísticas rápidas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Agendados</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {servicosAgendadosMock.filter(s => s.status === "agendado").length}
-                </p>
+                <p className="text-2xl font-bold text-blue-600">{servicos.filter((s) => s.status === "agendado").length}</p>
               </div>
               <Calendar className="h-8 w-8 text-blue-600" />
             </div>
@@ -252,9 +289,7 @@ function ServicosAgendadosContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Em Execucao</p>
-                <p className="text-2xl font-bold text-amber-600">
-                  {servicosAgendadosMock.filter(s => s.status === "em_execucao").length}
-                </p>
+                <p className="text-2xl font-bold text-amber-600">{servicos.filter((s) => s.status === "em_execucao").length}</p>
               </div>
               <Clock className="h-8 w-8 text-amber-600" />
             </div>
@@ -265,9 +300,7 @@ function ServicosAgendadosContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Concluidos</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {servicosAgendadosMock.filter(s => s.status === "concluido").length}
-                </p>
+                <p className="text-2xl font-bold text-green-600">{servicos.filter((s) => s.status === "concluido").length}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
@@ -275,7 +308,6 @@ function ServicosAgendadosContent() {
         </Card>
       </div>
 
-      {/* Lista de serviços */}
       <Card>
         <CardHeader>
           <CardTitle>Lista de Servicos</CardTitle>
@@ -283,11 +315,8 @@ function ServicosAgendadosContent() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {servicosAgendadosMock.map((servico) => (
-              <div 
-                key={servico.id} 
-                className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
-              >
+            {servicos.map((servico) => (
+              <div key={servico.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-3">
@@ -301,36 +330,34 @@ function ServicosAgendadosContent() {
                     </div>
                     <h3 className="font-semibold text-lg">{servico.servico}</h3>
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <User className="h-4 w-4" />
-                        <span>{servico.cliente}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        <span>{servico.local}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{servico.data}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{servico.horario}</span>
-                      </div>
+                      <div className="flex items-center gap-1"><User className="h-4 w-4" /><span>{servico.cliente}</span></div>
+                      <div className="flex items-center gap-1"><MapPin className="h-4 w-4" /><span>{servico.local}</span></div>
+                      <div className="flex items-center gap-1"><Calendar className="h-4 w-4" /><span>{servico.data}</span></div>
+                      <div className="flex items-center gap-1"><Clock className="h-4 w-4" /><span>{servico.horario}</span></div>
                     </div>
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Tecnico:</span> {servico.tecnico}
-                    </p>
+                    <p className="text-sm"><span className="text-muted-foreground">Tecnico:</span> {servico.tecnico}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onVerOS(servico)}>
                       <Eye className="h-4 w-4" />
                       Ver OS
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+                    <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onImprimirOS(servico)}>
                       <Printer className="h-4 w-4" />
                       Imprimir
                     </Button>
+                    <Select
+                      value={servico.status === "agendado" ? undefined : servico.status}
+                      onValueChange={(value) => onAtualizarStatus(servico.id, value as StatusAgendado)}
+                    >
+                      <SelectTrigger className="w-[170px] h-9">
+                        <SelectValue placeholder="STATUS OS" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="em_execucao">Em execucao</SelectItem>
+                        <SelectItem value="concluido">Dar baixa (Concluido)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -375,11 +402,11 @@ export default function ServicosPage() {
       date: "",
       startTime: "",
       endTime: "",
-      teamId: "",
+      teamIds: [],
       vehicleId: ""
     },
     billing: {
-      mode: "avulso",
+      mode: "contrato",
       price: "",
       paymentMethod: ""
     },
@@ -418,8 +445,16 @@ export default function ServicosPage() {
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
 
   // Estados para consumo de estoque (OS Vetores)
+  const [estoqueBase] = useState<ItemEstoque[]>(() => getEstoqueMock())
   const [estoqueSimulado, setEstoqueSimulado] = useState<ItemEstoque[]>(() => getEstoqueMock())
   const [consumos, setConsumos] = useState<ConsumoItem[]>([])
+  const [showBaixaServicoModal, setShowBaixaServicoModal] = useState(false)
+  const [baixaStep, setBaixaStep] = useState<1 | 2>(1)
+  const [baixaError, setBaixaError] = useState("")
+  const [baixaDraft, setBaixaDraft] = useState<Record<string, { quantidade: string; observacao: string }>>({})
+  const [servicosAgendados, setServicosAgendados] = useState<ServicoAgendado[]>(servicosAgendadosMock)
+  const [showOSViewerModal, setShowOSViewerModal] = useState(false)
+  const [selectedAgendadaOS, setSelectedAgendadaOS] = useState<OSViewerData | null>(null)
 
   // Determinar tipo de OS baseado no tipo de servico
   const getTipoOS = (): TipoOS => {
@@ -430,11 +465,21 @@ export default function ServicosPage() {
   }
 
   // Filtrar clientes
-  const filteredClientes = clientesMock.filter(cliente =>
-    cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.telefone.includes(searchTerm) ||
-    cliente.cpfCnpj.includes(searchTerm)
-  )
+  const filteredClientes = clientesMock.filter((cliente) => {
+    const term = searchTerm.toLowerCase()
+    const enderecoMatch = (locaisPorCliente[cliente.id] || []).some((local) =>
+      `${local.nome} ${local.endereco} ${local.numero} ${local.bairro} ${local.cidade} ${local.estado} ${local.cep}`
+        .toLowerCase()
+        .includes(term)
+    )
+
+    return (
+      cliente.nome.toLowerCase().includes(term) ||
+      cliente.telefone.includes(searchTerm) ||
+      cliente.cpfCnpj.includes(searchTerm) ||
+      enderecoMatch
+    )
+  })
 
   // Handlers
   const handleClienteSelect = (cliente: Cliente) => {
@@ -465,6 +510,24 @@ export default function ServicosPage() {
     }))
     if (errors[`schedule.${field}`]) {
       setErrors(prev => ({ ...prev, [`schedule.${field}`]: "" }))
+    }
+  }
+
+  const handleToggleResponsavel = (teamId: string) => {
+    setServiceRequest((prev) => {
+      const alreadySelected = prev.schedule.teamIds.includes(teamId)
+      const nextTeamIds = alreadySelected
+        ? prev.schedule.teamIds.filter((id) => id !== teamId)
+        : [...prev.schedule.teamIds, teamId]
+
+      return {
+        ...prev,
+        schedule: { ...prev.schedule, teamIds: nextTeamIds },
+      }
+    })
+
+    if (errors["schedule.teamIds"]) {
+      setErrors((prev) => ({ ...prev, ["schedule.teamIds"]: "" }))
     }
   }
 
@@ -518,21 +581,22 @@ export default function ServicosPage() {
     if (!serviceRequest.schedule.date) newErrors["schedule.date"] = "Informe a data"
     if (!serviceRequest.schedule.startTime) newErrors["schedule.startTime"] = "Informe o horário de início"
     if (!serviceRequest.schedule.endTime) newErrors["schedule.endTime"] = "Informe o horário de término"
-    if (!serviceRequest.schedule.teamId) newErrors["schedule.teamId"] = "Selecione o responsável"
+    if (serviceRequest.schedule.teamIds.length === 0) newErrors["schedule.teamIds"] = "Selecione ao menos um responsável"
 
     // Validação de veículo para esgotamento ou equipe_caminhao
-    const equipeSelecionada = equipesMock.find(e => e.id === serviceRequest.schedule.teamId)
+    const temEquipeCaminhao = serviceRequest.schedule.teamIds.some((teamId) => equipesMock.find((e) => e.id === teamId)?.tipo === "equipe_caminhao")
     if (
-      (serviceRequest.serviceType === "esgotamento" || equipeSelecionada?.tipo === "equipe_caminhao") &&
+      (serviceRequest.serviceType === "esgotamento" || temEquipeCaminhao) &&
       !serviceRequest.schedule.vehicleId
     ) {
       newErrors["schedule.vehicleId"] = "Selecione o veículo"
     }
 
     // Validação de billing
-    if (serviceRequest.billing.mode === "avulso" || serviceRequest.billing.mode === "adicional") {
+    if (serviceRequest.billing.mode === "adicional") {
       if (!serviceRequest.billing.price) newErrors["billing.price"] = "Informe o valor"
       if (!serviceRequest.billing.paymentMethod) newErrors["billing.paymentMethod"] = "Selecione a forma de pagamento"
+      if (!serviceRequest.billing.billingDocument) newErrors["billing.billingDocument"] = "Selecione o documento de cobrança"
     }
     if (serviceRequest.billing.mode === "adicional" && !serviceRequest.billing.additionalReason) {
       newErrors["billing.additionalReason"] = "Informe o motivo do adicional"
@@ -591,12 +655,122 @@ export default function ServicosPage() {
     setShowToast(true)
     setTimeout(() => setShowToast(false), 2000)
   }
-
   const handleMarcarEntregue = () => {
     setOsStatus("entregue_tecnico")
-    setToastMessage("OS marcada como entregue ao técnico!")
+    setToastMessage("OS marcada como entregue ao tecnico!")
     setShowToast(true)
     setTimeout(() => setShowToast(false), 3000)
+  }
+
+  const handleOpenBaixaServicoModal = () => {
+    const consumoPorProduto = consumos.reduce<Record<string, { quantidade: number; observacao: string }>>((acc, consumo) => {
+      const current = acc[consumo.produtoId]
+      if (current) {
+        acc[consumo.produtoId] = {
+          quantidade: current.quantidade + consumo.quantidade,
+          observacao: current.observacao || consumo.observacao || "",
+        }
+      } else {
+        acc[consumo.produtoId] = {
+          quantidade: consumo.quantidade,
+          observacao: consumo.observacao || "",
+        }
+      }
+      return acc
+    }, {})
+
+    const draftInicial: Record<string, { quantidade: string; observacao: string }> = {}
+    estoqueBase.forEach((item) => {
+      const consumoAtual = consumoPorProduto[item.id]
+      draftInicial[item.id] = {
+        quantidade: consumoAtual ? String(consumoAtual.quantidade) : "",
+        observacao: consumoAtual?.observacao || "",
+      }
+    })
+
+    setBaixaDraft(draftInicial)
+    setBaixaError("")
+    setBaixaStep(1)
+    setShowBaixaServicoModal(true)
+  }
+
+  const handleBaixaDraftChange = (itemId: string, field: "quantidade" | "observacao", value: string) => {
+    setBaixaDraft((prev) => ({
+      ...prev,
+      [itemId]: {
+        quantidade: prev[itemId]?.quantidade || "",
+        observacao: prev[itemId]?.observacao || "",
+        [field]: value,
+      },
+    }))
+    if (baixaError) {
+      setBaixaError("")
+    }
+  }
+
+  const itensSelecionadosBaixa = estoqueBase
+    .map((item) => {
+      const quantidade = Number.parseFloat(baixaDraft[item.id]?.quantidade || "0")
+      if (!Number.isFinite(quantidade) || quantidade <= 0) {
+        return null
+      }
+      return {
+        item,
+        quantidade,
+        observacao: baixaDraft[item.id]?.observacao || "",
+      }
+    })
+    .filter((entry): entry is { item: ItemEstoque; quantidade: number; observacao: string } => entry !== null)
+
+  const handleAvancarBaixaStep = () => {
+    if (itensSelecionadosBaixa.length === 0) {
+      setBaixaError("Informe ao menos um item consumido para dar baixa no servico.")
+      return
+    }
+
+    const itemComSaldoInsuficiente = itensSelecionadosBaixa.find(({ item, quantidade }) => quantidade > item.estoqueAtual)
+    if (itemComSaldoInsuficiente) {
+      setBaixaError(
+        `Quantidade informada para ${itemComSaldoInsuficiente.item.nome} excede o estoque mock (${itemComSaldoInsuficiente.item.estoqueAtual} ${itemComSaldoInsuficiente.item.unidadePadrao}).`
+      )
+      return
+    }
+
+    setBaixaError("")
+    setBaixaStep(2)
+  }
+
+  const handleConfirmarBaixaServico = () => {
+    const novosConsumos: ConsumoItem[] = itensSelecionadosBaixa.map(({ item, quantidade, observacao }, index) => ({
+      id: `baixa-${Date.now()}-${index}`,
+      produtoId: item.id,
+      produtoNome: item.nome,
+      categoria: item.categoria,
+      quantidade,
+      unidade: item.unidadePadrao,
+      estoqueAntes: item.estoqueAtual,
+      saldoEstimado: item.estoqueAtual - quantidade,
+      observacao,
+    }))
+
+    const novoEstoque = estoqueBase.map((item) => {
+      const selecionado = itensSelecionadosBaixa.find(({ item: baseItem }) => baseItem.id === item.id)
+      if (!selecionado) {
+        return { ...item }
+      }
+      return {
+        ...item,
+        estoqueAtual: item.estoqueAtual - selecionado.quantidade,
+      }
+    })
+
+    setConsumos(novosConsumos)
+    setEstoqueSimulado(novoEstoque)
+    setShowBaixaServicoModal(false)
+    setBaixaStep(1)
+    setToastMessage("Baixa do servico registrada em estado local.")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2500)
   }
 
   const handleUploadAssinado = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -610,8 +784,89 @@ export default function ServicosPage() {
     }
   }
 
+  const handleVerOSAgendada = (servico: ServicoAgendado) => {
+    setSelectedAgendadaOS({
+      osNumber: servico.osNumber,
+      servico: servico.servico,
+      cliente: servico.cliente,
+      local: servico.local,
+      data: servico.data,
+      horario: servico.horario,
+      tecnico: servico.tecnico,
+      status: servico.status,
+      osStatus: servico.osStatus,
+    })
+    setShowOSViewerModal(true)
+  }
+
+  const handleImprimirOSAgendada = (servico: ServicoAgendado) => {
+    handleVerOSAgendada(servico)
+    window.print()
+    setServicosAgendados((prev) =>
+      prev.map((item) => (item.id === servico.id && item.osStatus === "gerada" ? { ...item, osStatus: "impressa" } : item))
+    )
+    setToastMessage(`Impressao da ${servico.osNumber} enviada.`)
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleAtualizarStatusAgendada = (id: string, status: StatusAgendado) => {
+    setServicosAgendados((prev) =>
+      prev.map((servico) => {
+        if (servico.id !== id) {
+          return servico
+        }
+
+        let osStatusAtualizado = servico.osStatus
+        if (status === "em_execucao") {
+          osStatusAtualizado = "entregue_tecnico"
+        }
+        if (status === "concluido") {
+          osStatusAtualizado = "assinada_digitalizada"
+        }
+
+        return {
+          ...servico,
+          status,
+          osStatus: osStatusAtualizado,
+        }
+      })
+    )
+  }
+
+  const gerarProximoNumeroOS = () => {
+    const maiorNumero = servicosAgendados.reduce((acc, item) => {
+      const match = item.osNumber.match(/(\d+)$/)
+      const numeroAtual = match ? Number.parseInt(match[1], 10) : 0
+      return Math.max(acc, numeroAtual)
+    }, 0)
+    return `OS-2026-${String(maiorNumero + 1).padStart(6, "0")}`
+  }
+
 const handleConfirmarAgendamentoFinal = () => {
-    // Aviso não bloqueante se for Vetores e não houver consumo registrado
+    const localTexto = localSelecionado
+      ? `${localSelecionado.nome} - ${localSelecionado.endereco}, ${localSelecionado.numero}`
+      : "Local nao informado"
+    const dataFormatada = serviceRequest.schedule.date
+      ? new Date(`${serviceRequest.schedule.date}T00:00:00`).toLocaleDateString("pt-BR")
+      : "-"
+    const horarioFormatado = `${serviceRequest.schedule.startTime || "--:--"} - ${serviceRequest.schedule.endTime || "--:--"}`
+    const novoServico: ServicoAgendado = {
+      id: `ag-${Date.now()}`,
+      osNumber: gerarProximoNumeroOS(),
+      cliente: clienteSelecionado?.nome || "Cliente nao informado",
+      servico: serviceRequest.serviceName || "Servico sem nome",
+      tipo: serviceRequest.serviceType || "outro",
+      local: localTexto,
+      data: dataFormatada,
+      horario: horarioFormatado,
+      tecnico: nomesResponsaveisSelecionados.join(", ") || "Responsavel nao informado",
+      status: "agendado",
+      osStatus: "gerada",
+    }
+    setServicosAgendados((prev) => [novoServico, ...prev])
+
+    // Aviso nao bloqueante se for Vetores e nao houver consumo registrado
     if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
       setToastMessage("Aviso: Voce ainda nao registrou consumo de produtos. Isso pode ser preenchido apos a execucao.")
       setShowToast(true)
@@ -621,7 +876,7 @@ const handleConfirmarAgendamentoFinal = () => {
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
-          router.push("/dashboard/servicos/agendados")
+          setActiveTab("agendados")
         }, 2000)
       }, 3000)
     } else {
@@ -629,14 +884,21 @@ const handleConfirmarAgendamentoFinal = () => {
       setShowToast(true)
       setTimeout(() => {
         setShowToast(false)
-        router.push("/dashboard/servicos/agendados")
+        setActiveTab("agendados")
       }, 2000)
     }
   }
 
   // Verificar se precisa mostrar campo de veículo
-  const equipeSelecionada = equipesMock.find(e => e.id === serviceRequest.schedule.teamId)
-  const mostrarVeiculo = serviceRequest.serviceType === "esgotamento" || equipeSelecionada?.tipo === "equipe_caminhao"
+  const temEquipeCaminhao = serviceRequest.schedule.teamIds.some((teamId) => equipesMock.find((e) => e.id === teamId)?.tipo === "equipe_caminhao")
+  const mostrarVeiculo = serviceRequest.serviceType === "esgotamento" || temEquipeCaminhao
+  const equipesSelecionadas = equipesMock.filter((e) => serviceRequest.schedule.teamIds.includes(e.id))
+  const nomesResponsaveisSelecionados = equipesSelecionadas.map((e) => e.nome)
+  const veiculoSelecionado = veiculosMock.find((v) => v.id === serviceRequest.schedule.vehicleId)
+  const isServicoCupim = serviceRequest.serviceType === "pragas" && (
+    serviceRequest.serviceName.toLowerCase().includes("cupim") ||
+    dadosTecnicosVetores.pragasAlvo.includes("cupins")
+  )
 
   // Obter local selecionado
   const localSelecionado = locaisCliente.find(l => l.id === serviceRequest.locationId)
@@ -691,7 +953,7 @@ const handleConfirmarAgendamentoFinal = () => {
 
         {currentStep === 1 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* COLUNA ESQUERDA — Selecionar Cliente */}
+            {/* COLUNA ESQUERDA - Selecionar Cliente */}
             <Card className="lg:col-span-1">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -705,7 +967,7 @@ const handleConfirmarAgendamentoFinal = () => {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Nome, telefone, CPF ou CNPJ..."
+                      placeholder="Nome, telefone, endereço, CPF ou CNPJ..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
@@ -746,9 +1008,9 @@ const handleConfirmarAgendamentoFinal = () => {
               </CardContent>
             </Card>
 
-            {/* COLUNA DIREITA — Formulário */}
+            {/* COLUNA DIREITA - Formulario */}
             <div className="lg:col-span-2 space-y-6">
-              {/* SEÇÃO 1 — Informações do Serviço */}
+              {/* SECAO 1 - Informacoes do Servico */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -804,7 +1066,7 @@ const handleConfirmarAgendamentoFinal = () => {
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 2 — Local de Atendimento */}
+              {/* SECAO 2 - Local de Atendimento */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -872,7 +1134,7 @@ const handleConfirmarAgendamentoFinal = () => {
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 3 — Agendamento */}
+              {/* SECAO 3 - Agendamento */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -919,38 +1181,74 @@ const handleConfirmarAgendamentoFinal = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="team">Responsável (Equipe/Técnico) *</Label>
-                      <Select
-                        value={serviceRequest.schedule.teamId}
-                        onValueChange={(value) => handleScheduleChange("teamId", value)}
-                      >
-                        <SelectTrigger className={errors["schedule.teamId"] ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Selecione o responsável" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="tecnico_individual" disabled className="font-semibold text-muted-foreground">
-                            Técnico Individual
-                          </SelectItem>
-                          {equipesMock.filter(e => e.tipo === "tecnico_individual").map(eq => (
-                            <SelectItem key={eq.id} value={eq.id}>{eq.nome}</SelectItem>
-                          ))}
-                          <SelectItem value="equipe_limpeza" disabled className="font-semibold text-muted-foreground">
-                            Equipe de Limpeza
-                          </SelectItem>
-                          {equipesMock.filter(e => e.tipo === "equipe_limpeza").map(eq => (
-                            <SelectItem key={eq.id} value={eq.id}>{eq.nome}</SelectItem>
-                          ))}
-                          <SelectItem value="equipe_caminhao" disabled className="font-semibold text-muted-foreground">
-                            Equipe + Caminhão
-                          </SelectItem>
-                          {equipesMock.filter(e => e.tipo === "equipe_caminhao").map(eq => (
-                            <SelectItem key={eq.id} value={eq.id}>{eq.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {errors["schedule.teamId"] && <p className="text-sm text-destructive">{errors["schedule.teamId"]}</p>}
+                                            <Label htmlFor="team">Responsáveis (Equipe/Técnico) *</Label>
+                      <div className={`space-y-3 rounded-md border p-3 ${errors["schedule.teamIds"] ? "border-destructive" : "border-input"}`}>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">Técnico Individual</p>
+                          <div className="flex flex-wrap gap-2">
+                            {equipesMock.filter(e => e.tipo === "tecnico_individual").map(eq => {
+                              const selected = serviceRequest.schedule.teamIds.includes(eq.id)
+                              return (
+                                <Button
+                                  key={eq.id}
+                                  type="button"
+                                  variant={selected ? "default" : "outline"}
+                                  className="h-8"
+                                  onClick={() => handleToggleResponsavel(eq.id)}
+                                >
+                                  {eq.nome}
+                                </Button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">Equipe de Limpeza</p>
+                          <div className="flex flex-wrap gap-2">
+                            {equipesMock.filter(e => e.tipo === "equipe_limpeza").map(eq => {
+                              const selected = serviceRequest.schedule.teamIds.includes(eq.id)
+                              return (
+                                <Button
+                                  key={eq.id}
+                                  type="button"
+                                  variant={selected ? "default" : "outline"}
+                                  className="h-8"
+                                  onClick={() => handleToggleResponsavel(eq.id)}
+                                >
+                                  {eq.nome}
+                                </Button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">Equipe + Caminhão</p>
+                          <div className="flex flex-wrap gap-2">
+                            {equipesMock.filter(e => e.tipo === "equipe_caminhao").map(eq => {
+                              const selected = serviceRequest.schedule.teamIds.includes(eq.id)
+                              return (
+                                <Button
+                                  key={eq.id}
+                                  type="button"
+                                  variant={selected ? "default" : "outline"}
+                                  className="h-8"
+                                  onClick={() => handleToggleResponsavel(eq.id)}
+                                >
+                                  {eq.nome}
+                                </Button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                        {serviceRequest.schedule.teamIds.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Selecionados: {nomesResponsaveisSelecionados.join(", ")}
+                          </p>
+                        )}
+                      </div>
+                      {errors["schedule.teamIds"] && <p className="text-sm text-destructive">{errors["schedule.teamIds"]}</p>}
                     </div>
 
                     {mostrarVeiculo && (
@@ -978,7 +1276,7 @@ const handleConfirmarAgendamentoFinal = () => {
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 4 — Financeiro do Serviço */}
+              {/* SECAO 4 - Financeiro do Servico */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -997,10 +1295,6 @@ const handleConfirmarAgendamentoFinal = () => {
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="contrato" id="contrato" />
                         <Label htmlFor="contrato" className="font-normal cursor-pointer">Incluso em contrato</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="avulso" id="avulso" />
-                        <Label htmlFor="avulso" className="font-normal cursor-pointer">Avulso</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="adicional" id="adicional" />
@@ -1062,9 +1356,9 @@ const handleConfirmarAgendamentoFinal = () => {
                     </div>
                   )}
 
-                  {(serviceRequest.billing.mode === "avulso" || serviceRequest.billing.mode === "adicional") && (
+                  {(serviceRequest.billing.mode === "adicional") && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="price">Valor do Serviço *</Label>
                           <Input
@@ -1095,6 +1389,22 @@ const handleConfirmarAgendamentoFinal = () => {
                             </SelectContent>
                           </Select>
                           {errors["billing.paymentMethod"] && <p className="text-sm text-destructive">{errors["billing.paymentMethod"]}</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="billingDocument">Documento de cobrança *</Label>
+                          <Select
+                            value={serviceRequest.billing.billingDocument || ""}
+                            onValueChange={(value) => handleBillingChange("billingDocument", value)}
+                          >
+                            <SelectTrigger className={errors["billing.billingDocument"] ? "border-destructive" : ""}>
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="recibo">Recibo</SelectItem>
+                              <SelectItem value="nota_fiscal">Nota Fiscal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {errors["billing.billingDocument"] && <p className="text-sm text-destructive">{errors["billing.billingDocument"]}</p>}
                         </div>
                       </div>
 
@@ -1137,7 +1447,7 @@ const handleConfirmarAgendamentoFinal = () => {
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 5 — Garantia */}
+              {/* SECAO 5 - Garantia */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -1163,7 +1473,7 @@ const handleConfirmarAgendamentoFinal = () => {
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 6 — Anexos */}
+              {/* SECAO 6 - Anexos */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -1253,14 +1563,14 @@ const handleConfirmarAgendamentoFinal = () => {
                     <div>
                       <p className="text-muted-foreground">Responsável</p>
                       <p className="font-medium">
-                        {equipesMock.find(e => e.id === serviceRequest.schedule.teamId)?.nome || "-"}
+                        {nomesResponsaveisSelecionados.join(", ") || "-"}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Cobrança</p>
                       <p className="font-medium">
                         {serviceRequest.billing.mode === "contrato" && "Incluso em contrato"}
-                        {serviceRequest.billing.mode === "avulso" && `Avulso - ${serviceRequest.billing.price || "-"}`}
+                        
                         {serviceRequest.billing.mode === "adicional" && `Adicional - ${serviceRequest.billing.price || "-"}`}
                       </p>
                     </div>
@@ -1320,7 +1630,7 @@ const handleConfirmarAgendamentoFinal = () => {
                   <div className="space-y-2 text-sm p-4 bg-muted/50 rounded-lg">
                     <p><span className="text-muted-foreground">Data:</span> {new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR')}</p>
                     <p><span className="text-muted-foreground">Horário:</span> {serviceRequest.schedule.startTime} às {serviceRequest.schedule.endTime}</p>
-                    <p><span className="text-muted-foreground">Responsável:</span> {equipesMock.find(e => e.id === serviceRequest.schedule.teamId)?.nome}</p>
+                    <p><span className="text-muted-foreground">Responsável:</span> {nomesResponsaveisSelecionados.join(", ") || "-"}</p>
                     {serviceRequest.schedule.vehicleId && (
                       <p><span className="text-muted-foreground">Veículo:</span> {veiculosMock.find(v => v.id === serviceRequest.schedule.vehicleId)?.placa}</p>
                     )}
@@ -1335,12 +1645,13 @@ const handleConfirmarAgendamentoFinal = () => {
                   <div className="space-y-2 text-sm p-4 bg-muted/50 rounded-lg">
                     <p><span className="text-muted-foreground">Cobrança:</span> {
                       serviceRequest.billing.mode === "contrato" ? "Incluso em contrato" :
-                      serviceRequest.billing.mode === "avulso" ? "Avulso" : "Adicional"
+                      "Adicional"
                     }</p>
                     {serviceRequest.billing.mode !== "contrato" && (
                       <>
                         <p><span className="text-muted-foreground">Valor:</span> {serviceRequest.billing.price}</p>
                         <p><span className="text-muted-foreground">Pagamento:</span> {serviceRequest.billing.paymentMethod}</p>
+                        <p><span className="text-muted-foreground">Documento:</span> {serviceRequest.billing.billingDocument === "nota_fiscal" ? "Nota Fiscal" : "Recibo"}</p>
                       </>
                     )}
                     {serviceRequest.billing.mode === "contrato" && (
@@ -1389,9 +1700,36 @@ const handleConfirmarAgendamentoFinal = () => {
               onImprimir={handleImprimirOS}
               onMarcarEntregue={handleMarcarEntregue}
               clienteSelecionado={!!clienteSelecionado}
-              agendamentoCompleto={!!serviceRequest.schedule.date && !!serviceRequest.schedule.teamId}
+              agendamentoCompleto={!!serviceRequest.schedule.date && serviceRequest.schedule.teamIds.length > 0}
             />
 
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-primary" />
+                  Execucao e Baixa do Servico
+                </CardTitle>
+                <CardDescription>
+                  Registre os itens consumidos no atendimento (mock local) antes de finalizar o ciclo da OS.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="text-sm text-muted-foreground">
+                  {consumos.length > 0
+                    ? `${consumos.length} item(ns) de consumo registrado(s).`
+                    : "Nenhum consumo registrado ainda."}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleOpenBaixaServicoModal}
+                  className="gap-2 bg-transparent"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Dar baixa no servico
+                </Button>
+              </CardContent>
+            </Card>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* CARD 2 - Dados do Cliente (somente leitura) */}
               <Card>
@@ -1462,6 +1800,25 @@ const handleConfirmarAgendamentoFinal = () => {
                       <span className="text-muted-foreground">Nome do Serviço</span>
                       <span className="font-medium">{serviceRequest.serviceName}</span>
                     </div>
+                    <div className="py-2 border-b space-y-2">
+                      <span className="text-muted-foreground block">Veiculo associado ao atendimento</span>
+                      <Select
+                        value={serviceRequest.schedule.vehicleId || "__none"}
+                        onValueChange={(value) => handleScheduleChange("vehicleId", value === "__none" ? "" : value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o veiculo (opcional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">Sem veiculo</SelectItem>
+                          {veiculosMock.map((veiculo) => (
+                            <SelectItem key={veiculo.id} value={veiculo.id}>
+                              {veiculo.placa} - {veiculo.modelo}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     {serviceRequest.warrantyDays && (
                       <div className="flex justify-between py-2">
                         <span className="text-muted-foreground">Garantia</span>
@@ -1519,7 +1876,7 @@ const handleConfirmarAgendamentoFinal = () => {
                     <p className="text-sm text-muted-foreground mb-1">Cobrança</p>
                     <p className="font-semibold">
                       {serviceRequest.billing.mode === "contrato" ? "Incluso em contrato" :
-                       serviceRequest.billing.mode === "avulso" ? "Avulso" : "Adicional"}
+                       "Adicional"}
                     </p>
                   </div>
                   {serviceRequest.billing.mode === "contrato" && contratoSelecionado && (
@@ -1536,7 +1893,7 @@ const handleConfirmarAgendamentoFinal = () => {
                       </div>
                     </>
                   )}
-                  {(serviceRequest.billing.mode === "avulso" || serviceRequest.billing.mode === "adicional") && (
+                  {(serviceRequest.billing.mode === "adicional") && (
                     <>
                       <div className="p-4 bg-muted/50 rounded-lg">
                         <p className="text-sm text-muted-foreground mb-1">Valor</p>
@@ -1582,6 +1939,8 @@ const handleConfirmarAgendamentoFinal = () => {
               dadosTecnicosLimpeza={getTipoOS() === "limpeza" ? dadosTecnicosLimpeza : undefined}
               dataServico={serviceRequest.schedule.date ? new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR') : undefined}
               consumos={getTipoOS() === "vetores" ? consumos : []}
+              veiculo={veiculoSelecionado ? `${veiculoSelecionado.placa} - ${veiculoSelecionado.modelo}` : undefined}
+              mostrarDeclaracaoCupim={isServicoCupim}
             />
 
             {/* CARD 7 - Upload da OS Assinada (pós-execução) */}
@@ -1626,6 +1985,95 @@ const handleConfirmarAgendamentoFinal = () => {
           </div>
         )}
 
+        <Dialog open={showBaixaServicoModal} onOpenChange={setShowBaixaServicoModal}>
+          <DialogContent className="sm:max-w-[900px]">
+            <DialogHeader>
+              <DialogTitle>Dar baixa no servico</DialogTitle>
+              <DialogDescription>
+                Passo {baixaStep} de 2: informe os itens consumidos (estoque mock) e confirme o lancamento local da OS.
+              </DialogDescription>
+            </DialogHeader>
+
+            {baixaStep === 1 ? (
+              <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm font-medium text-muted-foreground px-1">
+                  <span>Item de estoque</span>
+                  <span>Quantidade consumida</span>
+                  <span>Observacao</span>
+                </div>
+                {estoqueBase.map((item) => (
+                  <div key={item.id} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start border rounded-lg p-3">
+                    <div>
+                      <p className="font-medium">{item.nome}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Saldo mock: {item.estoqueAtual} {item.unidadePadrao} | Categoria: {item.categoria}
+                      </p>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={baixaDraft[item.id]?.quantidade || ""}
+                      onChange={(e) => handleBaixaDraftChange(item.id, "quantidade", e.target.value)}
+                      placeholder={`Max ${item.estoqueAtual}`}
+                    />
+                    <Input
+                      value={baixaDraft[item.id]?.observacao || ""}
+                      onChange={(e) => handleBaixaDraftChange(item.id, "observacao", e.target.value)}
+                      placeholder="Ex: area tecnica/fundos"
+                    />
+                  </div>
+                ))}
+
+                {baixaError && (
+                  <p className="text-sm text-destructive">{baixaError}</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3 py-2 max-h-[60vh] overflow-y-auto pr-2">
+                <p className="text-sm text-muted-foreground">
+                  Revise os itens consumidos que serao gravados no estado local do servico:
+                </p>
+                <div className="space-y-2">
+                  {itensSelecionadosBaixa.map(({ item, quantidade, observacao }) => (
+                    <div key={item.id} className="border rounded-lg p-3 text-sm">
+                      <p className="font-medium">{item.nome}</p>
+                      <p className="text-muted-foreground">
+                        Quantidade: {quantidade} {item.unidadePadrao}
+                      </p>
+                      {observacao && (
+                        <p className="text-muted-foreground">Observacao: {observacao}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {itensSelecionadosBaixa.length === 0 && (
+                  <p className="text-sm text-destructive">Nenhum item selecionado. Volte para o passo anterior.</p>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              {baixaStep === 2 && (
+                <Button type="button" variant="outline" onClick={() => setBaixaStep(1)}>
+                  Voltar
+                </Button>
+              )}
+              <Button type="button" variant="outline" onClick={() => setShowBaixaServicoModal(false)}>
+                Cancelar
+              </Button>
+              {baixaStep === 1 ? (
+                <Button type="button" onClick={handleAvancarBaixaStep}>
+                  Avancar
+                </Button>
+              ) : (
+                <Button type="button" onClick={handleConfirmarBaixaServico} disabled={itensSelecionadosBaixa.length === 0}>
+                  Confirmar baixa
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {/* Modal Novo Local */}
         <Dialog open={showNovoLocalModal} onOpenChange={setShowNovoLocalModal}>
           <DialogContent className="sm:max-w-[500px]">
@@ -1724,11 +2172,55 @@ const handleConfirmarAgendamentoFinal = () => {
             {toastMessage}
           </div>
         )}
+
+        <Dialog open={showOSViewerModal} onOpenChange={setShowOSViewerModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Preview da OS</DialogTitle>
+              <DialogDescription>
+                Visualizacao mock da ordem de servico selecionada.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedAgendadaOS && (
+              <div className="space-y-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Badge variant="default">{selectedAgendadaOS.osNumber}</Badge>
+                  <Badge className={agendadosStatusConfig[selectedAgendadaOS.status].color}>
+                    {agendadosStatusConfig[selectedAgendadaOS.status].label}
+                  </Badge>
+                  <Badge variant={osStatusConfigMap[selectedAgendadaOS.osStatus]?.variant || "secondary"}>
+                    {osStatusConfigMap[selectedAgendadaOS.osStatus]?.label || selectedAgendadaOS.osStatus}
+                  </Badge>
+                </div>
+                <Card>
+                  <CardContent className="pt-4 space-y-2">
+                    <p><span className="text-muted-foreground">Servico:</span> {selectedAgendadaOS.servico}</p>
+                    <p><span className="text-muted-foreground">Cliente:</span> {selectedAgendadaOS.cliente}</p>
+                    <p><span className="text-muted-foreground">Local:</span> {selectedAgendadaOS.local}</p>
+                    <p><span className="text-muted-foreground">Data:</span> {selectedAgendadaOS.data}</p>
+                    <p><span className="text-muted-foreground">Horario:</span> {selectedAgendadaOS.horario}</p>
+                    <p><span className="text-muted-foreground">Tecnico:</span> {selectedAgendadaOS.tecnico}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowOSViewerModal(false)} className="bg-transparent">
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
           </TabsContent>
 
           {/* Aba Servicos Agendados */}
           <TabsContent value="agendados" className="mt-0">
-            <ServicosAgendadosContent />
+            <ServicosAgendadosContent
+              servicos={servicosAgendados}
+              onVerOS={handleVerOSAgendada}
+              onImprimirOS={handleImprimirOSAgendada}
+              onAtualizarStatus={handleAtualizarStatusAgendada}
+            />
           </TabsContent>
         </Tabs>
       </main>
@@ -1777,3 +2269,22 @@ const handleConfirmarAgendamentoFinal = () => {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

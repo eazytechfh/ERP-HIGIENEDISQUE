@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 import { usePathname } from 'next/navigation'
@@ -14,6 +14,7 @@ const navigation = [
   { name: "Cadastro de Serviços", href: "/dashboard/servicos" },
   { name: "Estoque", href: "/dashboard/produtos" },
   { name: "Cadastro Equipe", href: "/dashboard/equipe" },
+  { name: "Veiculos", href: "/dashboard/veiculos" },
   { name: "Financeiro", href: "/dashboard/financeiro" },
 ]
 
@@ -97,3 +98,6 @@ export function ErpHeader() {
     </header>
   )
 }
+
+
+
