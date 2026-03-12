@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import React from "react"
 
@@ -41,9 +41,12 @@ import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-heade
 import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
-import { ConsumoEstoqueCard, getEstoqueMock, type ConsumoItem, type ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
-import { useState } from "react"
+import { ConsumoEstoqueCard, type ConsumoItem, type ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
+import { buildLocaisPorCliente, mapClienteToServicoView } from "@/lib/supabase/clientes-view"
+import { ensureFlowStoreInitialized, loadFlowContratos, loadFlowStore, setFlowServicos, toIsoDate, type FlowContrato, type FlowServico } from "@/lib/flow-store"
 
 // Tipos
 type Cliente = {
@@ -80,6 +83,7 @@ type Veiculo = {
 
 type Contrato = {
   id: string
+  clienteId: string
   numero: string
   descricao: string
   itens: { id: string; nome: string }[]
@@ -154,26 +158,6 @@ const veiculosMock: Veiculo[] = [
   { id: "v3", placa: "GHI-9012", modelo: "Van Equipamentos" },
 ]
 
-const contratosMock: Contrato[] = [
-  { 
-    id: "c1", 
-    numero: "CONT-2026-001", 
-    descricao: "Contrato Anual - Manutenção Preventiva",
-    itens: [
-      { id: "ci1", nome: "Dedetização Mensal" },
-      { id: "ci2", nome: "Limpeza de Caixa d'Água Semestral" },
-    ]
-  },
-  { 
-    id: "c2", 
-    numero: "CONT-2026-002", 
-    descricao: "Contrato Semestral - Controle de Pragas",
-    itens: [
-      { id: "ci3", nome: "Controle de Pragas Bimestral" },
-    ]
-  },
-]
-
 // Mock data de serviços agendados
 
 type StatusAgendado = "agendado" | "em_execucao" | "concluido"
@@ -182,6 +166,7 @@ type ServicoAgendado = {
   id: string
   osNumber: string
   cliente: string
+  clienteId?: string
   servico: string
   tipo: string
   local: string
@@ -190,6 +175,10 @@ type ServicoAgendado = {
   tecnico: string
   status: StatusAgendado
   osStatus: Exclude<OSStatus, "a_gerar">
+  osFingerprint?: string
+  osDocumentoHtml?: string
+  osFoiAssinada?: boolean
+  responsavelBaixa?: string
 }
 
 type OSViewerData = {
@@ -202,6 +191,8 @@ type OSViewerData = {
   tecnico: string
   status: StatusAgendado
   osStatus: Exclude<OSStatus, "a_gerar">
+  osFingerprint?: string
+  osDocumentoHtml?: string
 }
 
 const servicosAgendadosMock: ServicoAgendado[] = [
@@ -259,17 +250,95 @@ const osStatusConfigMap = {
   assinada_digitalizada: { label: "OS Assinada", variant: "default" as const },
 }
 
+
+function toDisplayDate(value: string) {
+  const iso = toIsoDate(value)
+  if (!iso) return value
+  const parts = iso.split("-")
+  if (parts.length !== 3) return value
+  return `${parts[2]}/${parts[1]}/${parts[0]}`
+}
+
+function mapFlowStatusToAgendado(status: FlowServico["status"]): StatusAgendado {
+  if (status === "executado") return "concluido"
+  if (status === "em_execucao") return "em_execucao"
+  return "agendado"
+}
+
+function mapAgendadoStatusToFlow(status: StatusAgendado): FlowServico["status"] {
+  if (status === "concluido") return "executado"
+  if (status === "em_execucao") return "em_execucao"
+  return "agendado"
+}
+
+function mapFlowServicoToAgendado(servico: FlowServico): ServicoAgendado {
+  const osStatus = (servico.osStatus as Exclude<OSStatus, "a_gerar"> | undefined) || "gerada"
+  return {
+    id: servico.id,
+    osNumber: servico.osNumber,
+    cliente: servico.cliente,
+    clienteId: servico.clienteId,
+    servico: servico.servico,
+    tipo: servico.tipo || "outro",
+    local: servico.local,
+    data: toDisplayDate(servico.data),
+    horario: servico.horario,
+    tecnico: servico.tecnico,
+    status: mapFlowStatusToAgendado(servico.status),
+    osStatus,
+    osFingerprint: servico.osFingerprint,
+    osDocumentoHtml: servico.osDocumentoHtml,
+    osFoiAssinada: servico.osAssinada,
+    responsavelBaixa: servico.baixaObservacao,
+  }
+}
+
+function mapAgendadoToFlowServico(servico: ServicoAgendado): FlowServico {
+  return {
+    id: servico.id,
+    osNumber: servico.osNumber,
+    cliente: servico.cliente,
+    clienteId: servico.clienteId,
+    servico: servico.servico,
+    tipo: servico.tipo,
+    local: servico.local,
+    data: toIsoDate(servico.data) || servico.data,
+    horario: servico.horario,
+    tecnico: servico.tecnico,
+    status: mapAgendadoStatusToFlow(servico.status),
+    osStatus: servico.osStatus,
+    osAssinada: typeof servico.osFoiAssinada === "boolean" ? servico.osFoiAssinada : servico.osStatus === "assinada_digitalizada",
+    baixaObservacao: servico.responsavelBaixa,
+    osFingerprint: servico.osFingerprint,
+    osDocumentoHtml: servico.osDocumentoHtml,
+  }
+}
 function ServicosAgendadosContent({
   servicos,
   onVerOS,
   onImprimirOS,
   onAtualizarStatus,
+  onSolicitarBaixa,
+  onExcluirOS,
 }: {
   servicos: ServicoAgendado[]
   onVerOS: (servico: ServicoAgendado) => void
   onImprimirOS: (servico: ServicoAgendado) => void
   onAtualizarStatus: (id: string, status: StatusAgendado) => void
+  onSolicitarBaixa: (id: string) => void
+  onExcluirOS: (id: string) => void
 }) {
+  const [filtroAssinatura, setFiltroAssinatura] = useState<"todos" | "assinadas" | "sem_assinatura">("todos")
+
+  const osAssinada = (servico: ServicoAgendado) =>
+    typeof servico.osFoiAssinada === "boolean" ? servico.osFoiAssinada : servico.osStatus === "assinada_digitalizada"
+
+  const servicosFiltrados = servicos.filter((servico) => {
+    if (filtroAssinatura === "assinadas") return osAssinada(servico)
+    if (filtroAssinatura === "sem_assinatura") return !osAssinada(servico)
+    return true
+  })
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -309,13 +378,28 @@ function ServicosAgendadosContent({
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Lista de Servicos</CardTitle>
-          <CardDescription>Todos os servicos agendados com suas ordens de servico</CardDescription>
+        <CardHeader className="gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <CardTitle>Lista de Servicos</CardTitle>
+            <CardDescription>Todos os servicos agendados com suas ordens de servico</CardDescription>
+          </div>
+          <div className="w-full md:w-[240px]">
+            <Label className="text-xs text-muted-foreground">Assinatura da OS</Label>
+            <Select value={filtroAssinatura} onValueChange={(value) => setFiltroAssinatura(value as "todos" | "assinadas" | "sem_assinatura")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="assinadas">Somente assinadas</SelectItem>
+                <SelectItem value="sem_assinatura">Sem assinatura</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {servicos.map((servico) => (
+            {servicosFiltrados.map((servico) => (
               <div key={servico.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="space-y-2">
@@ -348,7 +432,13 @@ function ServicosAgendadosContent({
                     </Button>
                     <Select
                       value={servico.status === "agendado" ? undefined : servico.status}
-                      onValueChange={(value) => onAtualizarStatus(servico.id, value as StatusAgendado)}
+                      onValueChange={(value) => {
+                        if (value === "concluido") {
+                          onSolicitarBaixa(servico.id)
+                          return
+                        }
+                        onAtualizarStatus(servico.id, value as StatusAgendado)
+                      }}
                     >
                       <SelectTrigger className="w-[170px] h-9">
                         <SelectValue placeholder="STATUS OS" />
@@ -358,10 +448,24 @@ function ServicosAgendadosContent({
                         <SelectItem value="concluido">Dar baixa (Concluido)</SelectItem>
                       </SelectContent>
                     </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-red-600 border-red-200 hover:text-red-700 hover:border-red-300 bg-transparent"
+                      onClick={() => onExcluirOS(servico.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir OS
+                    </Button>
                   </div>
                 </div>
               </div>
             ))}
+            {servicosFiltrados.length === 0 && (
+              <div className="border rounded-lg p-6 text-sm text-muted-foreground text-center">
+                Nenhuma OS encontrada para o filtro selecionado.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -378,12 +482,94 @@ export default function ServicosPage() {
   const [activeTab, setActiveTab] = useState("nova-solicitacao")
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
   const [searchTerm, setSearchTerm] = useState("")
-  const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(
-    clienteIdParam ? clientesMock.find(c => c.id === clienteIdParam) || null : null
-  )
-  const [locaisCliente, setLocaisCliente] = useState<LocalAtendimento[]>(
-    clienteIdParam ? locaisPorCliente[clienteIdParam] || [] : []
-  )
+  const [tick, setTick] = useState(0)
+  const [clientesSupabase, setClientesSupabase] = useState<ClienteInput[]>([])
+
+  useEffect(() => {
+    ensureFlowStoreInitialized("operacional")
+    const onFocus = () => setTick((v) => v + 1)
+    const onStorage = () => setTick((v) => v + 1)
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("storage", onStorage)
+    return () => {
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("storage", onStorage)
+    }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+
+    const loadClientes = async () => {
+      try {
+        const rows = await listClientesSupabase()
+        if (mounted) setClientesSupabase(rows)
+      } catch (error) {
+        console.error("Falha ao carregar clientes para servicos", error)
+        if (mounted) setClientesSupabase([])
+      }
+    }
+
+    void loadClientes()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const flowStore = useMemo(() => loadFlowStore(), [tick])
+  const clientesData = useMemo<Cliente[]>(() => {
+    return clientesSupabase.map(mapClienteToServicoView)
+  }, [clientesSupabase])
+
+  const locaisPorClienteData = useMemo<Record<string, LocalAtendimento[]>>(() => {
+    return buildLocaisPorCliente(clientesSupabase)
+  }, [clientesSupabase])
+
+    const estoqueBase = useMemo<ItemEstoque[]>(() => {
+    const produtos = Array.isArray(flowStore.produtos) ? flowStore.produtos : []
+
+    const mapCategoria = (categoria: string): ItemEstoque["categoria"] => {
+      const normalizada = String(categoria || "").toLowerCase()
+      if (normalizada.includes("diluente")) return "Diluente"
+      if (normalizada.includes("epi")) return "EPI"
+      return "Produto Quimico"
+    }
+
+    const mapUnidade = (unidade: string): ItemEstoque["unidadePadrao"] => {
+      const value = String(unidade || "").toLowerCase()
+      if (value === "l" || value === "ml" || value === "g" || value === "kg" || value === "unid") {
+        return value as ItemEstoque["unidadePadrao"]
+      }
+      return "unid"
+    }
+
+    return produtos
+      .filter((p: any) => p && (p.ativo ?? true))
+      .map((p: any, idx: number) => ({
+        id: String(p.id ?? `est-${idx}`),
+        nome: String(p.nome || `Item ${idx + 1}`),
+        categoria: mapCategoria(p.categoria),
+        unidadePadrao: mapUnidade(p.unidade),
+        estoqueAtual: Number(p.estoqueAtual) || 0,
+        estoqueMinimo: Number(p.estoqueMinimo) || 0,
+      }))
+  }, [flowStore.produtos])
+
+  const opcoesProdutoEstoque = useMemo(() => estoqueBase.map((item) => item.nome), [estoqueBase])
+const contratosData = useMemo<Contrato[]>(() => {
+    const saved = loadFlowContratos()
+    if (!Array.isArray(saved) || saved.length === 0) return []
+
+    return saved.map((c: FlowContrato) => ({
+      id: c.id,
+      clienteId: c.clienteId,
+      numero: c.numero,
+      descricao: c.descricao,
+      itens: Array.isArray(c.itens) ? c.itens.map((i) => ({ id: i.id, nome: i.nome })) : [],
+    }))
+  }, [tick])
+  const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null)
+  const [locaisCliente, setLocaisCliente] = useState<LocalAtendimento[]>([])
   
   // Modal para novo local
   const [showNovoLocalModal, setShowNovoLocalModal] = useState(false)
@@ -413,6 +599,19 @@ export default function ServicosPage() {
     warrantyDays: "",
     attachments: []
   })
+
+  useEffect(() => {
+    if (!clienteIdParam) return
+    const found = clientesData.find((c) => c.id === clienteIdParam) || null
+    setClienteSelecionado(found)
+    setLocaisCliente(found ? (locaisPorClienteData[found.id] || []) : [])
+    setServiceRequest((prev) => ({
+      ...prev,
+      clientId: found?.id || "",
+      locationId: "",
+      billing: { ...prev.billing, contractId: "", contractItemId: "" },
+    }))
+  }, [clienteIdParam, clientesData, locaisPorClienteData])
 
   // Estados de validação
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -445,16 +644,118 @@ export default function ServicosPage() {
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
 
   // Estados para consumo de estoque (OS Vetores)
-  const [estoqueBase] = useState<ItemEstoque[]>(() => getEstoqueMock())
-  const [estoqueSimulado, setEstoqueSimulado] = useState<ItemEstoque[]>(() => getEstoqueMock())
+  const [estoqueSimulado, setEstoqueSimulado] = useState<ItemEstoque[]>([])
+
   const [consumos, setConsumos] = useState<ConsumoItem[]>([])
   const [showBaixaServicoModal, setShowBaixaServicoModal] = useState(false)
   const [baixaStep, setBaixaStep] = useState<1 | 2>(1)
   const [baixaError, setBaixaError] = useState("")
   const [baixaDraft, setBaixaDraft] = useState<Record<string, { quantidade: string; observacao: string }>>({})
-  const [servicosAgendados, setServicosAgendados] = useState<ServicoAgendado[]>(servicosAgendadosMock)
+  const [servicosAgendados, setServicosAgendados] = useState<ServicoAgendado[]>([])
+  const [servicosHydrated, setServicosHydrated] = useState(false)
   const [showOSViewerModal, setShowOSViewerModal] = useState(false)
   const [selectedAgendadaOS, setSelectedAgendadaOS] = useState<OSViewerData | null>(null)
+  const [isFinalizandoAgendamento, setIsFinalizandoAgendamento] = useState(false)
+  const [osDocumentoHtmlSnapshot, setOsDocumentoHtmlSnapshot] = useState("")
+  const [showBaixaAgendadaModal, setShowBaixaAgendadaModal] = useState(false)
+  const [servicoBaixaPendenteId, setServicoBaixaPendenteId] = useState<string | null>(null)
+  const [baixaAgendadaAssinada, setBaixaAgendadaAssinada] = useState<"sim" | "nao">("sim")
+  const [baixaAgendadaResponsavel, setBaixaAgendadaResponsavel] = useState("")
+  const [baixaAgendadaError, setBaixaAgendadaError] = useState("")
+
+  useEffect(() => {
+    setEstoqueSimulado(estoqueBase.map((item) => ({ ...item })))
+  }, [estoqueBase])
+  
+
+  // Sincroniza automaticamente o consumo de estoque com os produtos utilizados na OS Vetores
+  const normalizarTextoProduto = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+
+  const extrairQuantidadeProduto = (raw: string) => {
+    const normalized = String(raw || "").replace(",", ".")
+    const match = normalized.match(/\d+(?:\.\d+)?/)
+    const parsed = match ? Number.parseFloat(match[0]) : Number.NaN
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
+  }
+
+  useEffect(() => {
+    if (serviceRequest.serviceType !== "pragas") {
+      if (consumos.length > 0) setConsumos([])
+      const resetEstoque = estoqueBase.map((item) => ({ ...item }))
+      if (JSON.stringify(estoqueSimulado) !== JSON.stringify(resetEstoque)) {
+        setEstoqueSimulado(resetEstoque)
+      }
+      return
+    }
+
+    const agregado = new Map<string, { item: ItemEstoque; quantidade: number; observacao: string }>()
+
+    dadosTecnicosVetores.produtos.forEach((produto) => {
+      if (!produto.produto) return
+      const produtoNormalizado = normalizarTextoProduto(produto.produto)
+
+      const itemEstoque =
+        estoqueBase.find((e) => normalizarTextoProduto(e.nome) === produtoNormalizado) ||
+        estoqueBase.find((e) => normalizarTextoProduto(e.nome).includes(produtoNormalizado) || produtoNormalizado.includes(normalizarTextoProduto(e.nome)))
+
+      if (!itemEstoque) return
+
+      const quantidade = extrairQuantidadeProduto(produto.quantidade)
+      const observacao = [produto.pragaAlvo, produto.equipamento].filter(Boolean).join(" | ")
+      const atual = agregado.get(itemEstoque.id)
+
+      if (atual) {
+        atual.quantidade += quantidade
+        if (!atual.observacao && observacao) atual.observacao = observacao
+        agregado.set(itemEstoque.id, atual)
+      } else {
+        agregado.set(itemEstoque.id, { item: itemEstoque, quantidade, observacao })
+      }
+    })
+
+    const novosConsumos: ConsumoItem[] = Array.from(agregado.values()).map(({ item, quantidade, observacao }, index) => ({
+      id: `auto-consumo-${item.id}-${index}`,
+      produtoId: item.id,
+      produtoNome: item.nome,
+      categoria: item.categoria,
+      quantidade,
+      unidade: item.unidadePadrao,
+      estoqueAntes: item.estoqueAtual,
+      saldoEstimado: Math.max(0, item.estoqueAtual - quantidade),
+      observacao,
+    }))
+
+    const novoEstoque = estoqueBase.map((item) => {
+      const itemAgregado = agregado.get(item.id)
+      if (!itemAgregado) return { ...item }
+      return { ...item, estoqueAtual: Math.max(0, item.estoqueAtual - itemAgregado.quantidade) }
+    })
+
+    if (JSON.stringify(consumos) !== JSON.stringify(novosConsumos)) {
+      setConsumos(novosConsumos)
+    }
+
+    if (JSON.stringify(estoqueSimulado) !== JSON.stringify(novoEstoque)) {
+      setEstoqueSimulado(novoEstoque)
+    }
+  }, [dadosTecnicosVetores.produtos, serviceRequest.serviceType, estoqueBase, consumos, estoqueSimulado])
+
+  useEffect(() => {
+    const servicosFlow = Array.isArray(flowStore.servicos) ? flowStore.servicos : []
+    setServicosAgendados(servicosFlow.map((s) => mapFlowServicoToAgendado(s as FlowServico)))
+    setServicosHydrated(true)
+  }, [flowStore.servicos])
+
+  useEffect(() => {
+    if (!servicosHydrated) return
+    setFlowServicos(servicosAgendados.map(mapAgendadoToFlowServico))
+  }, [servicosAgendados, servicosHydrated])
 
   // Determinar tipo de OS baseado no tipo de servico
   const getTipoOS = (): TipoOS => {
@@ -465,9 +766,9 @@ export default function ServicosPage() {
   }
 
   // Filtrar clientes
-  const filteredClientes = clientesMock.filter((cliente) => {
+  const filteredClientes = clientesData.filter((cliente) => {
     const term = searchTerm.toLowerCase()
-    const enderecoMatch = (locaisPorCliente[cliente.id] || []).some((local) =>
+    const enderecoMatch = (locaisPorClienteData[cliente.id] || []).some((local) =>
       `${local.nome} ${local.endereco} ${local.numero} ${local.bairro} ${local.cidade} ${local.estado} ${local.cep}`
         .toLowerCase()
         .includes(term)
@@ -484,11 +785,12 @@ export default function ServicosPage() {
   // Handlers
   const handleClienteSelect = (cliente: Cliente) => {
     setClienteSelecionado(cliente)
-    setLocaisCliente(locaisPorCliente[cliente.id] || [])
-    setServiceRequest(prev => ({
+    setLocaisCliente(locaisPorClienteData[cliente.id] || [])
+    setServiceRequest((prev) => ({
       ...prev,
       clientId: cliente.id,
-      locationId: ""
+      locationId: "",
+      billing: { ...prev.billing, contractId: "", contractItemId: "" },
     }))
   }
 
@@ -622,6 +924,12 @@ export default function ServicosPage() {
     setTimeout(() => setShowToast(false), 3000)
   }
 
+  useEffect(() => {
+    if (currentStep !== 3 || activeTab !== "nova-solicitacao") {
+      setIsFinalizandoAgendamento(false)
+    }
+  }, [currentStep, activeTab])
+
   const handleVoltar = () => {
     if (currentStep > 1) {
       setCurrentStep(prev => (prev - 1) as 1 | 2 | 3)
@@ -644,6 +952,90 @@ export default function ServicosPage() {
     setToastMessage("Visualizando prévia da OS")
     setShowToast(true)
     setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const buildOSDocumentHtml = (contentHtml: string, osNumberValue: string) => `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>OS ${osNumberValue}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+    * { box-sizing: border-box; }
+    .bg-green-600 { background-color: #16a34a; }
+    .bg-gray-200 { background-color: #e5e7eb; }
+    .bg-gray-100 { background-color: #f3f4f6; }
+    .bg-black { background-color: #000; }
+    .text-white { color: #fff; }
+    .text-green-700 { color: #15803d; }
+    .text-red-600 { color: #dc2626; }
+    .text-gray-500 { color: #6b7280; }
+    .font-bold { font-weight: bold; }
+    .text-lg { font-size: 1.125rem; }
+    .text-sm { font-size: 0.875rem; }
+    .border { border: 1px solid #000; }
+    .border-black { border-color: #000; }
+    .border-t { border-top: 1px solid #000; }
+    .border-r { border-right: 1px solid #000; }
+    .border-b { border-bottom: 1px solid #000; }
+    .border-2 { border-width: 2px; }
+    .rounded { border-radius: 0.25rem; }
+    .p-1 { padding: 0.25rem; }
+    .p-2 { padding: 0.5rem; }
+    .p-8 { padding: 2rem; }
+    .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+    .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mt-1 { margin-top: 0.25rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-4 { margin-top: 1rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-8 { margin-bottom: 2rem; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-4 { gap: 1rem; }
+    .gap-8 { gap: 2rem; }
+    .flex { display: flex; }
+    .grid { display: grid; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .items-center { align-items: center; }
+    .items-start { align-items: flex-start; }
+    .justify-center { justify-content: center; }
+    .justify-between { justify-content: space-between; }
+    .text-center { text-align: center; }
+    .text-left { text-align: left; }
+    .text-right { text-align: right; }
+    .w-full { width: 100%; }
+    .w-4 { width: 1rem; }
+    .w-24 { width: 6rem; }
+    .h-4 { height: 1rem; }
+    .h-16 { height: 4rem; }
+    .min-h-\[40px\] { min-height: 40px; }
+    .min-h-\[60px\] { min-height: 60px; }
+    .inline-flex { display: inline-flex; }
+    .leading-tight { line-height: 1.25; }
+    .align-top { vertical-align: top; }
+    .space-y-1 > * + * { margin-top: 0.25rem; }
+    table { border-collapse: collapse; width: 100%; }
+    @media print {
+      body { margin: 0; padding: 10px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  ${contentHtml}
+</body>
+</html>`
+
+  const openAndPrintSavedOS = (contentHtml: string, osNumberValue: string) => {
+    if (!contentHtml) return false
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) return false
+    printWindow.document.write(buildOSDocumentHtml(contentHtml, osNumberValue))
+    printWindow.document.close()
+    printWindow.print()
+    return true
   }
 
   const handleImprimirOS = () => {
@@ -795,13 +1187,23 @@ export default function ServicosPage() {
       tecnico: servico.tecnico,
       status: servico.status,
       osStatus: servico.osStatus,
+      osFingerprint: servico.osFingerprint,
+      osDocumentoHtml: servico.osDocumentoHtml,
     })
     setShowOSViewerModal(true)
   }
 
   const handleImprimirOSAgendada = (servico: ServicoAgendado) => {
-    handleVerOSAgendada(servico)
-    window.print()
+    const impresso = openAndPrintSavedOS(servico.osDocumentoHtml || "", servico.osNumber)
+
+    if (!impresso) {
+      handleVerOSAgendada(servico)
+      setToastMessage(`A OS ${servico.osNumber} nao possui anexo salvo. Gere novamente para anexar o documento.`)
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return
+    }
+
     setServicosAgendados((prev) =>
       prev.map((item) => (item.id === servico.id && item.osStatus === "gerada" ? { ...item, osStatus: "impressa" } : item))
     )
@@ -834,6 +1236,65 @@ export default function ServicosPage() {
     )
   }
 
+  const handleSolicitarBaixaAgendada = (id: string) => {
+    setServicoBaixaPendenteId(id)
+    setBaixaAgendadaAssinada("sim")
+    setBaixaAgendadaResponsavel("")
+    setBaixaAgendadaError("")
+    setShowBaixaAgendadaModal(true)
+  }
+
+  const handleConfirmarBaixaAgendada = () => {
+    const responsavel = baixaAgendadaResponsavel.trim()
+    if (!servicoBaixaPendenteId) {
+      setBaixaAgendadaError("Servico nao encontrado para baixa.")
+      return
+    }
+    if (!responsavel) {
+      setBaixaAgendadaError("Informe o responsavel.")
+      return
+    }
+
+    const assinada = baixaAgendadaAssinada === "sim"
+
+    setServicosAgendados((prev) =>
+      prev.map((servico) => {
+        if (servico.id !== servicoBaixaPendenteId) return servico
+        return {
+          ...servico,
+          status: "concluido",
+          osStatus: assinada ? "assinada_digitalizada" : "entregue_tecnico",
+          osFoiAssinada: assinada,
+          responsavelBaixa: responsavel,
+        }
+      })
+    )
+
+    setShowBaixaAgendadaModal(false)
+    setServicoBaixaPendenteId(null)
+    setBaixaAgendadaError("")
+    setToastMessage("Baixa da OS registrada com sucesso.")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleExcluirOSAgendada = (id: string) => {
+    const alvo = servicosAgendados.find((item) => item.id === id)
+    if (!alvo) return
+
+    const ok = window.confirm(`Deseja excluir a ${alvo.osNumber}? Esta acao nao pode ser desfeita.`)
+    if (!ok) return
+
+    setServicosAgendados((prev) => prev.filter((item) => item.id !== id))
+    if (selectedAgendadaOS?.osNumber === alvo.osNumber) {
+      setShowOSViewerModal(false)
+      setSelectedAgendadaOS(null)
+    }
+    setToastMessage(`${alvo.osNumber} excluida com sucesso.`)
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2000)
+  }
+
   const gerarProximoNumeroOS = () => {
     const maiorNumero = servicosAgendados.reduce((acc, item) => {
       const match = item.osNumber.match(/(\d+)$/)
@@ -843,7 +1304,30 @@ export default function ServicosPage() {
     return `OS-2026-${String(maiorNumero + 1).padStart(6, "0")}`
   }
 
+  const gerarFingerprintAgendamento = () => {
+    const clienteId = clienteSelecionado?.id || ""
+    const servico = (serviceRequest.serviceName || "").trim().toLowerCase()
+    const tipo = serviceRequest.serviceType || "outro"
+    const data = serviceRequest.schedule.date || ""
+    const inicio = serviceRequest.schedule.startTime || ""
+    const fim = serviceRequest.schedule.endTime || ""
+    const localId = serviceRequest.locationId || ""
+    return [clienteId, servico, tipo, data, inicio, fim, localId].join("|")
+  }
+
 const handleConfirmarAgendamentoFinal = () => {
+    if (isFinalizandoAgendamento) return
+    setIsFinalizandoAgendamento(true)
+
+    if (!osDocumentoHtmlSnapshot) {
+      setToastMessage("A OS ainda esta carregando. Aguarde 1 segundo e clique novamente.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 2500)
+      setIsFinalizandoAgendamento(false)
+      return
+    }
+
+    const osFingerprint = gerarFingerprintAgendamento()
     const localTexto = localSelecionado
       ? `${localSelecionado.nome} - ${localSelecionado.endereco}, ${localSelecionado.numero}`
       : "Local nao informado"
@@ -851,10 +1335,39 @@ const handleConfirmarAgendamentoFinal = () => {
       ? new Date(`${serviceRequest.schedule.date}T00:00:00`).toLocaleDateString("pt-BR")
       : "-"
     const horarioFormatado = `${serviceRequest.schedule.startTime || "--:--"} - ${serviceRequest.schedule.endTime || "--:--"}`
+
+    const osExistente = servicosAgendados.find((item) => {
+      if (item.osFingerprint && item.osFingerprint === osFingerprint) return true
+
+      if (!item.osFingerprint) {
+        return (
+          (item.clienteId || "") === (clienteSelecionado?.id || "") &&
+          item.servico.trim().toLowerCase() === (serviceRequest.serviceName || "").trim().toLowerCase() &&
+          item.tipo === (serviceRequest.serviceType || "outro") &&
+          item.data === dataFormatada &&
+          item.horario === horarioFormatado &&
+          item.local === localTexto
+        )
+      }
+
+      return false
+    })
+
+    if (osExistente) {
+      setToastMessage(`A OS ${osExistente.osNumber} ja foi gerada para este agendamento.`)
+      setShowToast(true)
+      setTimeout(() => {
+        setShowToast(false)
+        setActiveTab("agendados")
+      }, 2000)
+      setIsFinalizandoAgendamento(false)
+      return
+    }
     const novoServico: ServicoAgendado = {
       id: `ag-${Date.now()}`,
       osNumber: gerarProximoNumeroOS(),
       cliente: clienteSelecionado?.nome || "Cliente nao informado",
+      clienteId: clienteSelecionado?.id,
       servico: serviceRequest.serviceName || "Servico sem nome",
       tipo: serviceRequest.serviceType || "outro",
       local: localTexto,
@@ -863,6 +1376,8 @@ const handleConfirmarAgendamentoFinal = () => {
       tecnico: nomesResponsaveisSelecionados.join(", ") || "Responsavel nao informado",
       status: "agendado",
       osStatus: "gerada",
+      osFingerprint,
+      osDocumentoHtml: osDocumentoHtmlSnapshot,
     }
     setServicosAgendados((prev) => [novoServico, ...prev])
 
@@ -889,7 +1404,6 @@ const handleConfirmarAgendamentoFinal = () => {
     }
   }
 
-  // Verificar se precisa mostrar campo de veículo
   const temEquipeCaminhao = serviceRequest.schedule.teamIds.some((teamId) => equipesMock.find((e) => e.id === teamId)?.tipo === "equipe_caminhao")
   const mostrarVeiculo = serviceRequest.serviceType === "esgotamento" || temEquipeCaminhao
   const equipesSelecionadas = equipesMock.filter((e) => serviceRequest.schedule.teamIds.includes(e.id))
@@ -903,8 +1417,10 @@ const handleConfirmarAgendamentoFinal = () => {
   // Obter local selecionado
   const localSelecionado = locaisCliente.find(l => l.id === serviceRequest.locationId)
 
+  const contratosDoCliente = contratosData.filter((c) => c.clienteId === serviceRequest.clientId)
+
   // Obter contrato selecionado
-  const contratoSelecionado = contratosMock.find(c => c.id === serviceRequest.billing.contractId)
+  const contratoSelecionado = contratosDoCliente.find((c) => c.id === serviceRequest.billing.contractId)
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -1313,13 +1829,17 @@ const handleConfirmarAgendamentoFinal = () => {
                           <Label>Vincular a Contrato *</Label>
                           <Select
                             value={serviceRequest.billing.contractId || ""}
-                            onValueChange={(value) => handleBillingChange("contractId", value)}
+                            onValueChange={(value) => {
+                              handleBillingChange("contractId", value)
+                              handleBillingChange("contractItemId", "")
+                            }}
+                            disabled={!serviceRequest.clientId || contratosDoCliente.length === 0}
                           >
                             <SelectTrigger className={errors["billing.contractId"] ? "border-destructive" : ""}>
-                              <SelectValue placeholder="Selecione o contrato" />
+                              <SelectValue placeholder={!serviceRequest.clientId ? "Selecione o cliente primeiro" : contratosDoCliente.length === 0 ? "Cliente sem contratos cadastrados" : "Selecione o contrato"} />
                             </SelectTrigger>
                             <SelectContent>
-                              {contratosMock.map(c => (
+                              {contratosDoCliente.map((c) => (
                                 <SelectItem key={c.id} value={c.id}>
                                   {c.numero} - {c.descricao}
                                 </SelectItem>
@@ -1835,6 +2355,7 @@ const handleConfirmarAgendamentoFinal = () => {
               <VetoresForm
                 dados={dadosTecnicosVetores}
                 onChange={setDadosTecnicosVetores}
+                produtosDisponiveis={opcoesProdutoEstoque}
               />
             ) : serviceRequest.serviceType === "reservatorio_potavel" ? (
               <LimpezaForm
@@ -1941,6 +2462,7 @@ const handleConfirmarAgendamentoFinal = () => {
               consumos={getTipoOS() === "vetores" ? consumos : []}
               veiculo={veiculoSelecionado ? `${veiculoSelecionado.placa} - ${veiculoSelecionado.modelo}` : undefined}
               mostrarDeclaracaoCupim={isServicoCupim}
+              onCaptureHtml={setOsDocumentoHtmlSnapshot}
             />
 
             {/* CARD 7 - Upload da OS Assinada (pós-execução) */}
@@ -2165,52 +2687,6 @@ const handleConfirmarAgendamentoFinal = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Toast */}
-        {showToast && (
-          <div className="fixed bottom-24 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-5">
-            <CheckCircle className="h-5 w-5" />
-            {toastMessage}
-          </div>
-        )}
-
-        <Dialog open={showOSViewerModal} onOpenChange={setShowOSViewerModal}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Preview da OS</DialogTitle>
-              <DialogDescription>
-                Visualizacao mock da ordem de servico selecionada.
-              </DialogDescription>
-            </DialogHeader>
-            {selectedAgendadaOS && (
-              <div className="space-y-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <Badge variant="default">{selectedAgendadaOS.osNumber}</Badge>
-                  <Badge className={agendadosStatusConfig[selectedAgendadaOS.status].color}>
-                    {agendadosStatusConfig[selectedAgendadaOS.status].label}
-                  </Badge>
-                  <Badge variant={osStatusConfigMap[selectedAgendadaOS.osStatus]?.variant || "secondary"}>
-                    {osStatusConfigMap[selectedAgendadaOS.osStatus]?.label || selectedAgendadaOS.osStatus}
-                  </Badge>
-                </div>
-                <Card>
-                  <CardContent className="pt-4 space-y-2">
-                    <p><span className="text-muted-foreground">Servico:</span> {selectedAgendadaOS.servico}</p>
-                    <p><span className="text-muted-foreground">Cliente:</span> {selectedAgendadaOS.cliente}</p>
-                    <p><span className="text-muted-foreground">Local:</span> {selectedAgendadaOS.local}</p>
-                    <p><span className="text-muted-foreground">Data:</span> {selectedAgendadaOS.data}</p>
-                    <p><span className="text-muted-foreground">Horario:</span> {selectedAgendadaOS.horario}</p>
-                    <p><span className="text-muted-foreground">Tecnico:</span> {selectedAgendadaOS.tecnico}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowOSViewerModal(false)} className="bg-transparent">
-                Fechar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
           </TabsContent>
 
           {/* Aba Servicos Agendados */}
@@ -2220,12 +2696,136 @@ const handleConfirmarAgendamentoFinal = () => {
               onVerOS={handleVerOSAgendada}
               onImprimirOS={handleImprimirOSAgendada}
               onAtualizarStatus={handleAtualizarStatusAgendada}
+              onSolicitarBaixa={handleSolicitarBaixaAgendada}
+              onExcluirOS={handleExcluirOSAgendada}
             />
           </TabsContent>
         </Tabs>
       </main>
 
+      {/* Toast */}
+      {showToast && (
+        <div className="fixed bottom-24 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-5 z-50">
+          <CheckCircle className="h-5 w-5" />
+          {toastMessage}
+        </div>
+      )}
+
+      <Dialog open={showOSViewerModal} onOpenChange={setShowOSViewerModal}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Preview da OS</DialogTitle>
+            <DialogDescription>
+              Visualizacao do documento salvo da ordem de servico.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedAgendadaOS && (
+            <div className="space-y-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="default">{selectedAgendadaOS.osNumber}</Badge>
+                <Badge className={agendadosStatusConfig[selectedAgendadaOS.status].color}>
+                  {agendadosStatusConfig[selectedAgendadaOS.status].label}
+                </Badge>
+                <Badge variant={osStatusConfigMap[selectedAgendadaOS.osStatus]?.variant || "secondary"}>
+                  {osStatusConfigMap[selectedAgendadaOS.osStatus]?.label || selectedAgendadaOS.osStatus}
+                </Badge>
+              </div>
+              <Card>
+                <CardContent className="pt-4 space-y-2">
+                  <p><span className="text-muted-foreground">Servico:</span> {selectedAgendadaOS.servico}</p>
+                  <p><span className="text-muted-foreground">Cliente:</span> {selectedAgendadaOS.cliente}</p>
+                  <p><span className="text-muted-foreground">Local:</span> {selectedAgendadaOS.local}</p>
+                  <p><span className="text-muted-foreground">Data:</span> {selectedAgendadaOS.data}</p>
+                  <p><span className="text-muted-foreground">Horario:</span> {selectedAgendadaOS.horario}</p>
+                  <p><span className="text-muted-foreground">Tecnico:</span> {selectedAgendadaOS.tecnico}</p>
+                </CardContent>
+              </Card>
+              {selectedAgendadaOS.osDocumentoHtml ? (
+                <div className="border rounded-lg overflow-hidden">
+                  <iframe
+                    title={`preview-${selectedAgendadaOS.osNumber}`}
+                    srcDoc={buildOSDocumentHtml(selectedAgendadaOS.osDocumentoHtml, selectedAgendadaOS.osNumber)}
+                    className="w-full h-[65vh]"
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-amber-600">Esta OS ainda nao possui anexo salvo.</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            {selectedAgendadaOS?.osDocumentoHtml && (
+              <Button
+                variant="outline"
+                onClick={() => openAndPrintSavedOS(selectedAgendadaOS.osDocumentoHtml || "", selectedAgendadaOS.osNumber)}
+                className="bg-transparent"
+              >
+                Imprimir OS
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setShowOSViewerModal(false)} className="bg-transparent">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBaixaAgendadaModal} onOpenChange={setShowBaixaAgendadaModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Dar baixa na OS</DialogTitle>
+            <DialogDescription>
+              Preencha os dados finais para concluir a ordem de servico.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>OS foi assinada?</Label>
+              <RadioGroup value={baixaAgendadaAssinada} onValueChange={(v) => setBaixaAgendadaAssinada(v as "sim" | "nao")}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="baixa-assinada-sim" value="sim" />
+                  <Label htmlFor="baixa-assinada-sim">Sim</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="baixa-assinada-nao" value="nao" />
+                  <Label htmlFor="baixa-assinada-nao">Nao</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="baixa-responsavel">Responsavel</Label>
+              <Input
+                id="baixa-responsavel"
+                value={baixaAgendadaResponsavel}
+                onChange={(e) => setBaixaAgendadaResponsavel(e.target.value)}
+                placeholder="Nome do responsavel"
+              />
+            </div>
+
+            {baixaAgendadaError && <p className="text-sm text-destructive">{baixaAgendadaError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBaixaAgendadaModal(false)
+                setBaixaAgendadaError("")
+              }}
+              className="bg-transparent"
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmarBaixaAgendada}>Confirmar baixa</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       {/* Rodapé Fixo com Ações */}
+      {activeTab === "nova-solicitacao" && (
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Button variant="outline" onClick={handleVoltar} className="gap-2 bg-transparent">
@@ -2257,7 +2857,7 @@ const handleConfirmarAgendamentoFinal = () => {
               <Button 
                 onClick={handleConfirmarAgendamentoFinal} 
                 className="gap-2"
-                disabled={osStatus === "a_gerar"}
+                disabled={osStatus === "a_gerar" || isFinalizandoAgendamento}
               >
                 Finalizar e Confirmar
                 <CheckCircle className="h-4 w-4" />
@@ -2266,9 +2866,47 @@ const handleConfirmarAgendamentoFinal = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

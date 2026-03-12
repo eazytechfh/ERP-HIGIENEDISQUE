@@ -1,0 +1,228 @@
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\trace\tracer.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+ ⨯ Error: Could not parse module '[project]/app/dashboard/servicos/page.tsx'
+
+reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+
+Caused by:
+- O arquivo já está sendo usado por outro processo. (os error 32)
+
+Debug info:
+- Execution of <FileSource as Asset>::content failed
+- Execution of <DiskFileSystem as FileSystem>::read failed
+- reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+- O arquivo já está sendo usado por outro processo. (os error 32)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:50:11)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.esmImport [as i] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:228:20)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:56:47)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.commonJsRequire [as r] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:249:12)
+    at Array.__TURBOPACK__page__$23$7__ (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8203:62)
+    at async doRender (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8614:28)
+    at async handleResponse (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8820:32)
+    at async handler (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:9191:20) {
+  code: 'MODULE_UNPARSABLE'
+}
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\trace\tracer.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+ ⨯ Error: Could not parse module '[project]/app/dashboard/servicos/page.tsx'
+
+reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+
+Caused by:
+- O arquivo já está sendo usado por outro processo. (os error 32)
+
+Debug info:
+- Execution of <FileSource as Asset>::content failed
+- Execution of <DiskFileSystem as FileSystem>::read failed
+- reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+- O arquivo já está sendo usado por outro processo. (os error 32)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:50:11)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.esmImport [as i] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:228:20)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:56:47)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.commonJsRequire [as r] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:249:12)
+    at Array.__TURBOPACK__page__$23$7__ (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8203:62)
+    at async doRender (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8614:28)
+    at async handleResponse (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8820:32)
+    at async handler (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:9191:20) {
+  code: 'MODULE_UNPARSABLE',
+  page: '/dashboard/servicos'
+}
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\trace\tracer.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+ ⨯ Error: Could not parse module '[project]/app/dashboard/servicos/page.tsx'
+
+reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+
+Caused by:
+- O arquivo já está sendo usado por outro processo. (os error 32)
+
+Debug info:
+- Execution of <FileSource as Asset>::content failed
+- Execution of <DiskFileSystem as FileSystem>::read failed
+- reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+- O arquivo já está sendo usado por outro processo. (os error 32)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:50:11)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.esmImport [as i] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:228:20)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:56:47)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.commonJsRequire [as r] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:249:12)
+    at Array.__TURBOPACK__page__$23$7__ (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8203:62)
+    at async doRender (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8614:28)
+    at async handleResponse (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8820:32)
+    at async handler (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:9191:20) {
+  code: 'MODULE_UNPARSABLE',
+  page: '/dashboard/servicos'
+}
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\trace\tracer.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+ ⨯ Error: Could not parse module '[project]/app/dashboard/servicos/page.tsx'
+
+reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+
+Caused by:
+- O arquivo já está sendo usado por outro processo. (os error 32)
+
+Debug info:
+- Execution of <FileSource as Asset>::content failed
+- Execution of <DiskFileSystem as FileSystem>::read failed
+- reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+- O arquivo já está sendo usado por outro processo. (os error 32)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:50:11)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.esmImport [as i] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:228:20)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:56:47)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.commonJsRequire [as r] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:249:12)
+    at Array.__TURBOPACK__page__$23$7__ (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8203:62)
+    at async doRender (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8614:28)
+    at async handleResponse (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8820:32)
+    at async handler (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:9191:20) {
+  code: 'MODULE_UNPARSABLE',
+  page: '/dashboard/servicos'
+}
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\trace\tracer.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+ ⨯ Error: Could not parse module '[project]/app/dashboard/servicos/page.tsx'
+
+reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+
+Caused by:
+- O arquivo já está sendo usado por outro processo. (os error 32)
+
+Debug info:
+- Execution of <FileSource as Asset>::content failed
+- Execution of <DiskFileSystem as FileSystem>::read failed
+- reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+- O arquivo já está sendo usado por outro processo. (os error 32)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:50:11)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.esmImport [as i] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:228:20)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:56:47)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.commonJsRequire [as r] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:249:12)
+    at Array.__TURBOPACK__page__$23$7__ (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8203:62)
+    at async doRender (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8614:28)
+    at async handleResponse (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8820:32)
+    at async handler (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:9191:20) {
+  code: 'MODULE_UNPARSABLE',
+  page: '/dashboard/servicos'
+}
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\trace\tracer.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\node_modules\.pnpm\next@16.0.10_react-dom@19.2.0_react@19.2.0__react@19.2.0\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+ ⨯ Error: Could not parse module '[project]/app/dashboard/servicos/page.tsx'
+
+reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+
+Caused by:
+- O arquivo já está sendo usado por outro processo. (os error 32)
+
+Debug info:
+- Execution of <FileSource as Asset>::content failed
+- Execution of <DiskFileSystem as FileSystem>::read failed
+- reading file C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\app\dashboard\servicos\page.tsx
+- O arquivo já está sendo usado por outro processo. (os error 32)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:50:11)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.esmImport [as i] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:228:20)
+    at module evaluation (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[root-of-the-server]__d4e60261._.js:56:47)
+    at instantiateModule (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:715:9)
+    at getOrInstantiateModuleFromParent (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:738:12)
+    at Context.commonJsRequire [as r] (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\[turbopack]_runtime.js:249:12)
+    at Array.__TURBOPACK__page__$23$7__ (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8203:62)
+    at async doRender (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8614:28)
+    at async handleResponse (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:8820:32)
+    at async handler (C:\projetos\disque-higiene\ERP-HIGIENEDISQUE\.next\dev\server\chunks\ssr\1dff6_next_dist_1db943a8._.js:9191:20) {
+  code: 'MODULE_UNPARSABLE',
+  page: '/dashboard/servicos'
+}

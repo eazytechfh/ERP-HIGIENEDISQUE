@@ -1,14 +1,19 @@
 "use client"
 
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
 import { ErpHeader } from "@/components/erp-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Search, CheckCircle2, Clock, XCircle, Bell, Calendar, FileText } from 'lucide-react'
-import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Search, CheckCircle2, Clock, XCircle, Bell, Calendar, FileText, Eye } from "lucide-react"
+import { toIsoDate } from "@/lib/flow-store"
+import { listClientesSupabase } from "@/lib/supabase/clientes-repo"
+import { mapClienteToServicoView } from "@/lib/supabase/clientes-view"
+import { listServicosSupabase } from "@/lib/supabase/servicos-repo"
 
-type Cliente = {
+type ClienteResumo = {
   id: string
   nome: string
   telefone: string
@@ -17,181 +22,121 @@ type Cliente = {
   cpfCnpj: string
 }
 
-type Servico = {
+type ServicoHistorico = {
   id: string
+  osNumber: string
   clienteId: string
   nome: string
   data: string
-  status: "Realizado" | "Programado" | "Cancelado"
+  status: "Realizado" | "Programado" | "Cancelado" | "Em execucao"
   valor: number
   observacao: string
 }
 
-type Notificacao = {
-  id: string
-  clienteId: string
-  servico: string
-  dataEnvio: string
-  tipo: string
+const statusMap: Record<string, ServicoHistorico["status"]> = {
+  executado: "Realizado",
+  agendado: "Programado",
+  cancelado: "Cancelado",
+  em_execucao: "Em execucao",
 }
 
 export default function HistoricoPage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null)
-  
-  // Dados de exemplo - Clientes
-  const clientes: Cliente[] = [
-    {
-      id: "1",
-      nome: "João Silva",
-      telefone: "(11) 98765-4321",
-      email: "joao@email.com",
-      empresa: "Silva & Cia",
-      cpfCnpj: "123.456.789-00"
-    },
-    {
-      id: "2",
-      nome: "Maria Santos",
-      telefone: "(11) 91234-5678",
-      email: "maria@empresa.com",
-      empresa: "Santos Ltda",
-      cpfCnpj: "12.345.678/0001-90"
-    },
-    {
-      id: "3",
-      nome: "Carlos Oliveira",
-      telefone: "(11) 99999-8888",
-      email: "carlos@email.com",
-      empresa: "Oliveira Corp",
-      cpfCnpj: "987.654.321-00"
-    },
-  ]
+  const [selectedCliente, setSelectedCliente] = useState<ClienteResumo | null>(null)
+  const [clientes, setClientes] = useState<ClienteResumo[]>([])
+  const [servicos, setServicos] = useState<ServicoHistorico[]>([])
 
-  // Dados de exemplo - Serviços
-  const servicos: Servico[] = [
-    {
-      id: "1",
-      clienteId: "1",
-      nome: "Dedetização Residencial",
-      data: "2025-01-10",
-      status: "Realizado",
-      valor: 450.00,
-      observacao: "Serviço completo em toda residência"
-    },
-    {
-      id: "2",
-      clienteId: "1",
-      nome: "Limpeza de Caixa D'água",
-      data: "2025-02-15",
-      status: "Programado",
-      valor: 350.00,
-      observacao: "Agendado para manhã"
-    },
-    {
-      id: "3",
-      clienteId: "1",
-      nome: "Controle de Pragas",
-      data: "2024-12-20",
-      status: "Cancelado",
-      valor: 280.00,
-      observacao: "Cliente solicitou cancelamento"
-    },
-    {
-      id: "4",
-      clienteId: "2",
-      nome: "Higienização de Estofados",
-      data: "2025-01-05",
-      status: "Realizado",
-      valor: 600.00,
-      observacao: "4 sofás higienizados"
-    },
-    {
-      id: "5",
-      clienteId: "2",
-      nome: "Dedetização Comercial",
-      data: "2025-02-20",
-      status: "Programado",
-      valor: 850.00,
-      observacao: "Escritório completo"
-    },
-  ]
+  useEffect(() => {
+    let mounted = true
 
-  // Dados de exemplo - Notificações
-  const notificacoes: Notificacao[] = [
-    {
-      id: "1",
-      clienteId: "1",
-      servico: "Dedetização Residencial",
-      dataEnvio: "08/01/2025",
-      tipo: "Lembrete de serviço"
-    },
-    {
-      id: "2",
-      clienteId: "1",
-      servico: "Limpeza de Caixa D'água",
-      dataEnvio: "10/02/2025",
-      tipo: "Confirmação de agendamento"
-    },
-    {
-      id: "3",
-      clienteId: "1",
-      servico: "Dedetização Residencial",
-      dataEnvio: "11/01/2025",
-      tipo: "Confirmação de conclusão"
-    },
-    {
-      id: "4",
-      clienteId: "2",
-      servico: "Higienização de Estofados",
-      dataEnvio: "03/01/2025",
-      tipo: "Lembrete de serviço"
-    },
-    {
-      id: "5",
-      clienteId: "2",
-      servico: "Dedetização Comercial",
-      dataEnvio: "15/02/2025",
-      tipo: "Confirmação de agendamento"
-    },
-  ]
+    const loadData = async () => {
+      try {
+        const [clientesRows, servicosRows] = await Promise.all([listClientesSupabase(), listServicosSupabase()])
+        if (!mounted) return
 
-  const filteredClientes = clientes.filter(cliente => 
-    cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.telefone.includes(searchTerm) ||
-    cliente.cpfCnpj.includes(searchTerm)
+        setClientes(
+          clientesRows.map((c) => {
+            const view = mapClienteToServicoView(c)
+            return {
+              id: view.id,
+              nome: view.nome,
+              telefone: view.telefone,
+              email: view.email,
+              empresa: view.empresa,
+              cpfCnpj: view.cpfCnpj,
+            }
+          })
+        )
+
+        setServicos(
+          servicosRows.map((s) => ({
+            id: s.id,
+            osNumber: s.osNumber,
+            clienteId: s.clienteId,
+            nome: s.servico,
+            data: toIsoDate(s.data) || s.data,
+            status: statusMap[s.status] ?? "Programado",
+            valor: 0,
+            observacao: s.baixaObservacao || `OS ${s.osNumber} registrada no sistema`,
+          }))
+        )
+      } catch (error) {
+        console.error("Falha ao carregar historico no Supabase", error)
+        if (!mounted) return
+        setClientes([])
+        setServicos([])
+      }
+    }
+
+    void loadData()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const notificacoes = useMemo(() => {
+    return servicos.map((s) => ({
+      id: `n-${s.id}`,
+      clienteId: String(s.clienteId ?? ""),
+      servico: s.nome,
+      dataEnvio: toIsoDate(s.data) || s.data,
+      tipo: `Atualizacao de OS: ${s.status}`,
+    }))
+  }, [servicos])
+
+  const filteredClientes = clientes.filter(
+    (cliente) =>
+      cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.telefone.includes(searchTerm) ||
+      cliente.cpfCnpj.includes(searchTerm)
   )
 
-  const clienteServicos = selectedCliente 
-    ? servicos.filter(s => s.clienteId === selectedCliente.id)
-    : []
+  const clienteServicos = selectedCliente ? servicos.filter((s) => s.clienteId === selectedCliente.id) : []
+  const clienteNotificacoes = selectedCliente ? notificacoes.filter((n) => n.clienteId === selectedCliente.id) : []
 
-  const clienteNotificacoes = selectedCliente
-    ? notificacoes.filter(n => n.clienteId === selectedCliente.id)
-    : []
-
-  const servicosRealizados = clienteServicos.filter(s => s.status === "Realizado").length
-  const servicosProgramados = clienteServicos.filter(s => s.status === "Programado").length
-  const servicosCancelados = clienteServicos.filter(s => s.status === "Cancelado").length
+  const servicosRealizados = clienteServicos.filter((s) => s.status === "Realizado").length
+  const servicosProgramados = clienteServicos.filter((s) => s.status === "Programado" || s.status === "Em execucao").length
+  const servicosCancelados = clienteServicos.filter((s) => s.status === "Cancelado").length
 
   const getStatusColor = (status: string) => {
-    switch(status) {
-      case "Realizado": return "bg-green-500/10 text-green-700 border-green-200"
-      case "Programado": return "bg-blue-500/10 text-blue-700 border-blue-200"
-      case "Cancelado": return "bg-red-500/10 text-red-700 border-red-200"
-      default: return ""
+    switch (status) {
+      case "Realizado":
+        return "bg-green-500/10 text-green-700 border-green-200"
+      case "Programado":
+      case "Em execucao":
+        return "bg-blue-500/10 text-blue-700 border-blue-200"
+      case "Cancelado":
+        return "bg-red-500/10 text-red-700 border-red-200"
+      default:
+        return ""
     }
   }
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value)
-  }
-
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('pt-BR')
+    const iso = toIsoDate(dateString)
+    const date = new Date(`${iso || dateString}T00:00:00`)
+    if (Number.isNaN(date.getTime())) return dateString
+    return date.toLocaleDateString("pt-BR")
   }
 
   return (
@@ -199,12 +144,11 @@ export default function HistoricoPage() {
       <ErpHeader />
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Histórico de Serviços</h1>
-          <p className="text-muted-foreground">Visualize todos os serviços e notificações por cliente</p>
+          <h1 className="mb-2 text-3xl font-bold text-foreground">Historico de Servicos</h1>
+          <p className="text-muted-foreground">Visualize os servicos interligados ao cadastro e as OS geradas.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Lista de Clientes */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle>Selecionar Cliente</CardTitle>
@@ -213,35 +157,26 @@ export default function HistoricoPage() {
             <CardContent>
               <div className="mb-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar cliente..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
+                  <Input placeholder="Buscar cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
                 </div>
               </div>
 
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+              <div className="max-h-[600px] space-y-2 overflow-y-auto">
                 {filteredClientes.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8 text-sm">
-                    Nenhum cliente encontrado
-                  </p>
+                  <p className="py-8 text-center text-sm text-muted-foreground">Nenhum cliente encontrado</p>
                 ) : (
                   filteredClientes.map((cliente) => (
                     <div
                       key={cliente.id}
                       onClick={() => setSelectedCliente(cliente)}
-                      className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                        selectedCliente?.id === cliente.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
+                      className={`cursor-pointer rounded-lg border p-4 transition-all hover:shadow-md ${
+                        selectedCliente?.id === cliente.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                       }`}
                     >
                       <h3 className="font-semibold text-foreground">{cliente.nome}</h3>
                       <p className="text-sm text-muted-foreground">{cliente.empresa}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{cliente.telefone}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{cliente.telefone}</p>
                     </div>
                   ))
                 )}
@@ -249,106 +184,75 @@ export default function HistoricoPage() {
             </CardContent>
           </Card>
 
-          {/* Detalhes do Cliente Selecionado */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6 lg:col-span-2">
             {!selectedCliente ? (
               <Card>
                 <CardContent className="flex items-center justify-center py-16">
                   <div className="text-center">
-                    <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      Selecione um cliente para visualizar o histórico
-                    </p>
+                    <FileText className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
+                    <p className="text-muted-foreground">Selecione um cliente para visualizar o historico</p>
                   </div>
                 </CardContent>
               </Card>
             ) : (
               <>
-                {/* Resumo de Serviços */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <Card>
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-green-500/10">
-                          <CheckCircle2 className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-foreground">{servicosRealizados}</p>
-                          <p className="text-sm text-muted-foreground">Realizados</p>
-                        </div>
+                        <div className="rounded-full bg-green-500/10 p-3"><CheckCircle2 className="h-6 w-6 text-green-600" /></div>
+                        <div><p className="text-2xl font-bold text-foreground">{servicosRealizados}</p><p className="text-sm text-muted-foreground">Realizados</p></div>
                       </div>
                     </CardContent>
                   </Card>
-
                   <Card>
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-blue-500/10">
-                          <Clock className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-foreground">{servicosProgramados}</p>
-                          <p className="text-sm text-muted-foreground">Programados</p>
-                        </div>
+                        <div className="rounded-full bg-blue-500/10 p-3"><Clock className="h-6 w-6 text-blue-600" /></div>
+                        <div><p className="text-2xl font-bold text-foreground">{servicosProgramados}</p><p className="text-sm text-muted-foreground">Programados</p></div>
                       </div>
                     </CardContent>
                   </Card>
-
                   <Card>
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-red-500/10">
-                          <XCircle className="h-6 w-6 text-red-600" />
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-foreground">{servicosCancelados}</p>
-                          <p className="text-sm text-muted-foreground">Cancelados</p>
-                        </div>
+                        <div className="rounded-full bg-red-500/10 p-3"><XCircle className="h-6 w-6 text-red-600" /></div>
+                        <div><p className="text-2xl font-bold text-foreground">{servicosCancelados}</p><p className="text-sm text-muted-foreground">Cancelados</p></div>
                       </div>
                     </CardContent>
                   </Card>
                 </div>
 
-                {/* Lista de Serviços */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Serviços Cadastrados</CardTitle>
-                    <CardDescription>
-                      Histórico completo de serviços para {selectedCliente.nome}
-                    </CardDescription>
+                    <CardTitle>Servicos Cadastrados</CardTitle>
+                    <CardDescription>Historico completo de servicos para {selectedCliente.nome}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
                       {clienteServicos.length === 0 ? (
-                        <p className="text-center text-muted-foreground py-8">
-                          Nenhum serviço cadastrado para este cliente
-                        </p>
+                        <p className="py-8 text-center text-muted-foreground">Nenhum servico cadastrado para este cliente</p>
                       ) : (
                         clienteServicos.map((servico) => (
-                          <div
-                            key={servico.id}
-                            className="p-4 rounded-lg border border-border hover:shadow-md transition-shadow"
-                          >
-                            <div className="flex items-start justify-between mb-2">
+                          <div key={servico.id} className="rounded-lg border border-border p-4 transition-shadow hover:shadow-md">
+                            <div className="mb-2 flex items-start justify-between gap-3">
                               <div>
                                 <h4 className="font-semibold text-foreground">{servico.nome}</h4>
-                                <div className="flex items-center gap-2 mt-1">
+                                <div className="mt-1 flex items-center gap-2">
                                   <Calendar className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-sm text-muted-foreground">
-                                    {formatDate(servico.data)}
-                                  </span>
+                                  <span className="text-sm text-muted-foreground">{formatDate(servico.data)}</span>
+                                  <span className="text-xs text-muted-foreground">{servico.osNumber}</span>
                                 </div>
                               </div>
-                              <Badge className={getStatusColor(servico.status)}>
-                                {servico.status}
-                              </Badge>
+                              <Badge className={getStatusColor(servico.status)}>{servico.status}</Badge>
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">
-                              {servico.observacao}
-                            </p>
-                            <p className="text-lg font-bold text-primary">
-                              {formatCurrency(servico.valor)}
-                            </p>
+                            <p className="mb-3 text-sm text-muted-foreground">{servico.observacao}</p>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/dashboard/servicos?os=${servico.osNumber}`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver OS
+                              </Link>
+                            </Button>
                           </div>
                         ))
                       )}
@@ -356,37 +260,23 @@ export default function HistoricoPage() {
                   </CardContent>
                 </Card>
 
-                {/* Histórico de Notificações */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Histórico de Notificações</CardTitle>
-                    <CardDescription>
-                      Registro de todas as notificações enviadas
-                    </CardDescription>
+                    <CardTitle>Historico de Notificacoes</CardTitle>
+                    <CardDescription>Registro das atualizacoes de OS por cliente</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       {clienteNotificacoes.length === 0 ? (
-                        <p className="text-center text-muted-foreground py-8">
-                          Nenhuma notificação registrada para este cliente
-                        </p>
+                        <p className="py-8 text-center text-muted-foreground">Nenhuma notificacao registrada para este cliente</p>
                       ) : (
                         clienteNotificacoes.map((notificacao) => (
-                          <div
-                            key={notificacao.id}
-                            className="flex items-start gap-3 p-3 rounded-lg bg-muted/50"
-                          >
-                            <div className="p-2 rounded-full bg-primary/10 mt-1">
-                              <Bell className="h-4 w-4 text-primary" />
-                            </div>
+                          <div key={notificacao.id} className="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
+                            <div className="mt-1 rounded-full bg-primary/10 p-2"><Bell className="h-4 w-4 text-primary" /></div>
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-foreground">
-                                {notificacao.tipo}
-                              </p>
+                              <p className="text-sm font-medium text-foreground">{notificacao.tipo}</p>
                               <p className="text-sm text-muted-foreground">
-                                Notificação para realizar o serviço{" "}
-                                <span className="font-medium">{notificacao.servico}</span>{" "}
-                                enviada dia {notificacao.dataEnvio}
+                                Atualizacao no servico <span className="font-medium">{notificacao.servico}</span> em {formatDate(notificacao.dataEnvio)}
                               </p>
                             </div>
                           </div>

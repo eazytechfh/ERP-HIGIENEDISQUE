@@ -1,0 +1,414 @@
+openapi: 3.0.3
+info:
+  title: ERP HIGIENE DISQUE API
+  version: 1.0.0
+  description: Contrato inicial da API para migracao do frontend de localStorage para backend.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, senha]
+              properties:
+                email: { type: string, format: email }
+                senha: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+  /auth/me:
+    get:
+      tags: [Auth]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /clientes:
+    get:
+      tags: [Clientes]
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: situacaoContrato
+          schema:
+            type: string
+            enum: [em_dia, a_vencer, vencido, sem_contrato]
+      responses:
+        '200':
+          description: Lista de clientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Cliente' }
+    post:
+      tags: [Clientes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClienteCreate' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cliente' }
+  /clientes/{id}:
+    get:
+      tags: [Clientes]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cliente' }
+    patch:
+      tags: [Clientes]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClienteUpdate' }
+      responses:
+        '200':
+          description: Atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cliente' }
+    delete:
+      tags: [Clientes]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204': { description: Excluido }
+
+  /contratos:
+    get:
+      tags: [Contratos]
+      parameters:
+        - in: query
+          name: clienteId
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lista de contratos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Contrato' }
+    post:
+      tags: [Contratos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContratoCreate' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contrato' }
+  /contratos/{id}:
+    patch:
+      tags: [Contratos]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContratoUpdate' }
+      responses:
+        '200':
+          description: Atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contrato' }
+    delete:
+      tags: [Contratos]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204': { description: Excluido }
+
+  /servicos:
+    get:
+      tags: [Servicos]
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [agendado, em_execucao, executado, cancelado] }
+      responses:
+        '200':
+          description: Lista de servi?os
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Servico' }
+    post:
+      tags: [Servicos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServicoCreate' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Servico' }
+  /servicos/{id}:
+    patch:
+      tags: [Servicos]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServicoUpdate' }
+      responses:
+        '200':
+          description: Atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Servico' }
+    delete:
+      tags: [Servicos]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204': { description: Excluido }
+
+  /servicos/{id}/baixa:
+    post:
+      tags: [Servicos]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [osFoiAssinada, responsavel]
+              properties:
+                osFoiAssinada: { type: boolean }
+                responsavel: { type: string }
+      responses:
+        '200':
+          description: Baixa registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Servico' }
+
+  /servicos/{id}/os/documento:
+    get:
+      tags: [OS]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Documento da OS
+          content:
+            text/html:
+              schema: { type: string }
+
+  /produtos:
+    get:
+      tags: [Estoque]
+      responses:
+        '200':
+          description: Lista de produtos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Produto' }
+    post:
+      tags: [Estoque]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProdutoCreate' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Produto' }
+  /produtos/{id}:
+    patch:
+      tags: [Estoque]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProdutoUpdate' }
+      responses:
+        '200':
+          description: Atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Produto' }
+    delete:
+      tags: [Estoque]
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204': { description: Excluido }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdPath:
+      in: path
+      name: id
+      required: true
+      schema: { type: string }
+  schemas:
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        nome: { type: string }
+        email: { type: string }
+        role:
+          type: string
+          enum: [admin, operacional, financeiro, tecnico, consulta]
+    Cliente:
+      type: object
+      properties:
+        id: { type: string }
+        tipoCliente: { type: string, enum: [pf, pj] }
+        nome: { type: string }
+        telefone: { type: string }
+        email: { type: string }
+        cpf: { type: string }
+        cnpj: { type: string }
+        status: { type: string }
+        possuiContrato: { type: boolean }
+        dataInicioContrato: { type: string, format: date }
+        dataFimContrato: { type: string, format: date }
+    ClienteCreate:
+      allOf:
+        - $ref: '#/components/schemas/Cliente'
+    ClienteUpdate:
+      type: object
+      additionalProperties: true
+    Contrato:
+      type: object
+      properties:
+        id: { type: string }
+        clienteId: { type: string }
+        numero: { type: string }
+        descricao: { type: string }
+        status: { type: string, enum: [ativo, suspenso, encerrado] }
+        tipoContrato: { type: string, enum: [recorrente, avulso] }
+        dataInicio: { type: string, format: date }
+        dataTermino: { type: string, format: date }
+        itens:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              nome: { type: string }
+    ContratoCreate:
+      allOf:
+        - $ref: '#/components/schemas/Contrato'
+    ContratoUpdate:
+      type: object
+      additionalProperties: true
+    Servico:
+      type: object
+      properties:
+        id: { type: string }
+        osNumber: { type: string }
+        cliente: { type: string }
+        clienteId: { type: string }
+        servico: { type: string }
+        tipo: { type: string }
+        local: { type: string }
+        data: { type: string, format: date }
+        horario: { type: string }
+        tecnico: { type: string }
+        status: { type: string, enum: [agendado, em_execucao, executado, cancelado] }
+        osStatus: { type: string }
+        osAssinada: { type: boolean }
+        baixaObservacao: { type: string }
+        osFingerprint: { type: string }
+        osDocumentoHtml: { type: string }
+    ServicoCreate:
+      allOf:
+        - $ref: '#/components/schemas/Servico'
+    ServicoUpdate:
+      type: object
+      additionalProperties: true
+    Produto:
+      type: object
+      properties:
+        id: { type: string }
+        nome: { type: string }
+        categoria: { type: string }
+        unidade: { type: string }
+        estoqueAtual: { type: number }
+        estoqueMinimo: { type: number }
+        ativo: { type: boolean }
+    ProdutoCreate:
+      allOf:
+        - $ref: '#/components/schemas/Produto'
+    ProdutoUpdate:
+      type: object
+      additionalProperties: true

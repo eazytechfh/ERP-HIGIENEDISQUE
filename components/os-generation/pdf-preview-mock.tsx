@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FileText, AlertCircle, Printer } from "lucide-react"
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 import type { OSStatus } from "./os-header-card"
 import { OSDocumentVetores } from "./os-document-vetores"
 import { OSDocumentLimpeza } from "./os-document-limpeza"
@@ -44,6 +44,7 @@ type PdfPreviewMockProps = {
   consumos?: ConsumoItem[]
   veiculo?: string
   mostrarDeclaracaoCupim?: boolean
+  onCaptureHtml?: (html: string) => void
 }
 
 export function PdfPreviewMock({
@@ -58,9 +59,15 @@ export function PdfPreviewMock({
   consumos = [],
   veiculo,
   mostrarDeclaracaoCupim = false,
+  onCaptureHtml,
 }: PdfPreviewMockProps) {
   const printRef = useRef<HTMLDivElement>(null)
   const isGenerated = status !== "a_gerar"
+
+  useEffect(() => {
+    if (!onCaptureHtml || !isGenerated || !printRef.current) return
+    onCaptureHtml(printRef.current.innerHTML)
+  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dataServico, consumos, veiculo, mostrarDeclaracaoCupim])
 
   const handlePrint = () => {
     if (!printRef.current) return

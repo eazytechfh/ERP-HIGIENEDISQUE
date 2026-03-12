@@ -1,165 +1,232 @@
-﻿'use client'
+'use client'
 
+import { useEffect, useState } from "react"
 import { ErpHeader } from "@/components/erp-header"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { useState } from "react"
-import { Search, UserPlus, Edit, Trash2, Users } from 'lucide-react'
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import {
+  deleteEquipeMembroSupabase,
+  listEquipeMembrosSupabase,
+  upsertEquipeMembroSupabase,
+  type EquipeMembroInput,
+  type EquipeRole,
+} from "@/lib/supabase/equipe-repo"
+import { Edit, Search, Trash2, UserPlus, Users } from "lucide-react"
 
-type Membro = {
-  id: number
-  nome: string
-  telefone: string
-  cargo: string
-  endereco: string
-  cpf: string
-  cnh: 'Sim' | 'Nao'
-  cnhValidade: string
-  nr33Validade: string
-  nr35Validade: string
-  asoValidade: string
-  situacao: 'Ativo' | 'Inativo'
+type FormData = EquipeMembroInput & {
+  senhaAcesso: string
+  confirmarSenhaAcesso: string
+}
+
+const INITIAL_FORM_DATA: FormData = {
+  nome: "",
+  telefone: "",
+  cargo: "",
+  endereco: "",
+  cpf: "",
+  cnh: "Nao",
+  cnhValidade: "",
+  nr33Validade: "",
+  nr35Validade: "",
+  asoValidade: "",
+  situacao: "Ativo",
+  emailAcesso: "",
+  perfilAcesso: "",
+  senhaAcesso: "",
+  confirmarSenhaAcesso: "",
 }
 
 export default function EquipePage() {
-  const [membros, setMembros] = useState<Membro[]>([
-    {
-      id: 1,
-      nome: "Joao Silva",
-      telefone: "(11) 98765-4321",
-      cargo: "Tecnico em Dedetizacao",
-      endereco: "Rua das Flores, 123 - Sao Paulo/SP",
-      cpf: "123.456.789-00",
-      cnh: "Sim",
-      cnhValidade: "2027-10-31",
-      nr33Validade: "2026-09-15",
-      nr35Validade: "2026-11-20",
-      asoValidade: "2026-12-01",
-      situacao: "Ativo",
-    },
-    {
-      id: 2,
-      nome: "Maria Santos",
-      telefone: "(11) 97654-3210",
-      cargo: "Auxiliar de Limpeza",
-      endereco: "Av. Paulista, 456 - Sao Paulo/SP",
-      cpf: "987.654.321-00",
-      cnh: "Nao",
-      cnhValidade: "",
-      nr33Validade: "2026-06-30",
-      nr35Validade: "",
-      asoValidade: "2026-08-10",
-      situacao: "Ativo",
-    },
-    {
-      id: 3,
-      nome: "Pedro Costa",
-      telefone: "(11) 96543-2109",
-      cargo: "Supervisor de Equipe",
-      endereco: "Rua dos Jardins, 789 - Sao Paulo/SP",
-      cpf: "741.852.963-00",
-      cnh: "Sim",
-      cnhValidade: "2028-01-15",
-      nr33Validade: "2026-10-10",
-      nr35Validade: "2026-10-10",
-      asoValidade: "2026-07-25",
-      situacao: "Ativo",
-    }
-  ])
-
+  const [membros, setMembros] = useState<EquipeMembroInput[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [editingId, setEditingId] = useState<number | null>(null)
-  const [formData, setFormData] = useState<Omit<Membro, 'id'>>({
-    nome: "",
-    telefone: "",
-    cargo: "",
-    endereco: "",
-    cpf: "",
-    cnh: "Nao",
-    cnhValidade: "",
-    nr33Validade: "",
-    nr35Validade: "",
-    asoValidade: "",
-    situacao: "Ativo"
-  })
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA)
+  const [submitError, setSubmitError] = useState("")
+  const [submitSuccess, setSubmitSuccess] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleInputChange = (field: keyof Omit<Membro, 'id'>, value: string) => {
+  const loadMembros = async () => {
+    setLoading(true)
+    try {
+      const data = await listEquipeMembrosSupabase()
+      setMembros(data)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Falha ao carregar equipe no Supabase.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadMembros()
+  }, [])
+
+  const resetForm = () => {
+    setEditingId(null)
+    setFormData(INITIAL_FORM_DATA)
+  }
+
+  const handleInputChange = (field: keyof FormData, value: string | boolean | undefined) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
-      ...(field === 'cnh' && value === 'Nao' ? { cnhValidade: '' } : {}),
+      ...(field === "cnh" && value === "Nao" ? { cnhValidade: "" } : {}),
+      ...(field === "emailAcesso" && !value
+        ? {
+            perfilAcesso: "",
+            senhaAcesso: "",
+            confirmarSenhaAcesso: "",
+          }
+        : {}),
     }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError("")
+    setSubmitSuccess("")
+    setIsSubmitting(true)
 
-    if (editingId) {
-      setMembros((prev) => prev.map((m) => (m.id === editingId ? { ...formData, id: editingId } : m)))
-      setEditingId(null)
-    } else {
-      const novoMembro: Membro = {
-        id: Math.max(0, ...membros.map((m) => m.id)) + 1,
-        ...formData,
+    try {
+      let userId = formData.userId
+      let emailAcesso = formData.emailAcesso.trim().toLowerCase()
+      let perfilAcesso = formData.perfilAcesso
+      let createdAuth = false
+
+      if (emailAcesso && !userId) {
+        if (formData.senhaAcesso.length < 6) {
+          throw new Error("A senha de acesso deve ter ao menos 6 caracteres.")
+        }
+
+        if (formData.senhaAcesso !== formData.confirmarSenhaAcesso) {
+          throw new Error("A confirmacao da senha nao confere.")
+        }
+
+        if (!perfilAcesso) {
+          throw new Error("Selecione o perfil de acesso do usuario.")
+        }
+
+        const supabase = getSupabaseBrowserClient()
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError || !sessionData.session?.access_token) {
+          throw new Error("Sessao admin do Supabase indisponivel. Entre com um administrador real para criar usuarios.")
+        }
+
+        const response = await fetch("/api/admin/create-user", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            email: emailAcesso,
+            password: formData.senhaAcesso,
+            nome: formData.nome.trim(),
+            role: perfilAcesso,
+          }),
+        })
+
+        const payload = (await response.json()) as {
+          error?: string
+          user?: { id: string; email?: string; role?: EquipeRole }
+        }
+
+        if (!response.ok || !payload.user) {
+          throw new Error(payload.error || "Falha ao criar usuario no Supabase Auth.")
+        }
+
+        userId = payload.user.id
+        emailAcesso = payload.user.email || emailAcesso
+        perfilAcesso = payload.user.role || perfilAcesso
+        createdAuth = true
       }
-      setMembros((prev) => [...prev, novoMembro])
-    }
 
-    setFormData({
-      nome: "",
-      telefone: "",
-      cargo: "",
-      endereco: "",
-      cpf: "",
-      cnh: "Nao",
-      cnhValidade: "",
-      nr33Validade: "",
-      nr35Validade: "",
-      asoValidade: "",
-      situacao: "Ativo"
-    })
-  }
+      const saved = await upsertEquipeMembroSupabase({
+        id: editingId || undefined,
+        userId,
+        nome: formData.nome.trim(),
+        telefone: formData.telefone.trim(),
+        cargo: formData.cargo.trim(),
+        endereco: formData.endereco.trim(),
+        cpf: formData.cpf.trim(),
+        cnh: formData.cnh,
+        cnhValidade: formData.cnhValidade,
+        nr33Validade: formData.nr33Validade,
+        nr35Validade: formData.nr35Validade,
+        asoValidade: formData.asoValidade,
+        situacao: formData.situacao,
+        emailAcesso,
+        perfilAcesso: perfilAcesso || "",
+      })
 
-  const handleEdit = (membro: Membro) => {
-    setFormData({
-      nome: membro.nome,
-      telefone: membro.telefone,
-      cargo: membro.cargo,
-      endereco: membro.endereco,
-      cpf: membro.cpf,
-      cnh: membro.cnh,
-      cnhValidade: membro.cnhValidade,
-      nr33Validade: membro.nr33Validade,
-      nr35Validade: membro.nr35Validade,
-      asoValidade: membro.asoValidade,
-      situacao: membro.situacao,
-    })
-    setEditingId(membro.id)
-  }
+      setMembros((prev) => {
+        const exists = prev.some((item) => item.id === saved.id)
+        return exists ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]
+      })
 
-  const handleDelete = (id: number) => {
-    if (confirm("Tem certeza que deseja excluir este membro?")) {
-      setMembros((prev) => prev.filter((m) => m.id !== id))
+      setSubmitSuccess(createdAuth ? "Membro salvo e usuario criado no Supabase com sucesso." : "Membro salvo no Supabase com sucesso.")
+      resetForm()
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Nao foi possivel salvar o membro.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const filteredMembros = membros.filter((membro) =>
-    membro.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    membro.telefone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    membro.cargo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    membro.cpf.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const handleEdit = (membro: EquipeMembroInput) => {
+    setSubmitError("")
+    setSubmitSuccess("")
+    setEditingId(membro.id || null)
+    setFormData({
+      ...membro,
+      senhaAcesso: "",
+      confirmarSenhaAcesso: "",
+    })
+  }
+
+  const handleDelete = async (membro: EquipeMembroInput) => {
+    if (!membro.id) return
+    if (!window.confirm(`Deseja excluir ${membro.nome}?`)) return
+
+    setSubmitError("")
+    setSubmitSuccess("")
+
+    try {
+      await deleteEquipeMembroSupabase(membro.id)
+      setMembros((prev) => prev.filter((item) => item.id !== membro.id))
+      if (editingId === membro.id) resetForm()
+      setSubmitSuccess("Membro removido do Supabase com sucesso.")
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Falha ao excluir membro.")
+    }
+  }
+
+  const filteredMembros = membros.filter((membro) => {
+    const query = searchTerm.toLowerCase()
+    return (
+      membro.nome.toLowerCase().includes(query) ||
+      membro.telefone.toLowerCase().includes(query) ||
+      membro.cargo.toLowerCase().includes(query) ||
+      membro.cpf.toLowerCase().includes(query) ||
+      membro.emailAcesso.toLowerCase().includes(query)
+    )
+  })
 
   return (
     <div className="min-h-screen bg-muted/30">
       <ErpHeader />
       <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center gap-3 mb-6">
+        <div className="mb-6 flex items-center gap-3">
           <Users className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold text-foreground">Cadastro de Equipe</h1>
         </div>
@@ -174,12 +241,11 @@ export default function EquipePage() {
             <Card>
               <CardHeader>
                 <CardTitle>Membros da Equipe</CardTitle>
-                <CardDescription>Visualize e gerencie todos os membros cadastrados</CardDescription>
-
+                <CardDescription>Somente dados carregados do Supabase aparecem nesta lista.</CardDescription>
                 <div className="relative mt-4">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Pesquisar por nome, telefone, CPF ou cargo..."
+                    placeholder="Pesquisar por nome, telefone, CPF, cargo ou email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -187,6 +253,18 @@ export default function EquipePage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {submitError ? (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription>{submitError}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                {submitSuccess ? (
+                  <Alert className="mb-4">
+                    <AlertDescription>{submitSuccess}</AlertDescription>
+                  </Alert>
+                ) : null}
+
                 <div className="rounded-md border">
                   <div className="overflow-x-auto">
                     <table className="w-full">
@@ -196,35 +274,47 @@ export default function EquipePage() {
                           <th className="px-4 py-3 text-left text-sm font-medium">Telefone</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Cargo</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Endereco</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Acesso</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Situacao</th>
                           <th className="px-4 py-3 text-center text-sm font-medium">Acoes</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {filteredMembros.length === 0 ? (
+                        {loading ? (
                           <tr>
-                            <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                              Nenhum membro encontrado
-                            </td>
+                            <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Carregando equipe do Supabase...</td>
+                          </tr>
+                        ) : filteredMembros.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Nenhum membro encontrado no Supabase.</td>
                           </tr>
                         ) : (
                           filteredMembros.map((membro) => (
-                            <tr key={membro.id} className="hover:bg-muted/50">
+                            <tr key={membro.id || membro.userId} className="hover:bg-muted/50">
                               <td className="px-4 py-3 font-medium">{membro.nome}</td>
                               <td className="px-4 py-3">{membro.telefone}</td>
                               <td className="px-4 py-3">{membro.cargo}</td>
                               <td className="px-4 py-3 text-sm">{membro.endereco}</td>
+                              <td className="px-4 py-3 text-sm">
+                                {membro.emailAcesso ? (
+                                  <div className="space-y-1">
+                                    <Badge variant="secondary">Com login</Badge>
+                                    <div className="text-xs text-muted-foreground">{membro.emailAcesso}</div>
+                                    <div className="text-xs uppercase text-muted-foreground">{membro.perfilAcesso}</div>
+                                  </div>
+                                ) : (
+                                  <Badge variant="outline">Sem login</Badge>
+                                )}
+                              </td>
                               <td className="px-4 py-3">
-                                <Badge variant={membro.situacao === 'Ativo' ? 'default' : 'secondary'}>
-                                  {membro.situacao}
-                                </Badge>
+                                <Badge variant={membro.situacao === "Ativo" ? "default" : "secondary"}>{membro.situacao}</Badge>
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center justify-center gap-2">
                                   <Button variant="outline" size="sm" onClick={() => handleEdit(membro)}>
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button variant="outline" size="sm" onClick={() => handleDelete(membro.id)}>
+                                  <Button variant="outline" size="sm" onClick={() => void handleDelete(membro)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
                                 </div>
@@ -237,9 +327,7 @@ export default function EquipePage() {
                   </div>
                 </div>
 
-                <div className="mt-4 text-sm text-muted-foreground">
-                  Total de membros: {filteredMembros.length}
-                </div>
+                <div className="mt-4 text-sm text-muted-foreground">Total de membros: {filteredMembros.length}</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -249,71 +337,70 @@ export default function EquipePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <UserPlus className="h-5 w-5" />
-                  {editingId ? 'Editar Membro' : 'Cadastrar Novo Membro'}
+                  {editingId ? "Editar Membro" : "Cadastrar Novo Membro"}
                 </CardTitle>
-                <CardDescription>
-                  {editingId ? 'Atualize as informacoes do membro' : 'Preencha os dados do novo membro da equipe'}
-                </CardDescription>
+                <CardDescription>O cadastro so e concluido quando o registro for salvo no Supabase.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {submitError ? (
+                    <Alert variant="destructive">
+                      <AlertDescription>{submitError}</AlertDescription>
+                    </Alert>
+                  ) : null}
+
+                  {submitSuccess ? (
+                    <Alert>
+                      <AlertDescription>{submitSuccess}</AlertDescription>
+                    </Alert>
+                  ) : null}
+
                   <div className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="nome">Nome Completo *</Label>
-                      <Input id="nome" placeholder="Digite o nome completo" value={formData.nome} onChange={(e) => handleInputChange('nome', e.target.value)} required />
+                      <Input id="nome" value={formData.nome} onChange={(e) => handleInputChange("nome", e.target.value)} required />
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="telefone">Telefone *</Label>
-                      <Input id="telefone" placeholder="(00) 00000-0000" value={formData.telefone} onChange={(e) => handleInputChange('telefone', e.target.value)} required />
+                      <Input id="telefone" value={formData.telefone} onChange={(e) => handleInputChange("telefone", e.target.value)} required />
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="cpf">CPF *</Label>
-                      <Input id="cpf" placeholder="000.000.000-00" value={formData.cpf} onChange={(e) => handleInputChange('cpf', e.target.value)} required />
+                      <Input id="cpf" value={formData.cpf} onChange={(e) => handleInputChange("cpf", e.target.value)} required />
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="cargo">Cargo *</Label>
-                      <Input id="cargo" placeholder="Digite o cargo" value={formData.cargo} onChange={(e) => handleInputChange('cargo', e.target.value)} required />
+                      <Input id="cargo" value={formData.cargo} onChange={(e) => handleInputChange("cargo", e.target.value)} required />
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="cnh">CNH</Label>
-                      <Select value={formData.cnh} onValueChange={(value) => handleInputChange('cnh', value as 'Sim' | 'Nao')}>
-                        <SelectTrigger id="cnh">
-                          <SelectValue />
-                        </SelectTrigger>
+                      <Select value={formData.cnh} onValueChange={(value) => handleInputChange("cnh", value as "Sim" | "Nao")}>
+                        <SelectTrigger id="cnh"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Sim">Sim</SelectItem>
                           <SelectItem value="Nao">Nao</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {formData.cnh === 'Sim' && (
+                    {formData.cnh === "Sim" ? (
                       <div className="space-y-2">
                         <Label htmlFor="cnhValidade">Validade da CNH *</Label>
-                        <Input id="cnhValidade" type="date" value={formData.cnhValidade} onChange={(e) => handleInputChange('cnhValidade', e.target.value)} required />
+                        <Input id="cnhValidade" type="date" value={formData.cnhValidade} onChange={(e) => handleInputChange("cnhValidade", e.target.value)} required />
                       </div>
-                    )}
-
+                    ) : null}
                     <div className="space-y-2">
                       <Label htmlFor="situacao">Situacao *</Label>
-                      <Select value={formData.situacao} onValueChange={(value) => handleInputChange('situacao', value as 'Ativo' | 'Inativo')}>
-                        <SelectTrigger id="situacao">
-                          <SelectValue />
-                        </SelectTrigger>
+                      <Select value={formData.situacao} onValueChange={(value) => handleInputChange("situacao", value as "Ativo" | "Inativo")}>
+                        <SelectTrigger id="situacao"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Ativo">Ativo</SelectItem>
                           <SelectItem value="Inativo">Inativo</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="endereco">Endereco Completo *</Label>
-                      <Input id="endereco" placeholder="Rua, numero, bairro, cidade/estado" value={formData.endereco} onChange={(e) => handleInputChange('endereco', e.target.value)} required />
+                      <Input id="endereco" value={formData.endereco} onChange={(e) => handleInputChange("endereco", e.target.value)} required />
                     </div>
                   </div>
 
@@ -322,47 +409,85 @@ export default function EquipePage() {
                     <div className="grid gap-6 md:grid-cols-3">
                       <div className="space-y-2">
                         <Label htmlFor="nr33">NR33 - Validade</Label>
-                        <Input id="nr33" type="date" value={formData.nr33Validade} onChange={(e) => handleInputChange('nr33Validade', e.target.value)} />
+                        <Input id="nr33" type="date" value={formData.nr33Validade} onChange={(e) => handleInputChange("nr33Validade", e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="nr35">NR35 - Validade</Label>
-                        <Input id="nr35" type="date" value={formData.nr35Validade} onChange={(e) => handleInputChange('nr35Validade', e.target.value)} />
+                        <Input id="nr35" type="date" value={formData.nr35Validade} onChange={(e) => handleInputChange("nr35Validade", e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="aso">ASO - Validade</Label>
-                        <Input id="aso" type="date" value={formData.asoValidade} onChange={(e) => handleInputChange('asoValidade', e.target.value)} />
+                        <Input id="aso" type="date" value={formData.asoValidade} onChange={(e) => handleInputChange("asoValidade", e.target.value)} />
                       </div>
                     </div>
                   </div>
 
+                  <div className="space-y-4 rounded-lg border bg-background p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-semibold text-foreground">Acesso ao sistema</h3>
+                        <p className="text-sm text-muted-foreground">Se preencher email e perfil, o usuario tambem sera criado no Supabase Auth.</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Label htmlFor="temAcesso" className="text-sm">Criar login</Label>
+                        <Switch
+                          id="temAcesso"
+                          checked={Boolean(formData.emailAcesso || formData.userId)}
+                          disabled={Boolean(formData.userId)}
+                          onCheckedChange={(checked) => {
+                            if (!checked) {
+                              handleInputChange("emailAcesso", "")
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {formData.userId ? (
+                      <Alert>
+                        <AlertDescription>Este membro ja possui usuario vinculado no Supabase Auth.</AlertDescription>
+                      </Alert>
+                    ) : null}
+
+                    {Boolean(formData.emailAcesso || formData.userId) ? (
+                      <div className="grid gap-6 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="emailAcesso">Email de acesso *</Label>
+                          <Input id="emailAcesso" type="email" value={formData.emailAcesso} onChange={(e) => handleInputChange("emailAcesso", e.target.value)} disabled={Boolean(formData.userId)} required={Boolean(formData.emailAcesso || formData.userId)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="perfilAcesso">Perfil de acesso *</Label>
+                          <Select value={formData.perfilAcesso || "operacional"} onValueChange={(value) => handleInputChange("perfilAcesso", value as EquipeRole)} disabled={Boolean(formData.userId)}>
+                            <SelectTrigger id="perfilAcesso"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Administrador</SelectItem>
+                              <SelectItem value="operacional">Operacional</SelectItem>
+                              <SelectItem value="financeiro">Financeiro</SelectItem>
+                              <SelectItem value="tecnico">Tecnico</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {!formData.userId ? (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="senhaAcesso">Senha provisoria *</Label>
+                              <Input id="senhaAcesso" type="password" value={formData.senhaAcesso} onChange={(e) => handleInputChange("senhaAcesso", e.target.value)} required={Boolean(formData.emailAcesso)} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="confirmarSenhaAcesso">Confirmar senha *</Label>
+                              <Input id="confirmarSenhaAcesso" type="password" value={formData.confirmarSenhaAcesso} onChange={(e) => handleInputChange("confirmarSenhaAcesso", e.target.value)} required={Boolean(formData.emailAcesso)} />
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+
                   <div className="flex gap-4 pt-4">
-                    <Button type="submit" className="flex-1">
-                      {editingId ? 'Atualizar Membro' : 'Cadastrar Membro'}
-                    </Button>
-                    {editingId && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingId(null)
-                          setFormData({
-                            nome: "",
-                            telefone: "",
-                            cargo: "",
-                            endereco: "",
-                            cpf: "",
-                            cnh: "Nao",
-                            cnhValidade: "",
-                            nr33Validade: "",
-                            nr35Validade: "",
-                            asoValidade: "",
-                            situacao: "Ativo",
-                          })
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                    )}
+                    <Button type="submit" className="flex-1" disabled={isSubmitting}>{isSubmitting ? "Salvando..." : editingId ? "Atualizar Membro" : "Cadastrar Membro"}</Button>
+                    {editingId ? (
+                      <Button type="button" variant="outline" onClick={resetForm} disabled={isSubmitting}>Cancelar</Button>
+                    ) : null}
                   </div>
                 </form>
               </CardContent>
@@ -373,3 +498,4 @@ export default function EquipePage() {
     </div>
   )
 }
+

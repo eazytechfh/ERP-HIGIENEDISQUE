@@ -1,6 +1,6 @@
-﻿"use client"
+"use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ErpHeader } from "@/components/erp-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Car, Wrench, Plus, Pencil, Trash2 } from "lucide-react"
+import { ensureFlowStoreInitialized, setFlowManutencoes, setFlowVeiculos } from "@/lib/flow-store"
 
 type Veiculo = {
   id: number
@@ -44,8 +45,26 @@ const manutencoesMock: ManutencaoPreventiva[] = [
 ]
 
 export default function VeiculosPage() {
-  const [veiculos, setVeiculos] = useState<Veiculo[]>(veiculosMock)
-  const [manutencoes, setManutencoes] = useState<ManutencaoPreventiva[]>(manutencoesMock)
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([])
+  const [manutencoes, setManutencoes] = useState<ManutencaoPreventiva[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    const store = ensureFlowStoreInitialized("operacional")
+    setVeiculos(Array.isArray(store.veiculos) ? (store.veiculos as Veiculo[]) : [])
+    setManutencoes(Array.isArray(store.manutencoes) ? (store.manutencoes as ManutencaoPreventiva[]) : [])
+    setLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (!loaded) return
+    setFlowVeiculos(veiculos as any[])
+  }, [veiculos, loaded])
+
+  useEffect(() => {
+    if (!loaded) return
+    setFlowManutencoes(manutencoes as any[])
+  }, [manutencoes, loaded])
   const [editingVeiculoId, setEditingVeiculoId] = useState<number | null>(null)
   const [editingManutencaoId, setEditingManutencaoId] = useState<number | null>(null)
 
@@ -148,6 +167,7 @@ export default function VeiculosPage() {
   }
 
   const handleExcluirManutencao = (id: number) => {
+    if (!window.confirm("Voce tem certeza que deseja excluir esta manutencao preventiva?")) return
     setManutencoes((prev) => prev.filter((m) => m.id !== id))
     if (editingManutencaoId === id) resetManutencaoForm()
   }
@@ -333,3 +353,8 @@ export default function VeiculosPage() {
     </div>
   )
 }
+
+
+
+
+

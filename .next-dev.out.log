@@ -1,0 +1,42 @@
+
+> my-v0-project@0.1.0 dev C:\projetos\disque-higiene\ERP-HIGIENEDISQUE
+> next dev
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://25.40.15.149:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+Creating turbopack project {
+  dir: 'C:\\projetos\\disque-higiene\\ERP-HIGIENEDISQUE',
+  testMode: true
+}
+ ✓ Ready in 1697ms
+ ○ Compiling / ...
+ GET / 200 in 7.5s (compile: 7.0s, render: 473ms)
+ ○ Compiling /dashboard ...
+ GET /dashboard 200 in 5.5s (compile: 5.0s, render: 497ms)
+ GET /dashboard/clientes 200 in 1980ms (compile: 1778ms, render: 202ms)
+ GET /dashboard/historico 200 in 801ms (compile: 668ms, render: 133ms)
+ GET /dashboard/servicos 200 in 1598ms (compile: 1495ms, render: 103ms)
+ GET /dashboard/produtos 200 in 898ms (compile: 809ms, render: 89ms)
+ ✓ Compiled in 578ms
+ ✓ Compiled in 945ms
+ ✓ Compiled in 224ms
+ GET /dashboard/produtos 200 in 598ms (compile: 291ms, render: 306ms)
+ GET /dashboard/produtos 200 in 88ms (compile: 7ms, render: 81ms)
+ GET /dashboard/produtos 200 in 71ms (compile: 18ms, render: 53ms)
+ GET /dashboard/produtos 200 in 49ms (compile: 8ms, render: 41ms)
+ GET /dashboard/produtos 200 in 48ms (compile: 5ms, render: 44ms)
+ ✓ Compiled in 494ms
+ GET /dashboard/produtos 200 in 66ms (compile: 8ms, render: 58ms)
+ GET /dashboard 200 in 441ms (compile: 275ms, render: 166ms)
+ GET /dashboard/clientes 200 in 245ms (compile: 160ms, render: 85ms)
+ GET /dashboard/historico 200 in 383ms (compile: 179ms, render: 204ms)
+ ○ Compiling /_error ...
+ GET /dashboard/clientes 200 in 86ms (compile: 27ms, render: 59ms)
+ GET /dashboard/servicos 500 in 7.0s (compile: 6.7s, render: 391ms)
+ GET /dashboard/historico 200 in 47ms (compile: 8ms, render: 39ms)
+ GET /dashboard/servicos 500 in 74ms (compile: 60ms, render: 14ms)
+ GET /dashboard/servicos 500 in 146ms (compile: 129ms, render: 16ms)

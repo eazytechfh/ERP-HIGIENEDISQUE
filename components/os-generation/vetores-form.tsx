@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -39,6 +39,7 @@ export type DadosTecnicosVetores = {
 type VetoresFormProps = {
   dados: DadosTecnicosVetores
   onChange: (dados: DadosTecnicosVetores) => void
+  produtosDisponiveis?: string[]
 }
 
 const pragasOptions: { value: PragaAlvo; label: string }[] = [
@@ -51,16 +52,6 @@ const pragasOptions: { value: PragaAlvo; label: string }[] = [
   { value: "outros", label: "Outros" },
 ]
 
-const produtosMock = [
-  "Cipermetrina 25%",
-  "Deltametrina 2,5%",
-  "Lambdacialotrina 10%",
-  "Fipronil 0,5%",
-  "Imidacloprido 21%",
-  "Gel Barata",
-  "Raticida em Bloco",
-]
-
 const equipamentosMock = [
   "Pulverizador Costal 20L",
   "Atomizador Motorizado",
@@ -69,7 +60,7 @@ const equipamentosMock = [
   "Polvilhadeira Manual",
 ]
 
-export function VetoresForm({ dados, onChange }: VetoresFormProps) {
+export function VetoresForm({ dados, onChange, produtosDisponiveis = [] }: VetoresFormProps) {
   const handlePragaChange = (praga: PragaAlvo, checked: boolean) => {
     const newPragas = checked
       ? [...dados.pragasAlvo, praga]
@@ -217,9 +208,15 @@ export function VetoresForm({ dados, onChange }: VetoresFormProps) {
                       <SelectValue placeholder="Selecione o produto" />
                     </SelectTrigger>
                     <SelectContent>
-                      {produtosMock.map(p => (
+                      {produtosDisponiveis.map((p: string) => (
                         <SelectItem key={p} value={p}>{p}</SelectItem>
                       ))}
+                      {produtosDisponiveis.length === 0 && (
+                        <SelectItem value="__sem_produtos__" disabled>
+                          Nenhum produto em estoque cadastrado
+                        </SelectItem>
+                      )}
+                    
                     </SelectContent>
                   </Select>
                 </div>
@@ -273,6 +270,7 @@ export function VetoresForm({ dados, onChange }: VetoresFormProps) {
                       {pragasOptions.map(p => (
                         <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                       ))}
+                    
                     </SelectContent>
                   </Select>
                 </div>
@@ -290,6 +288,7 @@ export function VetoresForm({ dados, onChange }: VetoresFormProps) {
                       {equipamentosMock.map(e => (
                         <SelectItem key={e} value={e}>{e}</SelectItem>
                       ))}
+                    
                     </SelectContent>
                   </Select>
                 </div>
@@ -355,3 +354,8 @@ export function VetoresForm({ dados, onChange }: VetoresFormProps) {
     </Card>
   )
 }
+
+
+
+
+

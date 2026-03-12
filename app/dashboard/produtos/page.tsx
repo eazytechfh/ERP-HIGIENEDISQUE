@@ -1,7 +1,7 @@
-﻿"use client"
+"use client"
 
 import { ErpHeader } from "@/components/erp-header"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { ensureFlowStoreInitialized, setFlowFornecedores, setFlowProdutos } from "@/lib/flow-store"
 
 // Tipos
 type Categoria = "Item Quimico" | "Diluente" | "Consumivel" | "Equipamentos" | "EPIs"
@@ -78,13 +79,13 @@ interface Fornecedor {
   ativo: boolean
 }
 
-// Mock database com produtos de dedetizaÃ§Ã£o
+// Mock database com produtos de dedetização
 const mockProdutos: Produto[] = [
   {
     id: 1,
     nome: "Cipermetrina 25% CE",
     marca: "Rogama",
-    fornecedor: "Distribuidora QuÃ­mica SA",
+    fornecedor: "Distribuidora Química SA",
     estoqueAtual: 45,
     estoqueMinimo: 20,
     unidade: "L",
@@ -120,7 +121,7 @@ const mockProdutos: Produto[] = [
     id: 4,
     nome: "Raticida Granulado",
     marca: "Citromax",
-    fornecedor: "Citromax Ind. QuÃ­mica",
+    fornecedor: "Citromax Ind. Química",
     estoqueAtual: 30,
     estoqueMinimo: 10,
     unidade: "kg",
@@ -132,7 +133,7 @@ const mockProdutos: Produto[] = [
     id: 5,
     nome: "Diluente Querosene",
     marca: "Petrobras",
-    fornecedor: "Distribuidora QuÃ­mica SA",
+    fornecedor: "Distribuidora Química SA",
     estoqueAtual: 100,
     estoqueMinimo: 50,
     unidade: "L",
@@ -142,7 +143,7 @@ const mockProdutos: Produto[] = [
   },
   {
     id: 6,
-    nome: "Luva NitrÃ­lica (Caixa 100un)",
+    nome: "Luva Nitrílica (Caixa 100un)",
     marca: "Descarpack",
     fornecedor: "EPI Center",
     estoqueAtual: 15,
@@ -154,7 +155,7 @@ const mockProdutos: Produto[] = [
   },
   {
     id: 7,
-    nome: "MÃ¡scara PFF2",
+    nome: "Máscara PFF2",
     marca: "3M",
     fornecedor: "EPI Center",
     estoqueAtual: 5,
@@ -168,7 +169,7 @@ const mockProdutos: Produto[] = [
     id: 8,
     nome: "Pulverizador Costal 20L",
     marca: "Guarany",
-    fornecedor: "Agro PeÃ§as Ltda",
+    fornecedor: "Agro Peças Ltda",
     estoqueAtual: 6,
     estoqueMinimo: 3,
     unidade: "unid",
@@ -180,7 +181,7 @@ const mockProdutos: Produto[] = [
     id: 9,
     nome: "Armadilha Adesiva Rateiro",
     marca: "Colly",
-    fornecedor: "Citromax Ind. QuÃ­mica",
+    fornecedor: "Citromax Ind. Química",
     estoqueAtual: 200,
     estoqueMinimo: 100,
     unidade: "unid",
@@ -315,15 +316,34 @@ function formatTelefone(value: string): string {
 }
 
 export default function EstoquePage() {
-  const [produtos, setProdutos] = useState<Produto[]>(mockProdutos)
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(mockFornecedores)
+  const [produtos, setProdutos] = useState<Produto[]>([])
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    const store = ensureFlowStoreInitialized("operacional")
+    setProdutos(Array.isArray(store.produtos) ? (store.produtos as Produto[]) : [])
+    setFornecedores(Array.isArray(store.fornecedores) ? (store.fornecedores as Fornecedor[]) : [])
+    setLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (!loaded) return
+    setFlowProdutos(produtos as any[])
+  }, [produtos, loaded])
+
+  useEffect(() => {
+    if (!loaded) return
+    setFlowFornecedores(fornecedores as any[])
+  }, [fornecedores, loaded])
   const [searchTerm, setSearchTerm] = useState("")
+  const [activeTab, setActiveTab] = useState("visualizar")
   const [searchFornecedor, setSearchFornecedor] = useState("")
   const [editingProduct, setEditingProduct] = useState<Produto | null>(null)
   const [editingFornecedor, setEditingFornecedor] = useState<Fornecedor | null>(null)
   const [isNFModalOpen, setIsNFModalOpen] = useState(false)
   
-  // FormulÃ¡rio Cadastro
+  // Formulário Cadastro
   const [formData, setFormData] = useState({
     nome: "",
     marca: "",
@@ -334,7 +354,7 @@ export default function EstoquePage() {
     ativo: true,
   })
 
-  // FormulÃ¡rio Fornecedor
+  // Formulário Fornecedor
   const [fornecedorForm, setFornecedorForm] = useState({
     razaoSocial: "",
     cnpj: "",
@@ -350,7 +370,7 @@ export default function EstoquePage() {
     ativo: true,
   })
 
-  // FormulÃ¡rio Nota Fiscal
+  // Formulário Nota Fiscal
   const [nfData, setNfData] = useState({
     fornecedorId: null as number | null,
     numeroNF: "",
@@ -365,17 +385,19 @@ export default function EstoquePage() {
   const handleCadastrar = (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.categoria || !formData.unidade) return
+    const categoria = formData.categoria
+    const unidade = formData.unidade
     
     const novoProduto: Produto = {
       id: Math.max(...produtos.map(p => p.id)) + 1,
       nome: formData.nome,
       marca: formData.marca,
       fornecedor: formData.fornecedor,
-      estoqueAtual: 0, // Estoque comeÃ§a zerado
+      estoqueAtual: 0, // Estoque começa zerado
       estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
-      unidade: formData.unidade,
-      categoria: formData.categoria,
-      custoUnitario: 0, // SerÃ¡ definido na entrada de NF
+      unidade,
+      categoria,
+      custoUnitario: 0, // Será definido na entrada de NF
       ativo: formData.ativo,
     }
     setProdutos([...produtos, novoProduto])
@@ -391,6 +413,7 @@ export default function EstoquePage() {
   }
 
   const handleEditar = (produto: Produto) => {
+    setActiveTab("cadastrar")
     setEditingProduct(produto)
     setFormData({
       nome: produto.nome,
@@ -406,6 +429,8 @@ export default function EstoquePage() {
   const handleSalvarEdicao = (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingProduct || !formData.categoria || !formData.unidade) return
+    const categoria = formData.categoria
+    const unidade = formData.unidade
     
     setProdutos(
       produtos.map((p) =>
@@ -415,8 +440,8 @@ export default function EstoquePage() {
               nome: formData.nome,
               marca: formData.marca,
               fornecedor: formData.fornecedor,
-              categoria: formData.categoria,
-              unidade: formData.unidade,
+              categoria,
+              unidade,
               estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
               ativo: formData.ativo,
             }
@@ -613,7 +638,7 @@ export default function EstoquePage() {
           </div>
         </div>
 
-        <Tabs defaultValue="visualizar" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="visualizar">Visualizar Estoque</TabsTrigger>
             <TabsTrigger value="cadastrar">Cadastrar Item</TabsTrigger>
@@ -1052,7 +1077,7 @@ export default function EstoquePage() {
           {/* Cadastro de Fornecedor */}
           <TabsContent value="fornecedor" className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
-              {/* FormulÃ¡rio de Cadastro */}
+              {/* Formulário de Cadastro */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1124,7 +1149,7 @@ export default function EstoquePage() {
                       </div>
                     </div>
 
-                    {/* EndereÃ§o */}
+                    {/* Endereço */}
                     <div className="pt-4 border-t">
                       <Label className="text-base font-semibold mb-3 block">Endereco</Label>
                       <div className="grid gap-4 md:grid-cols-2">
@@ -1303,7 +1328,7 @@ export default function EstoquePage() {
         </Tabs>
       </main>
 
-      {/* Modal de confirmaÃ§Ã£o (mantido para possÃ­vel uso futuro) */}
+      {/* Modal de confirmação (mantido para possível uso futuro) */}
       <Dialog open={isNFModalOpen} onOpenChange={setIsNFModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1325,6 +1350,13 @@ export default function EstoquePage() {
     </div>
   )
 }
+
+
+
+
+
+
+
 
 
 
