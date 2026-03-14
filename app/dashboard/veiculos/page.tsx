@@ -12,9 +12,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Car, Wrench, Plus, Pencil, Trash2 } from "lucide-react"
 import { ensureFlowStoreInitialized, setFlowManutencoes, setFlowVeiculos } from "@/lib/flow-store"
+import {
+  deleteManutencaoPreventivaSupabase,
+  deleteVeiculoSupabase,
+  listManutencoesPreventivasSupabase,
+  listVeiculosSupabase,
+  upsertManutencaoPreventivaSupabase,
+  upsertVeiculoSupabase,
+} from "@/lib/supabase/veiculos-repo"
 
 type Veiculo = {
-  id: number
+  id: string
   modelo: string
   marca: string
   placa: string
@@ -25,48 +33,33 @@ type Veiculo = {
 type StatusManutencao = "Pendente" | "Agendada" | "Concluida"
 
 type ManutencaoPreventiva = {
-  id: number
-  veiculoId: number
+  id: string
+  veiculoId: string
   descricao: string
   dataPrevista: string
   quilometragem: number
   status: StatusManutencao
 }
 
-const veiculosMock: Veiculo[] = [
-  { id: 1, modelo: "Sprinter 415", marca: "Mercedes", placa: "ABC1D23", responsavel: "Carlos Silva", ativo: true },
-  { id: 2, modelo: "Master", marca: "Renault", placa: "QWE4R56", responsavel: "Ana Costa", ativo: true },
-  { id: 3, modelo: "Ducato", marca: "Fiat", placa: "RTY7U89", responsavel: "Paulo Lima", ativo: false },
-]
-
-const manutencoesMock: ManutencaoPreventiva[] = [
-  { id: 1, veiculoId: 1, descricao: "Troca de oleo e filtros", dataPrevista: "2026-03-15", quilometragem: 45000, status: "Pendente" },
-  { id: 2, veiculoId: 2, descricao: "Revisao de freios", dataPrevista: "2026-03-10", quilometragem: 62000, status: "Agendada" },
-]
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === "string") return error
+  if (error && typeof error === "object") {
+    const maybeError = error as { message?: unknown; details?: unknown }
+    if (typeof maybeError.message === "string") return maybeError.message
+    if (typeof maybeError.details === "string") return maybeError.details
+  }
+  return "Ocorreu um erro inesperado."
+}
 
 export default function VeiculosPage() {
   const [veiculos, setVeiculos] = useState<Veiculo[]>([])
   const [manutencoes, setManutencoes] = useState<ManutencaoPreventiva[]>([])
   const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    const store = ensureFlowStoreInitialized("operacional")
-    setVeiculos(Array.isArray(store.veiculos) ? (store.veiculos as Veiculo[]) : [])
-    setManutencoes(Array.isArray(store.manutencoes) ? (store.manutencoes as ManutencaoPreventiva[]) : [])
-    setLoaded(true)
-  }, [])
-
-  useEffect(() => {
-    if (!loaded) return
-    setFlowVeiculos(veiculos as any[])
-  }, [veiculos, loaded])
-
-  useEffect(() => {
-    if (!loaded) return
-    setFlowManutencoes(manutencoes as any[])
-  }, [manutencoes, loaded])
-  const [editingVeiculoId, setEditingVeiculoId] = useState<number | null>(null)
-  const [editingManutencaoId, setEditingManutencaoId] = useState<number | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [pageError, setPageError] = useState<string | null>(null)
+  const [editingVeiculoId, setEditingVeiculoId] = useState<string | null>(null)
+  const [editingManutencaoId, setEditingManutencaoId] = useState<string | null>(null)
 
   const [veiculoForm, setVeiculoForm] = useState({
     modelo: "",
@@ -84,6 +77,49 @@ export default function VeiculosPage() {
     status: "Pendente" as StatusManutencao,
   })
 
+  useEffect(() => {
+    let active = true
+
+    async function loadData() {
+      try {
+        const [veiculosDb, manutencoesDb] = await Promise.all([
+          listVeiculosSupabase(),
+          listManutencoesPreventivasSupabase(),
+        ])
+
+        if (!active) return
+        setVeiculos(veiculosDb)
+        setManutencoes(manutencoesDb)
+        setLoadError(null)
+      } catch (error) {
+        console.error("Falha ao carregar veiculos do Supabase", error)
+        const store = ensureFlowStoreInitialized("operacional")
+        if (!active) return
+        setVeiculos(Array.isArray(store.veiculos) ? (store.veiculos as Veiculo[]) : [])
+        setManutencoes(Array.isArray(store.manutencoes) ? (store.manutencoes as ManutencaoPreventiva[]) : [])
+        setLoadError("Nao foi possivel carregar veiculos do Supabase. Exibindo dados locais, se houver.")
+      } finally {
+        if (active) setLoaded(true)
+      }
+    }
+
+    void loadData()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!loaded) return
+    setFlowVeiculos(veiculos as any[])
+  }, [veiculos, loaded])
+
+  useEffect(() => {
+    if (!loaded) return
+    setFlowManutencoes(manutencoes as any[])
+  }, [manutencoes, loaded])
+
   const veiculosAtivos = useMemo(() => veiculos.filter((v) => v.ativo), [veiculos])
 
   const resetVeiculoForm = () => {
@@ -96,25 +132,34 @@ export default function VeiculosPage() {
     setEditingManutencaoId(null)
   }
 
-  const handleSalvarVeiculo = (e: React.FormEvent) => {
+  const handleSalvarVeiculo = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = {
-      modelo: veiculoForm.modelo.trim(),
-      marca: veiculoForm.marca.trim(),
-      placa: veiculoForm.placa.trim().toUpperCase(),
-      responsavel: veiculoForm.responsavel.trim(),
-      ativo: veiculoForm.ativo,
+    try {
+      setPageError(null)
+      const payload = {
+        modelo: veiculoForm.modelo.trim(),
+        marca: veiculoForm.marca.trim(),
+        placa: veiculoForm.placa.trim().toUpperCase(),
+        responsavel: veiculoForm.responsavel.trim(),
+        ativo: veiculoForm.ativo,
+      }
+
+      if (!payload.modelo || !payload.marca || !payload.placa || !payload.responsavel) return
+
+      const saved = await upsertVeiculoSupabase({
+        id: editingVeiculoId || undefined,
+        ...payload,
+      })
+
+      setVeiculos((prev) =>
+        editingVeiculoId ? prev.map((v) => (v.id === editingVeiculoId ? saved : v)) : [saved, ...prev]
+      )
+
+      resetVeiculoForm()
+    } catch (error) {
+      console.error("Falha ao salvar veiculo", error)
+      setPageError(getErrorMessage(error))
     }
-
-    if (!payload.modelo || !payload.marca || !payload.placa || !payload.responsavel) return
-
-    if (editingVeiculoId) {
-      setVeiculos((prev) => prev.map((v) => (v.id === editingVeiculoId ? { ...v, ...payload } : v)))
-    } else {
-      setVeiculos((prev) => [...prev, { id: Date.now(), ...payload }])
-    }
-
-    resetVeiculoForm()
   }
 
   const handleEditarVeiculo = (veiculo: Veiculo) => {
@@ -128,37 +173,54 @@ export default function VeiculosPage() {
     })
   }
 
-  const handleExcluirVeiculo = (id: number) => {
-    setVeiculos((prev) => prev.filter((v) => v.id !== id))
-    setManutencoes((prev) => prev.filter((m) => m.veiculoId !== id))
-    if (editingVeiculoId === id) resetVeiculoForm()
+  const handleExcluirVeiculo = async (id: string) => {
+    if (!window.confirm("Voce tem certeza que deseja excluir este veiculo?")) return
+    try {
+      setPageError(null)
+      await deleteVeiculoSupabase(id)
+      setVeiculos((prev) => prev.filter((v) => v.id !== id))
+      setManutencoes((prev) => prev.filter((m) => m.veiculoId !== id))
+      if (editingVeiculoId === id) resetVeiculoForm()
+    } catch (error) {
+      console.error("Falha ao excluir veiculo", error)
+      setPageError(getErrorMessage(error))
+    }
   }
 
-  const handleSalvarManutencao = (e: React.FormEvent) => {
+  const handleSalvarManutencao = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = {
-      veiculoId: Number(manutencaoForm.veiculoId),
-      descricao: manutencaoForm.descricao.trim(),
-      dataPrevista: manutencaoForm.dataPrevista,
-      quilometragem: Number(manutencaoForm.quilometragem),
-      status: manutencaoForm.status,
+    try {
+      setPageError(null)
+      const payload = {
+        veiculoId: manutencaoForm.veiculoId,
+        descricao: manutencaoForm.descricao.trim(),
+        dataPrevista: manutencaoForm.dataPrevista,
+        quilometragem: Number(manutencaoForm.quilometragem),
+        status: manutencaoForm.status,
+      }
+
+      if (!payload.veiculoId || !payload.descricao || !payload.dataPrevista || !payload.quilometragem) return
+
+      const saved = await upsertManutencaoPreventivaSupabase({
+        id: editingManutencaoId || undefined,
+        ...payload,
+      })
+
+      setManutencoes((prev) =>
+        editingManutencaoId ? prev.map((m) => (m.id === editingManutencaoId ? saved : m)) : [...prev, saved]
+      )
+
+      resetManutencaoForm()
+    } catch (error) {
+      console.error("Falha ao salvar manutencao", error)
+      setPageError(getErrorMessage(error))
     }
-
-    if (!payload.veiculoId || !payload.descricao || !payload.dataPrevista || !payload.quilometragem) return
-
-    if (editingManutencaoId) {
-      setManutencoes((prev) => prev.map((m) => (m.id === editingManutencaoId ? { ...m, ...payload } : m)))
-    } else {
-      setManutencoes((prev) => [...prev, { id: Date.now(), ...payload }])
-    }
-
-    resetManutencaoForm()
   }
 
   const handleEditarManutencao = (m: ManutencaoPreventiva) => {
     setEditingManutencaoId(m.id)
     setManutencaoForm({
-      veiculoId: String(m.veiculoId),
+      veiculoId: m.veiculoId,
       descricao: m.descricao,
       dataPrevista: m.dataPrevista,
       quilometragem: String(m.quilometragem),
@@ -166,10 +228,17 @@ export default function VeiculosPage() {
     })
   }
 
-  const handleExcluirManutencao = (id: number) => {
+  const handleExcluirManutencao = async (id: string) => {
     if (!window.confirm("Voce tem certeza que deseja excluir esta manutencao preventiva?")) return
-    setManutencoes((prev) => prev.filter((m) => m.id !== id))
-    if (editingManutencaoId === id) resetManutencaoForm()
+    try {
+      setPageError(null)
+      await deleteManutencaoPreventivaSupabase(id)
+      setManutencoes((prev) => prev.filter((m) => m.id !== id))
+      if (editingManutencaoId === id) resetManutencaoForm()
+    } catch (error) {
+      console.error("Falha ao excluir manutencao", error)
+      setPageError(getErrorMessage(error))
+    }
   }
 
   return (
@@ -178,8 +247,20 @@ export default function VeiculosPage() {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-foreground">Veiculos</h1>
-          <p className="text-muted-foreground">Gestao de frota e manutencoes preventivas (mock local)</p>
+          <p className="text-muted-foreground">Gestao de frota e manutencoes preventivas conectada ao Supabase</p>
         </div>
+
+        {loadError ? (
+          <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {loadError}
+          </div>
+        ) : null}
+
+        {pageError ? (
+          <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {pageError}
+          </div>
+        ) : null}
 
         <Tabs defaultValue="lista" className="space-y-6">
           <TabsList className="grid w-full max-w-xl grid-cols-2">
@@ -207,23 +288,31 @@ export default function VeiculosPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {veiculos.map((v) => (
-                        <TableRow key={v.id} className={!v.ativo ? "opacity-60" : ""}>
-                          <TableCell>{v.modelo}</TableCell>
-                          <TableCell>{v.marca}</TableCell>
-                          <TableCell className="font-medium">{v.placa}</TableCell>
-                          <TableCell>{v.responsavel}</TableCell>
-                          <TableCell>
-                            <Badge variant={v.ativo ? "default" : "secondary"}>{v.ativo ? "Ativo" : "Inativo"}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => handleEditarVeiculo(v)}><Pencil className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleExcluirVeiculo(v.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </div>
+                      {veiculos.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                            Nenhum veiculo cadastrado.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        veiculos.map((v) => (
+                          <TableRow key={v.id} className={!v.ativo ? "opacity-60" : ""}>
+                            <TableCell>{v.modelo}</TableCell>
+                            <TableCell>{v.marca}</TableCell>
+                            <TableCell className="font-medium">{v.placa}</TableCell>
+                            <TableCell>{v.responsavel}</TableCell>
+                            <TableCell>
+                              <Badge variant={v.ativo ? "default" : "secondary"}>{v.ativo ? "Ativo" : "Inativo"}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => handleEditarVeiculo(v)}><Pencil className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" onClick={() => void handleExcluirVeiculo(v.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -233,7 +322,7 @@ export default function VeiculosPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Wrench className="h-5 w-5" />Manutencoes Preventivas</CardTitle>
-                <CardDescription>Lista editavel mock para controle preventivo da frota</CardDescription>
+                <CardDescription>Controle preventivo conectado ao Supabase</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <form onSubmit={handleSalvarManutencao} className="grid gap-4 md:grid-cols-5 items-end">
@@ -243,7 +332,7 @@ export default function VeiculosPage() {
                       <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                       <SelectContent>
                         {veiculosAtivos.map((v) => (
-                          <SelectItem key={v.id} value={String(v.id)}>{v.placa} - {v.modelo}</SelectItem>
+                          <SelectItem key={v.id} value={v.id}>{v.placa} - {v.modelo}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -289,24 +378,32 @@ export default function VeiculosPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {manutencoes.map((m) => {
-                        const veiculo = veiculos.find((v) => v.id === m.veiculoId)
-                        return (
-                          <TableRow key={m.id}>
-                            <TableCell>{veiculo ? `${veiculo.placa} - ${veiculo.modelo}` : "-"}</TableCell>
-                            <TableCell>{m.descricao}</TableCell>
-                            <TableCell>{m.dataPrevista}</TableCell>
-                            <TableCell>{m.quilometragem}</TableCell>
-                            <TableCell><Badge variant={m.status === "Concluida" ? "default" : "secondary"}>{m.status}</Badge></TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => handleEditarManutencao(m)}><Pencil className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleExcluirManutencao(m.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
+                      {manutencoes.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                            Nenhuma manutencao preventiva cadastrada.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        manutencoes.map((m) => {
+                          const veiculo = veiculos.find((v) => v.id === m.veiculoId)
+                          return (
+                            <TableRow key={m.id}>
+                              <TableCell>{veiculo ? `${veiculo.placa} - ${veiculo.modelo}` : "-"}</TableCell>
+                              <TableCell>{m.descricao}</TableCell>
+                              <TableCell>{m.dataPrevista}</TableCell>
+                              <TableCell>{m.quilometragem}</TableCell>
+                              <TableCell><Badge variant={m.status === "Concluida" ? "default" : "secondary"}>{m.status}</Badge></TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => handleEditarManutencao(m)}><Pencil className="h-4 w-4" /></Button>
+                                  <Button variant="ghost" size="icon" onClick={() => void handleExcluirManutencao(m.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -318,7 +415,7 @@ export default function VeiculosPage() {
             <Card>
               <CardHeader>
                 <CardTitle>{editingVeiculoId ? "Editar Veiculo" : "Cadastrar Veiculo"}</CardTitle>
-                <CardDescription>Preencha os dados basicos do veiculo (mock local)</CardDescription>
+                <CardDescription>Preencha os dados basicos do veiculo salvos no Supabase</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSalvarVeiculo} className="space-y-4">
@@ -342,7 +439,7 @@ export default function VeiculosPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Button type="submit">{editingVeiculoId ? "Salvar Alteracoes" : "Cadastrar Veiculo"}</Button>
-                    {editingVeiculoId && <Button type="button" variant="outline" onClick={resetVeiculoForm}>Cancelar</Button>}
+                    {editingVeiculoId ? <Button type="button" variant="outline" onClick={resetVeiculoForm}>Cancelar</Button> : null}
                   </div>
                 </form>
               </CardContent>
@@ -353,8 +450,3 @@ export default function VeiculosPage() {
     </div>
   )
 }
-
-
-
-
-

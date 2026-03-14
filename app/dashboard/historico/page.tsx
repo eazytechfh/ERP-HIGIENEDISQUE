@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Search, CheckCircle2, Clock, XCircle, Bell, Calendar, FileText, Eye } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Search, CheckCircle2, Clock, XCircle, Bell, Calendar, FileText, Eye, Paperclip } from "lucide-react"
 import { toIsoDate } from "@/lib/flow-store"
 import { listClientesSupabase } from "@/lib/supabase/clientes-repo"
 import { mapClienteToServicoView } from "@/lib/supabase/clientes-view"
-import { listServicosSupabase } from "@/lib/supabase/servicos-repo"
+import { getOSAssinadaArquivoUrl, listServicosSupabase } from "@/lib/supabase/servicos-repo"
 
 type ClienteResumo = {
   id: string
@@ -31,6 +32,15 @@ type ServicoHistorico = {
   status: "Realizado" | "Programado" | "Cancelado" | "Em execucao"
   valor: number
   observacao: string
+  cliente: string
+  local: string
+  horario: string
+  tecnico: string
+  osDocumentoHtml: string
+  osAssinada: boolean
+  osAssinadaNome: string
+  osAssinadaStorageBucket: string
+  osAssinadaStoragePath: string
 }
 
 const statusMap: Record<string, ServicoHistorico["status"]> = {
@@ -45,6 +55,8 @@ export default function HistoricoPage() {
   const [selectedCliente, setSelectedCliente] = useState<ClienteResumo | null>(null)
   const [clientes, setClientes] = useState<ClienteResumo[]>([])
   const [servicos, setServicos] = useState<ServicoHistorico[]>([])
+  const [selectedServico, setSelectedServico] = useState<ServicoHistorico | null>(null)
+  const [showOSDialog, setShowOSDialog] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -75,10 +87,19 @@ export default function HistoricoPage() {
             clienteId: s.clienteId,
             nome: s.servico,
             data: toIsoDate(s.data) || s.data,
-            status: statusMap[s.status] ?? "Programado",
-            valor: 0,
-            observacao: s.baixaObservacao || `OS ${s.osNumber} registrada no sistema`,
-          }))
+             status: statusMap[s.status] ?? "Programado",
+             valor: 0,
+             observacao: s.baixaObservacao || `OS ${s.osNumber} registrada no sistema`,
+             cliente: s.cliente,
+             local: s.local,
+             horario: s.horario,
+             tecnico: s.tecnico,
+             osDocumentoHtml: s.osDocumentoHtml,
+             osAssinada: s.osAssinada,
+             osAssinadaNome: s.osAssinadaNome,
+             osAssinadaStorageBucket: s.osAssinadaStorageBucket,
+             osAssinadaStoragePath: s.osAssinadaStoragePath,
+            }))
         )
       } catch (error) {
         console.error("Falha ao carregar historico no Supabase", error)
@@ -137,6 +158,58 @@ export default function HistoricoPage() {
     const date = new Date(`${iso || dateString}T00:00:00`)
     if (Number.isNaN(date.getTime())) return dateString
     return date.toLocaleDateString("pt-BR")
+  }
+
+  const buildOSDocumentHtml = (contentHtml: string, osNumberValue: string) => `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${osNumberValue}</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111827; }
+    .h-4 { height: 1rem; }
+    .h-16 { height: 4rem; }
+    .min-h-\[40px\] { min-height: 40px; }
+    .min-h-\[60px\] { min-height: 60px; }
+    .inline-flex { display: inline-flex; }
+    .leading-tight { line-height: 1.25; }
+    .align-top { vertical-align: top; }
+    .space-y-1 > * + * { margin-top: 0.25rem; }
+    table { border-collapse: collapse; width: 100%; }
+    @media print {
+      body { margin: 0; padding: 10px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  ${contentHtml}
+</body>
+</html>`
+
+  const handleVerOS = (servico: ServicoHistorico) => {
+    setSelectedServico(servico)
+    setShowOSDialog(true)
+  }
+
+  const handleImprimirOS = () => {
+    if (!selectedServico?.osDocumentoHtml) return
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) return
+    printWindow.document.write(buildOSDocumentHtml(selectedServico.osDocumentoHtml, selectedServico.osNumber))
+    printWindow.document.close()
+    printWindow.print()
+  }
+
+  const handleAbrirAnexoAssinado = async (servico: ServicoHistorico) => {
+    if (!servico.osAssinadaStorageBucket || !servico.osAssinadaStoragePath) return
+    try {
+      const signedUrl = await getOSAssinadaArquivoUrl(servico.osAssinadaStorageBucket, servico.osAssinadaStoragePath)
+      window.open(signedUrl, "_blank", "noopener,noreferrer")
+    } catch (error) {
+      console.error("Falha ao abrir anexo assinado da OS", error)
+    }
   }
 
   return (
@@ -247,12 +320,18 @@ export default function HistoricoPage() {
                               <Badge className={getStatusColor(servico.status)}>{servico.status}</Badge>
                             </div>
                             <p className="mb-3 text-sm text-muted-foreground">{servico.observacao}</p>
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/dashboard/servicos?os=${servico.osNumber}`}>
+                            <div className="flex flex-wrap gap-2">
+                              <Button variant="outline" size="sm" onClick={() => handleVerOS(servico)}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver OS
-                              </Link>
-                            </Button>
+                              </Button>
+                              {servico.osAssinada && servico.osAssinadaStoragePath ? (
+                                <Button variant="outline" size="sm" onClick={() => void handleAbrirAnexoAssinado(servico)}>
+                                  <Paperclip className="mr-2 h-4 w-4" />
+                                  Ver anexo assinado
+                                </Button>
+                              ) : null}
+                            </div>
                           </div>
                         ))
                       )}
@@ -289,6 +368,60 @@ export default function HistoricoPage() {
             )}
           </div>
         </div>
+
+        <Dialog open={showOSDialog} onOpenChange={setShowOSDialog}>
+          <DialogContent className="max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>Preview da OS</DialogTitle>
+              <DialogDescription>Visualizacao do documento salvo da ordem de servico.</DialogDescription>
+            </DialogHeader>
+            {selectedServico && (
+              <div className="space-y-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Badge variant="default">{selectedServico.osNumber}</Badge>
+                  <Badge className={getStatusColor(selectedServico.status)}>{selectedServico.status}</Badge>
+                </div>
+                <Card>
+                  <CardContent className="space-y-2 pt-4">
+                    <p><span className="text-muted-foreground">Servico:</span> {selectedServico.nome}</p>
+                    <p><span className="text-muted-foreground">Cliente:</span> {selectedServico.cliente}</p>
+                    <p><span className="text-muted-foreground">Local:</span> {selectedServico.local || "-"}</p>
+                    <p><span className="text-muted-foreground">Data:</span> {formatDate(selectedServico.data)}</p>
+                    <p><span className="text-muted-foreground">Horario:</span> {selectedServico.horario || "-"}</p>
+                    <p><span className="text-muted-foreground">Tecnico:</span> {selectedServico.tecnico || "-"}</p>
+                    <p><span className="text-muted-foreground">OS assinada:</span> {selectedServico.osAssinada ? (selectedServico.osAssinadaNome || "Arquivo anexado") : "Nao"}</p>
+                  </CardContent>
+                </Card>
+                {selectedServico.osDocumentoHtml ? (
+                  <div className="overflow-hidden rounded-lg border">
+                    <iframe
+                      title={`preview-${selectedServico.osNumber}`}
+                      srcDoc={buildOSDocumentHtml(selectedServico.osDocumentoHtml, selectedServico.osNumber)}
+                      className="h-[65vh] w-full"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-600">Esta OS ainda nao possui documento salvo.</p>
+                )}
+              </div>
+            )}
+            <DialogFooter>
+              {selectedServico?.osAssinada && selectedServico.osAssinadaStoragePath ? (
+                <Button variant="outline" onClick={() => void handleAbrirAnexoAssinado(selectedServico)} className="bg-transparent">
+                  Ver anexo assinado
+                </Button>
+              ) : null}
+              {selectedServico?.osDocumentoHtml ? (
+                <Button variant="outline" onClick={handleImprimirOS} className="bg-transparent">
+                  Imprimir OS
+                </Button>
+              ) : null}
+              <Button variant="outline" onClick={() => setShowOSDialog(false)} className="bg-transparent">
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )

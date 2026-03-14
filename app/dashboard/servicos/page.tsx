@@ -4,6 +4,7 @@ import React from "react"
 
 import { ErpHeader } from "@/components/erp-header"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -46,7 +47,13 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { buildLocaisPorCliente, mapClienteToServicoView } from "@/lib/supabase/clientes-view"
-import { ensureFlowStoreInitialized, loadFlowContratos, loadFlowStore, setFlowServicos, toIsoDate, type FlowContrato, type FlowServico } from "@/lib/flow-store"
+import { setFlowServicos, toIsoDate, type FlowServico } from "@/lib/flow-store"
+import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
+import { listEquipeMembrosSupabase } from "@/lib/supabase/equipe-repo"
+import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
+import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
+import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, type ServicoSupabaseItem } from "@/lib/supabase/servicos-repo"
+import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 
 // Tipos
 type Cliente = {
@@ -113,6 +120,10 @@ type ServiceRequest = {
     billingDocument?: "recibo" | "nota_fiscal"
     additionalReason?: string
     approved?: boolean
+    registerRevenueInCashFlow?: boolean
+    revenueCategoryId?: string
+    notifyEmail?: boolean
+    notifyWhatsapp?: boolean
   }
   warrantyDays: string
   attachments: File[]
@@ -160,7 +171,8 @@ const veiculosMock: Veiculo[] = [
 
 // Mock data de serviços agendados
 
-type StatusAgendado = "agendado" | "em_execucao" | "concluido"
+type StatusAgendado = "agendado" | "em_execucao" | "concluido" | "cancelado"
+type StatusOSVisual = Exclude<OSStatus, "a_gerar"> | "cancelada"
 
 type ServicoAgendado = {
   id: string
@@ -174,11 +186,23 @@ type ServicoAgendado = {
   horario: string
   tecnico: string
   status: StatusAgendado
-  osStatus: Exclude<OSStatus, "a_gerar">
+  osStatus: StatusOSVisual
   osFingerprint?: string
   osDocumentoHtml?: string
   osFoiAssinada?: boolean
   responsavelBaixa?: string
+  billingMode?: BillingMode
+  contractId?: string
+  contractItemId?: string
+  billingValue?: number
+  paymentMethod?: string
+  billingDocument?: string
+  additionalReason?: string
+  billingApproved?: boolean
+  registerRevenueInCashFlow?: boolean
+  revenueCategoryId?: string
+  notifyEmail?: boolean
+  notifyWhatsapp?: boolean
 }
 
 type OSViewerData = {
@@ -190,7 +214,7 @@ type OSViewerData = {
   horario: string
   tecnico: string
   status: StatusAgendado
-  osStatus: Exclude<OSStatus, "a_gerar">
+  osStatus: StatusOSVisual
   osFingerprint?: string
   osDocumentoHtml?: string
 }
@@ -241,6 +265,7 @@ const agendadosStatusConfig = {
   agendado: { label: "Agendado", color: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
   em_execucao: { label: "Em Execucao", color: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
   concluido: { label: "Concluido", color: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" },
+  cancelado: { label: "Cancelado", color: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
 }
 
 const osStatusConfigMap = {
@@ -248,6 +273,7 @@ const osStatusConfigMap = {
   impressa: { label: "OS Impressa", variant: "default" as const },
   entregue_tecnico: { label: "Entregue ao Tecnico", variant: "default" as const },
   assinada_digitalizada: { label: "OS Assinada", variant: "default" as const },
+  cancelada: { label: "OS Cancelada", variant: "destructive" as const },
 }
 
 
@@ -259,20 +285,76 @@ function toDisplayDate(value: string) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === "string") return error
+  if (error && typeof error === "object") {
+    const maybeError = error as { message?: unknown; details?: unknown }
+    if (typeof maybeError.message === "string") return maybeError.message
+    if (typeof maybeError.details === "string") return maybeError.details
+  }
+  return "Ocorreu um erro inesperado."
+}
+
+function mapEquipeTipo(value: string): Equipe["tipo"] {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+
+  if (normalized.includes("caminh")) return "equipe_caminhao"
+  if (normalized.includes("limpeza") || normalized.includes("fossa") || normalized.includes("hidrojato")) {
+    return "equipe_limpeza"
+  }
+  return "tecnico_individual"
+}
+
+function mapServicoSupabaseToAgendado(servico: ServicoSupabaseItem): ServicoAgendado {
+  return {
+    id: servico.id,
+    osNumber: servico.osNumber,
+    cliente: servico.cliente,
+    clienteId: servico.clienteId,
+    servico: servico.servico,
+    tipo: servico.tipo || "outro",
+    local: servico.local,
+    data: toDisplayDate(servico.data),
+    horario: servico.horario,
+    tecnico: servico.tecnico,
+    status: mapFlowStatusToAgendado(servico.status),
+    osStatus: (servico.osStatus as StatusOSVisual) || "gerada",
+    osFingerprint: servico.osFingerprint || undefined,
+    osDocumentoHtml: servico.osDocumentoHtml || undefined,
+    osFoiAssinada: servico.osAssinada,
+    responsavelBaixa: servico.responsavelBaixa || servico.baixaObservacao || undefined,
+    billingMode: servico.cobrancaModo,
+    contractId: servico.contratoId || undefined,
+    contractItemId: servico.contratoItemId || undefined,
+    billingValue: servico.valorCobranca || 0,
+    paymentMethod: servico.formaPagamento || undefined,
+    billingDocument: servico.tipoDocumentoCobranca || undefined,
+    additionalReason: servico.motivoAdicional || undefined,
+    billingApproved: servico.cobrancaAprovada,
+    registerRevenueInCashFlow: servico.cobrancaModo === "adicional" && servico.valorCobranca > 0,
+  }
+}
+
 function mapFlowStatusToAgendado(status: FlowServico["status"]): StatusAgendado {
+  if (status === "cancelado") return "cancelado"
   if (status === "executado") return "concluido"
   if (status === "em_execucao") return "em_execucao"
   return "agendado"
 }
 
 function mapAgendadoStatusToFlow(status: StatusAgendado): FlowServico["status"] {
+  if (status === "cancelado") return "cancelado"
   if (status === "concluido") return "executado"
   if (status === "em_execucao") return "em_execucao"
   return "agendado"
 }
 
 function mapFlowServicoToAgendado(servico: FlowServico): ServicoAgendado {
-  const osStatus = (servico.osStatus as Exclude<OSStatus, "a_gerar"> | undefined) || "gerada"
+  const osStatus = (servico.osStatus as StatusOSVisual | undefined) || "gerada"
   return {
     id: servico.id,
     osNumber: servico.osNumber,
@@ -319,6 +401,7 @@ function ServicosAgendadosContent({
   onImprimirOS,
   onAtualizarStatus,
   onSolicitarBaixa,
+  onSolicitarCancelamento,
   onExcluirOS,
 }: {
   servicos: ServicoAgendado[]
@@ -326,6 +409,7 @@ function ServicosAgendadosContent({
   onImprimirOS: (servico: ServicoAgendado) => void
   onAtualizarStatus: (id: string, status: StatusAgendado) => void
   onSolicitarBaixa: (id: string) => void
+  onSolicitarCancelamento: (id: string) => void
   onExcluirOS: (id: string) => void
 }) {
   const [filtroAssinatura, setFiltroAssinatura] = useState<"todos" | "assinadas" | "sem_assinatura">("todos")
@@ -437,6 +521,10 @@ function ServicosAgendadosContent({
                           onSolicitarBaixa(servico.id)
                           return
                         }
+                        if (value === "cancelado") {
+                          onSolicitarCancelamento(servico.id)
+                          return
+                        }
                         onAtualizarStatus(servico.id, value as StatusAgendado)
                       }}
                     >
@@ -446,6 +534,7 @@ function ServicosAgendadosContent({
                       <SelectContent>
                         <SelectItem value="em_execucao">Em execucao</SelectItem>
                         <SelectItem value="concluido">Dar baixa (Concluido)</SelectItem>
+                        <SelectItem value="cancelado">Cancelar OS</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button
@@ -482,41 +571,84 @@ export default function ServicosPage() {
   const [activeTab, setActiveTab] = useState("nova-solicitacao")
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
   const [searchTerm, setSearchTerm] = useState("")
-  const [tick, setTick] = useState(0)
   const [clientesSupabase, setClientesSupabase] = useState<ClienteInput[]>([])
-
-  useEffect(() => {
-    ensureFlowStoreInitialized("operacional")
-    const onFocus = () => setTick((v) => v + 1)
-    const onStorage = () => setTick((v) => v + 1)
-    window.addEventListener("focus", onFocus)
-    window.addEventListener("storage", onStorage)
-    return () => {
-      window.removeEventListener("focus", onFocus)
-      window.removeEventListener("storage", onStorage)
-    }
-  }, [])
+  const [contratosSupabase, setContratosSupabase] = useState<Contrato[]>([])
+  const [equipesData, setEquipesData] = useState<Equipe[]>([])
+  const [veiculosData, setVeiculosData] = useState<Veiculo[]>([])
+  const [produtosData, setProdutosData] = useState<any[]>([])
+  const [categoriasFinanceirasReceita, setCategoriasFinanceirasReceita] = useState<FinanceiroCategoriaItem[]>([])
+  const [servicosDb, setServicosDb] = useState<ServicoSupabaseItem[]>([])
+  const [pageError, setPageError] = useState("")
 
   useEffect(() => {
     let mounted = true
-
-    const loadClientes = async () => {
+    const loadData = async () => {
       try {
-        const rows = await listClientesSupabase()
-        if (mounted) setClientesSupabase(rows)
+        const [clientesRows, contratosRows, equipeRows, veiculosRows, produtosRows, servicosRows, categoriasReceitaRows] = await Promise.all([
+          listClientesSupabase(),
+          listContratosSupabase(),
+          listEquipeMembrosSupabase(),
+          listVeiculosSupabase(),
+          listProdutosSupabase(),
+          listServicosSupabase(),
+          listFinanceiroCategoriasSupabase("receita"),
+        ])
+
+        if (!mounted) return
+
+        setClientesSupabase(clientesRows)
+        setContratosSupabase(
+          contratosRows.map((contrato) => ({
+            id: contrato.id,
+            clienteId: contrato.clienteId,
+            numero: contrato.numero,
+            descricao: contrato.descricao,
+            itens: contrato.itens,
+          })),
+        )
+        setEquipesData(
+          equipeRows
+            .filter((membro) => membro.situacao === "Ativo")
+            .map((membro, index) => ({
+              id: String(membro.id || membro.userId || `eq-${index}`),
+              nome: membro.nome || `Membro ${index + 1}`,
+              tipo: mapEquipeTipo(`${membro.cargo} ${membro.nome} ${membro.perfilAcesso}`),
+            })),
+        )
+        setVeiculosData(
+          veiculosRows
+            .filter((veiculo) => veiculo.ativo)
+            .map((veiculo) => ({
+              id: veiculo.id,
+              placa: veiculo.placa,
+              modelo: `${veiculo.marca} ${veiculo.modelo}`.trim(),
+            })),
+        )
+        setProdutosData(produtosRows)
+        setCategoriasFinanceirasReceita(categoriasReceitaRows.filter((item) => item.ativo))
+        setServicosDb(servicosRows)
+        setPageError("")
       } catch (error) {
         console.error("Falha ao carregar clientes para servicos", error)
-        if (mounted) setClientesSupabase([])
+        if (mounted) {
+          setClientesSupabase([])
+          setContratosSupabase([])
+          setEquipesData([])
+          setVeiculosData([])
+          setProdutosData([])
+          setCategoriasFinanceirasReceita([])
+          setServicosDb([])
+          setPageError(getErrorMessage(error))
+        }
       }
     }
 
-    void loadClientes()
+    void loadData()
     return () => {
       mounted = false
     }
   }, [])
 
-  const flowStore = useMemo(() => loadFlowStore(), [tick])
   const clientesData = useMemo<Cliente[]>(() => {
     return clientesSupabase.map(mapClienteToServicoView)
   }, [clientesSupabase])
@@ -526,7 +658,7 @@ export default function ServicosPage() {
   }, [clientesSupabase])
 
     const estoqueBase = useMemo<ItemEstoque[]>(() => {
-    const produtos = Array.isArray(flowStore.produtos) ? flowStore.produtos : []
+    const produtos = Array.isArray(produtosData) ? produtosData : []
 
     const mapCategoria = (categoria: string): ItemEstoque["categoria"] => {
       const normalizada = String(categoria || "").toLowerCase()
@@ -550,24 +682,13 @@ export default function ServicosPage() {
         nome: String(p.nome || `Item ${idx + 1}`),
         categoria: mapCategoria(p.categoria),
         unidadePadrao: mapUnidade(p.unidade),
-        estoqueAtual: Number(p.estoqueAtual) || 0,
-        estoqueMinimo: Number(p.estoqueMinimo) || 0,
+        estoqueAtual: Number(p.estoqueAtual ?? p.estoque_atual) || 0,
+        estoqueMinimo: Number(p.estoqueMinimo ?? p.estoque_minimo) || 0,
       }))
-  }, [flowStore.produtos])
+  }, [produtosData])
 
   const opcoesProdutoEstoque = useMemo(() => estoqueBase.map((item) => item.nome), [estoqueBase])
-const contratosData = useMemo<Contrato[]>(() => {
-    const saved = loadFlowContratos()
-    if (!Array.isArray(saved) || saved.length === 0) return []
-
-    return saved.map((c: FlowContrato) => ({
-      id: c.id,
-      clienteId: c.clienteId,
-      numero: c.numero,
-      descricao: c.descricao,
-      itens: Array.isArray(c.itens) ? c.itens.map((i) => ({ id: i.id, nome: i.nome })) : [],
-    }))
-  }, [tick])
+  const contratosData = useMemo<Contrato[]>(() => contratosSupabase, [contratosSupabase])
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null)
   const [locaisCliente, setLocaisCliente] = useState<LocalAtendimento[]>([])
   
@@ -594,7 +715,10 @@ const contratosData = useMemo<Contrato[]>(() => {
     billing: {
       mode: "contrato",
       price: "",
-      paymentMethod: ""
+      paymentMethod: "",
+      registerRevenueInCashFlow: false,
+      notifyEmail: false,
+      notifyWhatsapp: false,
     },
     warrantyDays: "",
     attachments: []
@@ -661,7 +785,13 @@ const contratosData = useMemo<Contrato[]>(() => {
   const [servicoBaixaPendenteId, setServicoBaixaPendenteId] = useState<string | null>(null)
   const [baixaAgendadaAssinada, setBaixaAgendadaAssinada] = useState<"sim" | "nao">("sim")
   const [baixaAgendadaResponsavel, setBaixaAgendadaResponsavel] = useState("")
+  const [baixaAgendadaArquivo, setBaixaAgendadaArquivo] = useState<File | null>(null)
   const [baixaAgendadaError, setBaixaAgendadaError] = useState("")
+  const [showCancelamentoModal, setShowCancelamentoModal] = useState(false)
+  const [servicoCancelamentoPendenteId, setServicoCancelamentoPendenteId] = useState<string | null>(null)
+  const [cancelamentoResponsavel, setCancelamentoResponsavel] = useState("")
+  const [cancelamentoMotivo, setCancelamentoMotivo] = useState("")
+  const [cancelamentoError, setCancelamentoError] = useState("")
 
   useEffect(() => {
     setEstoqueSimulado(estoqueBase.map((item) => ({ ...item })))
@@ -747,10 +877,9 @@ const contratosData = useMemo<Contrato[]>(() => {
   }, [dadosTecnicosVetores.produtos, serviceRequest.serviceType, estoqueBase, consumos, estoqueSimulado])
 
   useEffect(() => {
-    const servicosFlow = Array.isArray(flowStore.servicos) ? flowStore.servicos : []
-    setServicosAgendados(servicosFlow.map((s) => mapFlowServicoToAgendado(s as FlowServico)))
+    setServicosAgendados(servicosDb.map(mapServicoSupabaseToAgendado))
     setServicosHydrated(true)
-  }, [flowStore.servicos])
+  }, [servicosDb])
 
   useEffect(() => {
     if (!servicosHydrated) return
@@ -886,7 +1015,7 @@ const contratosData = useMemo<Contrato[]>(() => {
     if (serviceRequest.schedule.teamIds.length === 0) newErrors["schedule.teamIds"] = "Selecione ao menos um responsável"
 
     // Validação de veículo para esgotamento ou equipe_caminhao
-    const temEquipeCaminhao = serviceRequest.schedule.teamIds.some((teamId) => equipesMock.find((e) => e.id === teamId)?.tipo === "equipe_caminhao")
+    const temEquipeCaminhao = serviceRequest.schedule.teamIds.some((teamId) => equipesData.find((e) => e.id === teamId)?.tipo === "equipe_caminhao")
     if (
       (serviceRequest.serviceType === "esgotamento" || temEquipeCaminhao) &&
       !serviceRequest.schedule.vehicleId
@@ -1193,7 +1322,7 @@ const contratosData = useMemo<Contrato[]>(() => {
     setShowOSViewerModal(true)
   }
 
-  const handleImprimirOSAgendada = (servico: ServicoAgendado) => {
+  const handleImprimirOSAgendada = async (servico: ServicoAgendado) => {
     const impresso = openAndPrintSavedOS(servico.osDocumentoHtml || "", servico.osNumber)
 
     if (!impresso) {
@@ -1204,48 +1333,135 @@ const contratosData = useMemo<Contrato[]>(() => {
       return
     }
 
-    setServicosAgendados((prev) =>
-      prev.map((item) => (item.id === servico.id && item.osStatus === "gerada" ? { ...item, osStatus: "impressa" } : item))
-    )
+    if (servico.osStatus === "gerada") {
+      try {
+        setPageError("")
+        await persistServicoAgendado({ ...servico, osStatus: "impressa" })
+      } catch (error) {
+        console.error("Falha ao atualizar status de impressao da OS", error)
+        setPageError(getErrorMessage(error))
+      }
+    }
+
     setToastMessage(`Impressao da ${servico.osNumber} enviada.`)
     setShowToast(true)
     setTimeout(() => setShowToast(false), 2000)
   }
 
-  const handleAtualizarStatusAgendada = (id: string, status: StatusAgendado) => {
-    setServicosAgendados((prev) =>
-      prev.map((servico) => {
-        if (servico.id !== id) {
-          return servico
-        }
+  const persistServicoAgendado = async (
+    servico: ServicoAgendado & {
+      osAssinadaNome?: string
+      osAssinadaMimeType?: string
+      osAssinadaStorageBucket?: string
+      osAssinadaStoragePath?: string
+      osAssinadaTamanho?: number
+    },
+  ) => {
+    const saved = await upsertServicoSupabase({
+      id: servico.id,
+      osNumber: servico.osNumber,
+      clienteId: servico.clienteId || "",
+      cliente: servico.cliente,
+      servico: servico.servico,
+      tipo: servico.tipo || "outro",
+      local: servico.local,
+      data: toIsoDate(servico.data) || servico.data,
+      horario: servico.horario,
+      tecnico: servico.tecnico,
+      status: mapAgendadoStatusToFlow(servico.status),
+      osStatus: servico.osStatus,
+      osAssinada: servico.osFoiAssinada,
+      baixaObservacao: servico.responsavelBaixa || "",
+      osFingerprint: servico.osFingerprint || "",
+      osDocumentoHtml: servico.osDocumentoHtml || "",
+      responsavelBaixa: servico.responsavelBaixa || "",
+      osAssinadaNome: servico.osAssinadaNome || "",
+      osAssinadaMimeType: servico.osAssinadaMimeType || "",
+      osAssinadaStorageBucket: servico.osAssinadaStorageBucket || "",
+      osAssinadaStoragePath: servico.osAssinadaStoragePath || "",
+      osAssinadaTamanho: servico.osAssinadaTamanho || 0,
+      cobrancaModo: servico.billingMode || "contrato",
+      contratoId: servico.contractId || "",
+      contratoItemId: servico.contractItemId || "",
+      valorCobranca: servico.billingValue || 0,
+      formaPagamento: servico.paymentMethod || "",
+      tipoDocumentoCobranca: servico.billingDocument || "",
+      motivoAdicional: servico.additionalReason || "",
+      cobrancaAprovada: Boolean(servico.billingApproved),
+    })
 
-        let osStatusAtualizado = servico.osStatus
-        if (status === "em_execucao") {
-          osStatusAtualizado = "entregue_tecnico"
-        }
-        if (status === "concluido") {
-          osStatusAtualizado = "assinada_digitalizada"
-        }
+    setServicosDb((prev) => {
+      const next = prev.some((item) => item.id === saved.id) ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]
+      return next
+    })
 
-        return {
-          ...servico,
-          status,
-          osStatus: osStatusAtualizado,
-        }
+    if (servico.registerRevenueInCashFlow && saved.cobrancaModo === "adicional" && saved.valorCobranca > 0) {
+      await upsertReceitaServicoSupabase({
+        servicoId: saved.id,
+        clienteId: saved.clienteId || undefined,
+        contratoId: saved.contratoId || undefined,
+        categoriaId: servico.revenueCategoryId,
+        categoria: categoriasFinanceirasReceita.find((item) => item.id === servico.revenueCategoryId)?.nome,
+        descricao: `${saved.servico} - ${saved.cliente}`,
+        valor: saved.valorCobranca,
+        dataCompetencia: saved.data,
+        dataVencimento: saved.data,
+        formaPagamento: saved.formaPagamento || undefined,
+        documentoTipo: saved.tipoDocumentoCobranca || undefined,
+        notificacaoEmail: servico.notifyEmail,
+        notificacaoWhatsapp: servico.notifyWhatsapp,
+        observacoes: saved.motivoAdicional || undefined,
       })
-    )
+    }
+  }
+
+  const handleAtualizarStatusAgendada = async (id: string, status: StatusAgendado) => {
+    const servicoAtual = servicosAgendados.find((servico) => servico.id === id)
+    if (!servicoAtual) return
+
+    let osStatusAtualizado = servicoAtual.osStatus
+    if (status === "em_execucao") {
+      osStatusAtualizado = "entregue_tecnico"
+    }
+    if (status === "concluido") {
+      osStatusAtualizado = "assinada_digitalizada"
+    }
+
+    const atualizado = {
+      ...servicoAtual,
+      status,
+      osStatus: osStatusAtualizado,
+    }
+
+    try {
+      setPageError("")
+      await persistServicoAgendado(atualizado)
+    } catch (error) {
+      console.error("Falha ao atualizar status da OS", error)
+      setPageError(getErrorMessage(error))
+    }
   }
 
   const handleSolicitarBaixaAgendada = (id: string) => {
     setServicoBaixaPendenteId(id)
     setBaixaAgendadaAssinada("sim")
     setBaixaAgendadaResponsavel("")
+    setBaixaAgendadaArquivo(null)
     setBaixaAgendadaError("")
     setShowBaixaAgendadaModal(true)
   }
 
-  const handleConfirmarBaixaAgendada = () => {
+  const handleSolicitarCancelamento = (id: string) => {
+    setServicoCancelamentoPendenteId(id)
+    setCancelamentoResponsavel("")
+    setCancelamentoMotivo("")
+    setCancelamentoError("")
+    setShowCancelamentoModal(true)
+  }
+
+  const handleConfirmarBaixaAgendada = async () => {
     const responsavel = baixaAgendadaResponsavel.trim()
+    const assinada = baixaAgendadaAssinada === "sim"
     if (!servicoBaixaPendenteId) {
       setBaixaAgendadaError("Servico nao encontrado para baixa.")
       return
@@ -1254,45 +1470,122 @@ const contratosData = useMemo<Contrato[]>(() => {
       setBaixaAgendadaError("Informe o responsavel.")
       return
     }
+    if (assinada && !baixaAgendadaArquivo) {
+      setBaixaAgendadaError("Anexe a OS assinada antes de confirmar a baixa.")
+      return
+    }
 
-    const assinada = baixaAgendadaAssinada === "sim"
+    const servicoAtual = servicosAgendados.find((servico) => servico.id === servicoBaixaPendenteId)
+    if (!servicoAtual) {
+      setBaixaAgendadaError("Servico nao encontrado para baixa.")
+      return
+    }
 
-    setServicosAgendados((prev) =>
-      prev.map((servico) => {
-        if (servico.id !== servicoBaixaPendenteId) return servico
-        return {
-          ...servico,
-          status: "concluido",
-          osStatus: assinada ? "assinada_digitalizada" : "entregue_tecnico",
-          osFoiAssinada: assinada,
-          responsavelBaixa: responsavel,
-        }
+    try {
+      setPageError("")
+      const anexoAssinado = assinada && baixaAgendadaArquivo
+        ? await uploadOSAssinadaServicoSupabase({
+            servicoId: servicoAtual.id,
+            clienteId: servicoAtual.clienteId,
+            arquivo: baixaAgendadaArquivo,
+          })
+        : null
+
+      await persistServicoAgendado({
+        ...servicoAtual,
+        status: "concluido",
+        osStatus: assinada ? "assinada_digitalizada" : "entregue_tecnico",
+        osFoiAssinada: assinada,
+        responsavelBaixa: responsavel,
+        osAssinadaNome: anexoAssinado?.nome || "",
+        osAssinadaMimeType: anexoAssinado?.mimeType || "",
+        osAssinadaStorageBucket: anexoAssinado?.storageBucket || "",
+        osAssinadaStoragePath: anexoAssinado?.storagePath || "",
+        osAssinadaTamanho: anexoAssinado?.tamanho || 0,
       })
-    )
 
-    setShowBaixaAgendadaModal(false)
-    setServicoBaixaPendenteId(null)
-    setBaixaAgendadaError("")
-    setToastMessage("Baixa da OS registrada com sucesso.")
-    setShowToast(true)
-    setTimeout(() => setShowToast(false), 2000)
+      setShowBaixaAgendadaModal(false)
+      setServicoBaixaPendenteId(null)
+      setBaixaAgendadaArquivo(null)
+      setBaixaAgendadaError("")
+      setToastMessage("Baixa da OS registrada com sucesso.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 2000)
+    } catch (error) {
+      console.error("Falha ao dar baixa na OS", error)
+      setBaixaAgendadaError(getErrorMessage(error))
+    }
   }
 
-  const handleExcluirOSAgendada = (id: string) => {
+  const handleExcluirOSAgendada = async (id: string) => {
     const alvo = servicosAgendados.find((item) => item.id === id)
     if (!alvo) return
 
     const ok = window.confirm(`Deseja excluir a ${alvo.osNumber}? Esta acao nao pode ser desfeita.`)
     if (!ok) return
 
-    setServicosAgendados((prev) => prev.filter((item) => item.id !== id))
-    if (selectedAgendadaOS?.osNumber === alvo.osNumber) {
-      setShowOSViewerModal(false)
-      setSelectedAgendadaOS(null)
+    try {
+      setPageError("")
+      await deleteServicoSupabase(id)
+      setServicosDb((prev) => prev.filter((item) => item.id !== id))
+      if (selectedAgendadaOS?.osNumber === alvo.osNumber) {
+        setShowOSViewerModal(false)
+        setSelectedAgendadaOS(null)
+      }
+      setToastMessage(`${alvo.osNumber} excluida com sucesso.`)
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 2000)
+    } catch (error) {
+      console.error("Falha ao excluir OS", error)
+      setPageError(getErrorMessage(error))
     }
-    setToastMessage(`${alvo.osNumber} excluida com sucesso.`)
-    setShowToast(true)
-    setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleConfirmarCancelamento = async () => {
+    const responsavel = cancelamentoResponsavel.trim()
+    const motivo = cancelamentoMotivo.trim()
+
+    if (!servicoCancelamentoPendenteId) {
+      setCancelamentoError("Servico nao encontrado para cancelamento.")
+      return
+    }
+    if (!responsavel) {
+      setCancelamentoError("Informe o responsavel pelo cancelamento.")
+      return
+    }
+    if (!motivo) {
+      setCancelamentoError("Informe o motivo do cancelamento.")
+      return
+    }
+
+    const servicoAtual = servicosAgendados.find((servico) => servico.id === servicoCancelamentoPendenteId)
+    if (!servicoAtual) {
+      setCancelamentoError("Servico nao encontrado para cancelamento.")
+      return
+    }
+
+    try {
+      setPageError("")
+      await persistServicoAgendado({
+        ...servicoAtual,
+        status: "cancelado",
+        osStatus: "cancelada",
+        responsavelBaixa: `${responsavel} | Motivo: ${motivo}`,
+      })
+      await cancelLancamentoServicoSupabase(servicoAtual.id, `Cancelado por ${responsavel}. Motivo: ${motivo}`)
+
+      setShowCancelamentoModal(false)
+      setServicoCancelamentoPendenteId(null)
+      setCancelamentoResponsavel("")
+      setCancelamentoMotivo("")
+      setCancelamentoError("")
+      setToastMessage("OS cancelada com sucesso.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 2000)
+    } catch (error) {
+      console.error("Falha ao cancelar a OS", error)
+      setCancelamentoError(getErrorMessage(error))
+    }
   }
 
   const gerarProximoNumeroOS = () => {
@@ -1315,7 +1608,7 @@ const contratosData = useMemo<Contrato[]>(() => {
     return [clienteId, servico, tipo, data, inicio, fim, localId].join("|")
   }
 
-const handleConfirmarAgendamentoFinal = () => {
+const handleConfirmarAgendamentoFinal = async () => {
     if (isFinalizandoAgendamento) return
     setIsFinalizandoAgendamento(true)
 
@@ -1364,7 +1657,7 @@ const handleConfirmarAgendamentoFinal = () => {
       return
     }
     const novoServico: ServicoAgendado = {
-      id: `ag-${Date.now()}`,
+      id: "",
       osNumber: gerarProximoNumeroOS(),
       cliente: clienteSelecionado?.nome || "Cliente nao informado",
       clienteId: clienteSelecionado?.id,
@@ -1378,37 +1671,66 @@ const handleConfirmarAgendamentoFinal = () => {
       osStatus: "gerada",
       osFingerprint,
       osDocumentoHtml: osDocumentoHtmlSnapshot,
+      billingMode: serviceRequest.billing.mode,
+      contractId: serviceRequest.billing.contractId,
+      contractItemId: serviceRequest.billing.contractItemId,
+      billingValue: Number(String(serviceRequest.billing.price || "0").replace(",", ".")) || 0,
+      paymentMethod: serviceRequest.billing.paymentMethod,
+      billingDocument: serviceRequest.billing.mode === "adicional"
+        ? serviceRequest.billing.billingDocument === "nota_fiscal"
+          ? "nota_fiscal"
+          : serviceRequest.billing.paymentMethod === "boleto"
+            ? "boleto"
+            : "recibo"
+        : "",
+      additionalReason: serviceRequest.billing.additionalReason,
+      billingApproved: Boolean(serviceRequest.billing.approved),
+      registerRevenueInCashFlow: Boolean(serviceRequest.billing.registerRevenueInCashFlow),
+      revenueCategoryId: serviceRequest.billing.revenueCategoryId,
+      notifyEmail: Boolean(serviceRequest.billing.notifyEmail),
+      notifyWhatsapp: Boolean(serviceRequest.billing.notifyWhatsapp),
     }
-    setServicosAgendados((prev) => [novoServico, ...prev])
+    try {
+      setPageError("")
+      await persistServicoAgendado(novoServico)
 
-    // Aviso nao bloqueante se for Vetores e nao houver consumo registrado
-    if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
-      setToastMessage("Aviso: Voce ainda nao registrou consumo de produtos. Isso pode ser preenchido apos a execucao.")
-      setShowToast(true)
-      setTimeout(() => {
-        setShowToast(false)
+      // Aviso nao bloqueante se for Vetores e nao houver consumo registrado
+      if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
+        setToastMessage("Aviso: Voce ainda nao registrou consumo de produtos. Isso pode ser preenchido apos a execucao.")
+        setShowToast(true)
+        setTimeout(() => {
+          setShowToast(false)
+          setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+          setShowToast(true)
+          setTimeout(() => {
+            setShowToast(false)
+            setActiveTab("agendados")
+          }, 2000)
+        }, 3000)
+      } else {
         setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
           setActiveTab("agendados")
         }, 2000)
-      }, 3000)
-    } else {
-      setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+      }
+    } catch (error) {
+      console.error("Falha ao salvar agendamento no Supabase", error)
+      setPageError(getErrorMessage(error))
+      setToastMessage("Nao foi possivel salvar a OS no Supabase.")
       setShowToast(true)
-      setTimeout(() => {
-        setShowToast(false)
-        setActiveTab("agendados")
-      }, 2000)
+      setTimeout(() => setShowToast(false), 2500)
+    } finally {
+      setIsFinalizandoAgendamento(false)
     }
   }
 
-  const temEquipeCaminhao = serviceRequest.schedule.teamIds.some((teamId) => equipesMock.find((e) => e.id === teamId)?.tipo === "equipe_caminhao")
+  const temEquipeCaminhao = serviceRequest.schedule.teamIds.some((teamId) => equipesData.find((e) => e.id === teamId)?.tipo === "equipe_caminhao")
   const mostrarVeiculo = serviceRequest.serviceType === "esgotamento" || temEquipeCaminhao
-  const equipesSelecionadas = equipesMock.filter((e) => serviceRequest.schedule.teamIds.includes(e.id))
+  const equipesSelecionadas = equipesData.filter((e) => serviceRequest.schedule.teamIds.includes(e.id))
   const nomesResponsaveisSelecionados = equipesSelecionadas.map((e) => e.nome)
-  const veiculoSelecionado = veiculosMock.find((v) => v.id === serviceRequest.schedule.vehicleId)
+  const veiculoSelecionado = veiculosData.find((v) => v.id === serviceRequest.schedule.vehicleId)
   const isServicoCupim = serviceRequest.serviceType === "pragas" && (
     serviceRequest.serviceName.toLowerCase().includes("cupim") ||
     dadosTecnicosVetores.pragasAlvo.includes("cupins")
@@ -1431,6 +1753,11 @@ const handleConfirmarAgendamentoFinal = () => {
           <h1 className="text-3xl font-bold text-foreground mb-2">Servicos</h1>
           <p className="text-muted-foreground">Gerencie solicitacoes, agendamentos e ordens de servico.</p>
         </div>
+        {pageError ? (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {pageError}
+          </div>
+        ) : null}
 
         {/* Abas superiores */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -1704,7 +2031,7 @@ const handleConfirmarAgendamentoFinal = () => {
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground mb-2">Técnico Individual</p>
                           <div className="flex flex-wrap gap-2">
-                            {equipesMock.filter(e => e.tipo === "tecnico_individual").map(eq => {
+                            {equipesData.filter(e => e.tipo === "tecnico_individual").map(eq => {
                               const selected = serviceRequest.schedule.teamIds.includes(eq.id)
                               return (
                                 <Button
@@ -1723,7 +2050,7 @@ const handleConfirmarAgendamentoFinal = () => {
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground mb-2">Equipe de Limpeza</p>
                           <div className="flex flex-wrap gap-2">
-                            {equipesMock.filter(e => e.tipo === "equipe_limpeza").map(eq => {
+                            {equipesData.filter(e => e.tipo === "equipe_limpeza").map(eq => {
                               const selected = serviceRequest.schedule.teamIds.includes(eq.id)
                               return (
                                 <Button
@@ -1742,7 +2069,7 @@ const handleConfirmarAgendamentoFinal = () => {
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground mb-2">Equipe + Caminhão</p>
                           <div className="flex flex-wrap gap-2">
-                            {equipesMock.filter(e => e.tipo === "equipe_caminhao").map(eq => {
+                            {equipesData.filter(e => e.tipo === "equipe_caminhao").map(eq => {
                               const selected = serviceRequest.schedule.teamIds.includes(eq.id)
                               return (
                                 <Button
@@ -1778,7 +2105,7 @@ const handleConfirmarAgendamentoFinal = () => {
                             <SelectValue placeholder="Selecione o veículo" />
                           </SelectTrigger>
                           <SelectContent>
-                            {veiculosMock.map(v => (
+                            {veiculosData.map(v => (
                               <SelectItem key={v.id} value={v.id}>
                                 {v.placa} - {v.modelo}
                               </SelectItem>
@@ -1941,6 +2268,60 @@ const handleConfirmarAgendamentoFinal = () => {
                               className={errors["billing.additionalReason"] ? "border-destructive" : ""}
                             />
                             {errors["billing.additionalReason"] && <p className="text-sm text-destructive">{errors["billing.additionalReason"]}</p>}
+                          </div>
+
+                          <div className="rounded-lg border p-4 space-y-4">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="font-medium">Cadastrar receita no fluxo de caixa?</p>
+                                <p className="text-sm text-muted-foreground">Se marcado, o servico adicional entra automaticamente no financeiro.</p>
+                              </div>
+                              <Checkbox
+                                checked={serviceRequest.billing.registerRevenueInCashFlow || false}
+                                onCheckedChange={(checked) => handleBillingChange("registerRevenueInCashFlow", checked === true)}
+                              />
+                            </div>
+
+                            {serviceRequest.billing.registerRevenueInCashFlow ? (
+                              <>
+                                <div className="space-y-2">
+                                  <Label>Categoria de receita</Label>
+                                  <Select
+                                    value={serviceRequest.billing.revenueCategoryId || "__none__"}
+                                    onValueChange={(value) => handleBillingChange("revenueCategoryId", value === "__none__" ? "" : value)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Selecione a categoria" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">Sem categoria</SelectItem>
+                                      {categoriasFinanceirasReceita.map((categoria) => (
+                                        <SelectItem key={categoria.id} value={categoria.id}>
+                                          {categoria.nome}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <label className="flex items-center gap-3 rounded-lg border p-3">
+                                    <Checkbox
+                                      checked={serviceRequest.billing.notifyEmail || false}
+                                      onCheckedChange={(checked) => handleBillingChange("notifyEmail", checked === true)}
+                                    />
+                                    <span className="text-sm">Notificar por email</span>
+                                  </label>
+                                  <label className="flex items-center gap-3 rounded-lg border p-3">
+                                    <Checkbox
+                                      checked={serviceRequest.billing.notifyWhatsapp || false}
+                                      onCheckedChange={(checked) => handleBillingChange("notifyWhatsapp", checked === true)}
+                                    />
+                                    <span className="text-sm">Notificar por WhatsApp</span>
+                                  </label>
+                                </div>
+                              </>
+                            ) : null}
                           </div>
 
                           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
@@ -2152,7 +2533,7 @@ const handleConfirmarAgendamentoFinal = () => {
                     <p><span className="text-muted-foreground">Horário:</span> {serviceRequest.schedule.startTime} às {serviceRequest.schedule.endTime}</p>
                     <p><span className="text-muted-foreground">Responsável:</span> {nomesResponsaveisSelecionados.join(", ") || "-"}</p>
                     {serviceRequest.schedule.vehicleId && (
-                      <p><span className="text-muted-foreground">Veículo:</span> {veiculosMock.find(v => v.id === serviceRequest.schedule.vehicleId)?.placa}</p>
+                      <p><span className="text-muted-foreground">Veículo:</span> {veiculosData.find(v => v.id === serviceRequest.schedule.vehicleId)?.placa}</p>
                     )}
                   </div>
                 </div>
@@ -2331,7 +2712,7 @@ const handleConfirmarAgendamentoFinal = () => {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none">Sem veiculo</SelectItem>
-                          {veiculosMock.map((veiculo) => (
+                          {veiculosData.map((veiculo) => (
                             <SelectItem key={veiculo.id} value={veiculo.id}>
                               {veiculo.placa} - {veiculo.modelo}
                             </SelectItem>
@@ -2697,6 +3078,7 @@ const handleConfirmarAgendamentoFinal = () => {
               onImprimirOS={handleImprimirOSAgendada}
               onAtualizarStatus={handleAtualizarStatusAgendada}
               onSolicitarBaixa={handleSolicitarBaixaAgendada}
+              onSolicitarCancelamento={handleSolicitarCancelamento}
               onExcluirOS={handleExcluirOSAgendada}
             />
           </TabsContent>
@@ -2804,6 +3186,23 @@ const handleConfirmarAgendamentoFinal = () => {
               />
             </div>
 
+            {baixaAgendadaAssinada === "sim" ? (
+              <div className="space-y-2">
+                <Label htmlFor="baixa-os-assinada">Anexar OS assinada</Label>
+                <Input
+                  id="baixa-os-assinada"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  onChange={(e) => setBaixaAgendadaArquivo(e.target.files?.[0] || null)}
+                />
+                {baixaAgendadaArquivo ? (
+                  <p className="text-xs text-muted-foreground">
+                    Arquivo selecionado: {baixaAgendadaArquivo.name}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             {baixaAgendadaError && <p className="text-sm text-destructive">{baixaAgendadaError}</p>}
           </div>
 
@@ -2813,6 +3212,7 @@ const handleConfirmarAgendamentoFinal = () => {
               onClick={() => {
                 setShowBaixaAgendadaModal(false)
                 setBaixaAgendadaError("")
+                setBaixaAgendadaArquivo(null)
               }}
               className="bg-transparent"
             >
@@ -2825,6 +3225,58 @@ const handleConfirmarAgendamentoFinal = () => {
 
 
       {/* Rodapé Fixo com Ações */}
+      <Dialog open={showCancelamentoModal} onOpenChange={setShowCancelamentoModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar OS</DialogTitle>
+            <DialogDescription>
+              Informe o motivo do cancelamento e o responsavel por esta acao.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancelamento-responsavel">Responsavel</Label>
+              <Input
+                id="cancelamento-responsavel"
+                value={cancelamentoResponsavel}
+                onChange={(e) => setCancelamentoResponsavel(e.target.value)}
+                placeholder="Nome do responsavel"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cancelamento-motivo">Motivo do cancelamento</Label>
+              <Textarea
+                id="cancelamento-motivo"
+                value={cancelamentoMotivo}
+                onChange={(e) => setCancelamentoMotivo(e.target.value)}
+                placeholder="Descreva o motivo do cancelamento"
+                rows={4}
+              />
+            </div>
+
+            {cancelamentoError ? <p className="text-sm text-destructive">{cancelamentoError}</p> : null}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCancelamentoModal(false)
+                setCancelamentoError("")
+              }}
+              className="bg-transparent"
+            >
+              Fechar
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmarCancelamento}>
+              Confirmar cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {activeTab === "nova-solicitacao" && (
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">

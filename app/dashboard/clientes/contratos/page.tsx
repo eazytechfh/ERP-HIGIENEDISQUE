@@ -30,9 +30,10 @@ import {
   Printer
 } from "lucide-react"
 import Link from "next/link"
-import { listClientesSupabase } from "@/lib/supabase/clientes-repo"
+import { listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { mapClienteToResumoView } from "@/lib/supabase/clientes-view"
-import { ensureFlowStoreInitialized, loadFlowStore, loadFlowContratos, upsertFlowContrato, setFlowClientes } from "@/lib/flow-store"
+import { upsertFlowContrato, type FlowContrato } from "@/lib/flow-store"
+import { addClienteArquivoContratoSupabase, listContratosSupabase, upsertContratoSupabase } from "@/lib/supabase/contratos-repo"
 
 interface ServicoContrato {
   id: string
@@ -58,6 +59,17 @@ declare global {
     docxtemplater?: any
   }
 }
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === "string") return error
+  if (error && typeof error === "object") {
+    const maybeError = error as { message?: unknown; details?: unknown }
+    if (typeof maybeError.message === "string") return maybeError.message
+    if (typeof maybeError.details === "string") return maybeError.details
+  }
+  return "Ocorreu um erro inesperado."
+}
 // Mock de clientes cadastrados
 const clientesCadastrados: Cliente[] = [
   { id: "1", nome: "Empresa ABC Ltda", cpfCnpj: "12.345.678/0001-90", tipo: "PJ", status: "Ativo", telefone: "(11) 99999-9999", email: "contato@empresaabc.com.br" },
@@ -76,7 +88,9 @@ export default function NovoContratoPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null)
   const [clientesDisponiveis, setClientesDisponiveis] = useState<Cliente[]>([])
+  const [clientesCompletos, setClientesCompletos] = useState<ClienteInput[]>([])
   const [showClienteList, setShowClienteList] = useState(false)
+  const [pageError, setPageError] = useState("")
 
   useEffect(() => {
     let mounted = true
@@ -85,10 +99,14 @@ export default function NovoContratoPage() {
       try {
         const rows = await listClientesSupabase()
         if (!mounted) return
+        setClientesCompletos(rows)
         setClientesDisponiveis(rows.map(mapClienteToResumoView))
       } catch (error) {
         console.error("Falha ao carregar clientes para contratos", error)
-        if (mounted) setClientesDisponiveis([])
+        if (mounted) {
+          setClientesCompletos([])
+          setClientesDisponiveis([])
+        }
       }
     }
 
@@ -346,12 +364,16 @@ export default function NovoContratoPage() {
       return null
     }
 
-    const contratosExistentes = loadFlowContratos()
+    const contratosExistentes = await listContratosSupabase()
     const ano = new Date().getFullYear()
     const sequencial = String(contratosExistentes.length + 1).padStart(3, "0")
 
-    const contrato = {
-      id: `cont-${Date.now()}`,
+    const clienteCompleto = clientesCompletos.find((cliente) => String(cliente.id) === clienteSelecionado.id)
+    if (!clienteCompleto) {
+      throw new Error("Cliente selecionado nao foi encontrado para salvar o contrato.")
+    }
+
+    const contratoPayload = {
       clienteId: clienteSelecionado.id,
       numero: `CONT-${ano}-${sequencial}`,
       descricao: `${tipoContrato === "recorrente" ? "Contrato Recorrente" : "Contrato Avulso"} - ${itensValidos[0]?.nome || "Servicos"}`,
@@ -362,8 +384,6 @@ export default function NovoContratoPage() {
       itens: itensValidos,
     }
 
-    upsertFlowContrato(contrato)
-
     const nomeClienteSeguro = clienteSelecionado.nome
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -371,7 +391,6 @@ export default function NovoContratoPage() {
       .replace(/^_+|_+$/g, "")
       .toLowerCase()
 
-    const clienteCompleto = loadFlowStore().clientes.find((c: any) => String(c.id) === clienteSelecionado.id)
     const enderecoPrincipal = Array.isArray(clienteCompleto?.locais) && clienteCompleto.locais.length > 0
       ? clienteCompleto.locais[0]
       : null
@@ -403,7 +422,7 @@ export default function NovoContratoPage() {
       ]
         .filter(Boolean)
         .join(", ")
-    const nomeDoLocal = enderecoPrincipal?.nome || enderecoPrincipal?.tipoLocal || "Local principal"
+    const nomeDoLocal = enderecoPrincipal?.nome || enderecoPrincipal?.tipoAmbiente || "Local principal"
 
     const dataAssinatura = new Date()
     const dataAssinaturaExtenso = dataAssinatura.toLocaleDateString("pt-BR", {
@@ -455,7 +474,7 @@ export default function NovoContratoPage() {
       "(Valor por extenso)": valorMensalNormalizado || "-",
       "DATA DO VENCIMENTO": diaVencimento || "-",
       "Data Atual": new Date().toLocaleDateString("pt-BR"),
-      CONTRATO_NUMERO: contrato.numero,
+      CONTRATO_NUMERO: contratoPayload.numero,
       CONTRATO_TIPO: tipoContrato === "recorrente" ? "Recorrente" : "Avulso",
       CONTRATO_STATUS: statusContrato,
       DATA_INICIO: formatarDataBR(dataInicio),
@@ -482,7 +501,7 @@ export default function NovoContratoPage() {
 
     const docxBlob = await gerarDocxDoTemplate(templateData)
     const documentoFallbackHtml = gerarDocumentoContratoFallback({
-      numeroContrato: contrato.numero,
+      numeroContrato: contratoPayload.numero,
       cliente: clienteSelecionado,
       itens: itensDetalhados,
     })
@@ -490,91 +509,99 @@ export default function NovoContratoPage() {
     const arquivoBlob =
       docxBlob || new Blob([documentoFallbackHtml], { type: "application/msword;charset=utf-8" })
     const arquivoNome = docxBlob
-      ? `${contrato.numero}-${nomeClienteSeguro || "cliente"}.docx`
-      : `${contrato.numero}-${nomeClienteSeguro || "cliente"}.doc`
+      ? `${contratoPayload.numero}-${nomeClienteSeguro || "cliente"}.docx`
+      : `${contratoPayload.numero}-${nomeClienteSeguro || "cliente"}.doc`
     const arquivoMime = docxBlob
       ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       : "application/msword"
 
-    const arquivoBase64 = await toBase64(arquivoBlob)
-    const anexoGerado = {
-      id: `arq-contrato-${Date.now()}`,
+    const contratoSalvo = await upsertContratoSupabase(contratoPayload)
+
+    let situacaoContrato = clienteCompleto.situacaoContrato || ""
+    if (statusContrato === "encerrado") {
+      situacaoContrato = "Vencido"
+    } else if (statusContrato === "suspenso") {
+      situacaoContrato = "A vencer"
+    } else if (dataTermino) {
+      const hoje = new Date()
+      hoje.setHours(0, 0, 0, 0)
+      const fim = new Date(`${dataTermino}T00:00:00`)
+      const diffDays = Math.floor((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+      if (diffDays < 0) situacaoContrato = "Vencido"
+      else if (diffDays <= 30) situacaoContrato = "A vencer"
+      else situacaoContrato = "Em dia"
+    } else {
+      situacaoContrato = "Em dia"
+    }
+
+    await upsertClienteSupabase({
+      ...clienteCompleto,
+      possuiContrato: true,
+      tipoContrato: tipoContrato === "recorrente" ? "Recorrente" : "Avulso",
+      dataInicioContrato: dataInicio || clienteCompleto.dataInicioContrato || "",
+      dataFimContrato: dataTermino || clienteCompleto.dataFimContrato || "",
+      situacaoContrato,
+    })
+
+    await addClienteArquivoContratoSupabase({
+      clienteId: clienteSelecionado.id,
+      contratoId: contratoSalvo.id,
       nome: arquivoNome,
       mimeType: arquivoMime,
-      conteudoBase64: arquivoBase64,
-      criadoEm: new Date().toISOString(),
-      tamanho: arquivoBlob.size,
+      arquivo: arquivoBlob,
       origem: "contrato-gerado",
-      contratoId: contrato.id,
-    }
+    })
 
-    let anexoAssinado: any = null
     if (arquivoContrato) {
-      const assinadoBase64 = await toBase64(arquivoContrato)
-      anexoAssinado = {
-        id: `arq-assinado-${Date.now()}`,
+      await addClienteArquivoContratoSupabase({
+        clienteId: clienteSelecionado.id,
+        contratoId: contratoSalvo.id,
         nome: arquivoContrato.name,
         mimeType: arquivoContrato.type || "application/octet-stream",
-        conteudoBase64: assinadoBase64,
-        criadoEm: new Date().toISOString(),
-        tamanho: arquivoContrato.size,
+        arquivo: arquivoContrato,
         origem: "contrato-assinado",
-        contratoId: contrato.id,
-      }
-    }
-
-    const store = loadFlowStore()
-    if (Array.isArray(store.clientes)) {
-      const clientesAtualizados = store.clientes.map((c: any) => {
-        if (String(c.id) !== clienteSelecionado.id) return c
-
-        const arquivosAtuais = Array.isArray(c.arquivos) ? c.arquivos : []
-        const novosArquivos = anexoAssinado ? [...arquivosAtuais, anexoGerado, anexoAssinado] : [...arquivosAtuais, anexoGerado]
-
-        let situacaoContrato = c.situacaoContrato || ""
-        if (statusContrato === "encerrado") {
-          situacaoContrato = "Vencido"
-        } else if (statusContrato === "suspenso") {
-          situacaoContrato = "A vencer"
-        } else if (dataTermino) {
-          const hoje = new Date()
-          hoje.setHours(0, 0, 0, 0)
-          const fim = new Date(`${dataTermino}T00:00:00`)
-          const diffDays = Math.floor((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-          if (diffDays < 0) situacaoContrato = "Vencido"
-          else if (diffDays <= 30) situacaoContrato = "A vencer"
-          else situacaoContrato = "Em dia"
-        } else {
-          situacaoContrato = "Em dia"
-        }
-
-        return {
-          ...c,
-          possuiContrato: true,
-          tipoContrato: tipoContrato === "recorrente" ? "Recorrente" : "Avulso",
-          dataInicioContrato: dataInicio || c.dataInicioContrato || "",
-          dataFimContrato: dataTermino || c.dataFimContrato || "",
-          situacaoContrato,
-          arquivos: novosArquivos,
-        }
       })
-      setFlowClientes(clientesAtualizados)
     }
 
-    return contrato
+    const contratoFlow: FlowContrato = {
+      id: contratoSalvo.id,
+      clienteId: contratoSalvo.clienteId,
+      numero: contratoSalvo.numero,
+      descricao: contratoSalvo.descricao,
+      status: contratoSalvo.status,
+      tipoContrato: contratoSalvo.tipoContrato,
+      dataInicio: contratoSalvo.dataInicio,
+      dataTermino: contratoSalvo.dataTermino,
+      itens: contratoSalvo.itens,
+    }
+
+    upsertFlowContrato(contratoFlow)
+    return contratoFlow
   }
   const handleSalvar = async () => {
-    const contrato = await persistirContrato()
-    if (!contrato) return
-    alert("Contrato salvo com sucesso e anexado ao cliente.")
-    router.push(`/dashboard/clientes`)
+    try {
+      setPageError("")
+      const contrato = await persistirContrato()
+      if (!contrato) return
+      alert("Contrato salvo com sucesso e anexado ao cliente.")
+      router.push(`/dashboard/clientes`)
+    } catch (error) {
+      console.error("Falha ao salvar contrato", error)
+      setPageError(getErrorMessage(error))
+    }
   }
 
   const handleSalvarECadastrarServico = async () => {
-    const contrato = await persistirContrato()
-    if (!contrato) return
-    alert("Contrato salvo e anexado ao cliente. Redirecionando para cadastro de servico...")
-    router.push(`/dashboard/servicos?clienteId=${contrato.clienteId}`)
+    try {
+      setPageError("")
+      const contrato = await persistirContrato()
+      if (!contrato) return
+      alert("Contrato salvo e anexado ao cliente. Redirecionando para cadastro de servico...")
+      router.push(`/dashboard/servicos?clienteId=${contrato.clienteId}`)
+    } catch (error) {
+      console.error("Falha ao salvar contrato e redirecionar", error)
+      setPageError(getErrorMessage(error))
+    }
   }
   const clienteData = clienteSelecionado || { nome: "", cpfCnpj: "", tipo: "", status: "" }
 
@@ -601,6 +628,11 @@ export default function NovoContratoPage() {
         </div>
 
         <div className="space-y-6">
+          {pageError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {pageError}
+            </div>
+          ) : null}
           {/* BLOCO 1 ??" Seleção/Identificação do Cliente */}
           <Card>
             <CardHeader className="pb-4">

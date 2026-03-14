@@ -15,7 +15,57 @@ export type ServicoSupabaseItem = {
   tecnico: string
   status: "agendado" | "em_execucao" | "executado" | "cancelado"
   osStatus: string
+  osAssinada: boolean
   baixaObservacao: string
+  osFingerprint: string
+  osDocumentoHtml: string
+  responsavelBaixa: string
+  osAssinadaNome: string
+  osAssinadaMimeType: string
+  osAssinadaStorageBucket: string
+  osAssinadaStoragePath: string
+  osAssinadaTamanho: number
+  cobrancaModo: "contrato" | "adicional"
+  contratoId: string
+  contratoItemId: string
+  valorCobranca: number
+  formaPagamento: string
+  tipoDocumentoCobranca: string
+  motivoAdicional: string
+  cobrancaAprovada: boolean
+}
+
+export type ServicoSupabaseInput = {
+  id?: string
+  osNumber: string
+  clienteId: string
+  cliente: string
+  servico: string
+  tipo: string
+  local: string
+  data: string
+  horario: string
+  tecnico: string
+  status: "agendado" | "em_execucao" | "executado" | "cancelado"
+  osStatus: string
+  osAssinada?: boolean
+  baixaObservacao?: string
+  osFingerprint?: string
+  osDocumentoHtml?: string
+  responsavelBaixa?: string
+  osAssinadaNome?: string
+  osAssinadaMimeType?: string
+  osAssinadaStorageBucket?: string
+  osAssinadaStoragePath?: string
+  osAssinadaTamanho?: number
+  cobrancaModo?: "contrato" | "adicional"
+  contratoId?: string
+  contratoItemId?: string
+  valorCobranca?: number
+  formaPagamento?: string
+  tipoDocumentoCobranca?: string
+  motivoAdicional?: string
+  cobrancaAprovada?: boolean
 }
 
 function mapDbToServico(row: any): ServicoSupabaseItem {
@@ -32,8 +82,65 @@ function mapDbToServico(row: any): ServicoSupabaseItem {
     tecnico: row.tecnico || "",
     status: row.status || "agendado",
     osStatus: row.os_status || "",
+    osAssinada: Boolean(row.os_assinada ?? false),
     baixaObservacao: row.baixa_observacao || "",
+    osFingerprint: row.os_fingerprint || "",
+    osDocumentoHtml: row.os_documento_html || "",
+    responsavelBaixa: row.responsavel_baixa || "",
+    osAssinadaNome: row.os_assinada_nome || "",
+    osAssinadaMimeType: row.os_assinada_mime_type || "",
+    osAssinadaStorageBucket: row.os_assinada_storage_bucket || "",
+    osAssinadaStoragePath: row.os_assinada_storage_path || "",
+    osAssinadaTamanho: typeof row.os_assinada_tamanho === "number" ? row.os_assinada_tamanho : Number(row.os_assinada_tamanho) || 0,
+    cobrancaModo: row.cobranca_modo === "adicional" ? "adicional" : "contrato",
+    contratoId: row.contrato_id ? String(row.contrato_id) : "",
+    contratoItemId: row.contrato_item_id ? String(row.contrato_item_id) : "",
+    valorCobranca: typeof row.valor_cobranca === "number" ? row.valor_cobranca : Number(row.valor_cobranca) || 0,
+    formaPagamento: row.forma_pagamento || "",
+    tipoDocumentoCobranca: row.tipo_documento_cobranca || "",
+    motivoAdicional: row.motivo_adicional || "",
+    cobrancaAprovada: Boolean(row.cobranca_aprovada ?? false),
   }
+}
+
+function mapServicoToDb(input: ServicoSupabaseInput) {
+  return {
+    id: input.id || undefined,
+    os_number: input.osNumber,
+    cliente_id: input.clienteId || null,
+    cliente: input.cliente,
+    servico: input.servico,
+    tipo: input.tipo || null,
+    local: input.local,
+    data: input.data,
+    horario: input.horario,
+    tecnico: input.tecnico || null,
+    status: input.status,
+    os_status: input.osStatus || null,
+    os_assinada: Boolean(input.osAssinada),
+    baixa_observacao: input.baixaObservacao || null,
+    os_fingerprint: input.osFingerprint || null,
+    os_documento_html: input.osDocumentoHtml || null,
+    responsavel_baixa: input.responsavelBaixa || null,
+    os_assinada_nome: input.osAssinadaNome || null,
+    os_assinada_mime_type: input.osAssinadaMimeType || null,
+    os_assinada_storage_bucket: input.osAssinadaStorageBucket || null,
+    os_assinada_storage_path: input.osAssinadaStoragePath || null,
+    os_assinada_tamanho: input.osAssinadaTamanho ?? null,
+    cobranca_modo: input.cobrancaModo || "contrato",
+    contrato_id: input.contratoId || null,
+    contrato_item_id: input.contratoItemId || null,
+    valor_cobranca: input.valorCobranca ?? null,
+    forma_pagamento: input.formaPagamento || null,
+    tipo_documento_cobranca: input.tipoDocumentoCobranca || null,
+    motivo_adicional: input.motivoAdicional || null,
+    cobranca_aprovada: Boolean(input.cobrancaAprovada),
+    deleted_at: null,
+  }
+}
+
+function sanitizeFileName(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, "_")
 }
 
 export async function listServicosSupabase(): Promise<ServicoSupabaseItem[]> {
@@ -46,4 +153,64 @@ export async function listServicosSupabase(): Promise<ServicoSupabaseItem[]> {
 
   if (error) throw error
   return (data || []).map(mapDbToServico)
+}
+
+export async function upsertServicoSupabase(input: ServicoSupabaseInput): Promise<ServicoSupabaseItem> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("servicos")
+    .upsert(mapServicoToDb(input))
+    .select("*")
+    .single()
+
+  if (error) throw error
+  return mapDbToServico(data)
+}
+
+export async function deleteServicoSupabase(id: string): Promise<void> {
+  const supabase = getSupabaseBrowserClient()
+  const { error } = await supabase
+    .from("servicos")
+    .delete()
+    .eq("id", id)
+
+  if (error) throw error
+}
+
+export async function uploadOSAssinadaServicoSupabase(input: {
+  servicoId: string
+  clienteId?: string
+  arquivo: File
+}): Promise<{
+  nome: string
+  mimeType: string
+  storageBucket: string
+  storagePath: string
+  tamanho: number
+}> {
+  const supabase = getSupabaseBrowserClient()
+  const bucket = "os-documentos"
+  const path = `${input.clienteId || "sem-cliente"}/${input.servicoId}/assinada-${Date.now()}-${sanitizeFileName(input.arquivo.name)}`
+
+  const { error } = await supabase.storage.from(bucket).upload(path, input.arquivo, {
+    upsert: false,
+    contentType: input.arquivo.type || "application/octet-stream",
+  })
+
+  if (error) throw error
+
+  return {
+    nome: input.arquivo.name,
+    mimeType: input.arquivo.type || "application/octet-stream",
+    storageBucket: bucket,
+    storagePath: path,
+    tamanho: Number(input.arquivo.size) || 0,
+  }
+}
+
+export async function getOSAssinadaArquivoUrl(storageBucket: string, storagePath: string): Promise<string> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.storage.from(storageBucket).createSignedUrl(storagePath, 60)
+  if (error) throw error
+  return data.signedUrl
 }

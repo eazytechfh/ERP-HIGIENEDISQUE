@@ -33,6 +33,8 @@ export type ClienteArquivoInput = {
   tamanho?: number
   origem?: string
   contratoId?: string
+  storageBucket?: string
+  storagePath?: string
 }
 
 export type ClienteInput = {
@@ -132,6 +134,8 @@ function mapDbToCliente(row: any): ClienteInput {
       tamanho: typeof a.tamanho === "number" ? a.tamanho : undefined,
       origem: a.origem || "arquivo",
       contratoId: a.contrato_id || undefined,
+      storageBucket: a.storage_bucket || undefined,
+      storagePath: a.storage_path || undefined,
     })),
   }
 }

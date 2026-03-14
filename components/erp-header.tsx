@@ -18,7 +18,6 @@ const navigation = [
   { name: "Cadastro Equipe", href: "/dashboard/equipe" },
   { name: "Veiculos", href: "/dashboard/veiculos" },
   { name: "Financeiro", href: "/dashboard/financeiro" },
-  { name: "QA Fluxo", href: "/dashboard/qa" },
 ]
 
 export function ErpHeader() {

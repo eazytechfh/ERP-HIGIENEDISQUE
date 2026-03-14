@@ -48,6 +48,7 @@ export default function EquipePage() {
   const [membros, setMembros] = useState<EquipeMembroInput[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [activeTab, setActiveTab] = useState("visualizar")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA)
   const [submitError, setSubmitError] = useState("")
@@ -73,6 +74,7 @@ export default function EquipePage() {
   const resetForm = () => {
     setEditingId(null)
     setFormData(INITIAL_FORM_DATA)
+    setActiveTab("visualizar")
   }
 
   const handleInputChange = (field: keyof FormData, value: string | boolean | undefined) => {
@@ -175,7 +177,9 @@ export default function EquipePage() {
       })
 
       setSubmitSuccess(createdAuth ? "Membro salvo e usuario criado no Supabase com sucesso." : "Membro salvo no Supabase com sucesso.")
-      resetForm()
+      setEditingId(null)
+      setFormData(INITIAL_FORM_DATA)
+      setActiveTab("visualizar")
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Nao foi possivel salvar o membro.")
     } finally {
@@ -192,6 +196,7 @@ export default function EquipePage() {
       senhaAcesso: "",
       confirmarSenhaAcesso: "",
     })
+    setActiveTab("cadastrar")
   }
 
   const handleDelete = async (membro: EquipeMembroInput) => {
@@ -231,7 +236,7 @@ export default function EquipePage() {
           <h1 className="text-3xl font-bold text-foreground">Cadastro de Equipe</h1>
         </div>
 
-        <Tabs defaultValue="visualizar" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="visualizar">Equipe Cadastrada</TabsTrigger>
             <TabsTrigger value="cadastrar">Cadastrar Novo Membro</TabsTrigger>

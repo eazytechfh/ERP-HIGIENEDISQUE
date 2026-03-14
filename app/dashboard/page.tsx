@@ -8,6 +8,9 @@ import { Users, UserCheck, Calendar, CheckCircle2, Clock, AlertTriangle, AlertCi
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts"
 import { listClientesSupabase } from "@/lib/supabase/clientes-repo"
 import { listServicosSupabase, type ServicoSupabaseItem } from "@/lib/supabase/servicos-repo"
+import { listProdutosSupabase, type ProdutoSupabaseItem } from "@/lib/supabase/estoque-repo"
+import { listManutencoesPreventivasSupabase, listVeiculosSupabase, type ManutencaoPreventivaSupabaseItem, type VeiculoSupabaseItem } from "@/lib/supabase/veiculos-repo"
+import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabase/equipe-repo"
 
 type DashboardMetrics = {
   programadosHoje: number
@@ -22,7 +25,7 @@ type DashboardMetrics = {
   realizadosSemana: number
   realizadosMes: number
   osSemana: Array<{ dia: string; os: number }>
-  pendenciasCriticas: Array<{ cliente: string; texto: string }>
+  pendenciasCriticas: Array<{ origem: string; texto: string }>
   alertas: {
     osSemAssinatura: number
     servicosVencidos: number
@@ -58,7 +61,20 @@ function parseServiceDate(value: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-function computeMetrics(clientes: any[], servicos: ServicoSupabaseItem[], now = new Date()): DashboardMetrics {
+function isPastDate(value: string, today: Date): boolean {
+  const parsed = parseServiceDate(value)
+  return parsed ? parsed < today : false
+}
+
+function computeMetrics(
+  clientes: any[],
+  servicos: ServicoSupabaseItem[],
+  manutencoes: ManutencaoPreventivaSupabaseItem[],
+  veiculos: VeiculoSupabaseItem[],
+  produtos: ProdutoSupabaseItem[],
+  equipe: EquipeMembroInput[],
+  now = new Date(),
+): DashboardMetrics {
   const today = new Date(now)
   today.setHours(0, 0, 0, 0)
   const weekStart = startOfWeekMonday(today)
@@ -106,6 +122,52 @@ function computeMetrics(clientes: any[], servicos: ServicoSupabaseItem[], now = 
     }
   })
 
+  const pendenciasClientes = clientesComContratoAtivo
+    .map((c) => {
+      const situacao = getSituacaoContratoCliente(c)
+      if (situacao !== "A vencer" && situacao !== "Vencido") return null
+      return {
+        origem: c.nome || "Cliente sem nome",
+        texto: `Contrato com status: ${situacao}${c.dataFimContrato ? ` (fim em ${new Date(`${c.dataFimContrato}T00:00:00`).toLocaleDateString("pt-BR")})` : ""}`,
+      }
+    })
+    .filter((item): item is { origem: string; texto: string } => item !== null)
+
+  const pendenciasManutencao = manutencoes
+    .filter((m) => m.status === "Pendente")
+    .map((m) => {
+      const veiculo = veiculos.find((v) => v.id === m.veiculoId)
+      const nomeVeiculo = veiculo ? `${veiculo.placa} - ${veiculo.marca} ${veiculo.modelo}`.trim() : "Veiculo nao identificado"
+      return {
+        origem: nomeVeiculo,
+        texto: `Manutencao preventiva pendente: ${m.descricao || "Sem descricao"}${m.dataPrevista ? ` (prevista para ${new Date(`${m.dataPrevista}T00:00:00`).toLocaleDateString("pt-BR")})` : ""}`,
+      }
+    })
+
+  const pendenciasEstoque = produtos
+    .filter((p) => p.ativo && p.estoqueAtual <= p.estoqueMinimo)
+    .map((p) => ({
+      origem: p.nome || "Item de estoque",
+      texto: `Item no estoque com status: Critico (${p.estoqueAtual} ${p.unidade} disponiveis, minimo ${p.estoqueMinimo})`,
+    }))
+
+  const pendenciasEquipe = equipe
+    .filter((membro) => membro.situacao === "Ativo")
+    .flatMap((membro) => {
+      const docs = [
+        { label: "NR33", data: membro.nr33Validade },
+        { label: "NR35", data: membro.nr35Validade },
+        { label: "ASO", data: membro.asoValidade },
+      ]
+
+      return docs
+        .filter((doc) => isPastDate(doc.data, today))
+        .map((doc) => ({
+          origem: membro.nome || "Membro sem nome",
+          texto: `${doc.label} vencido${doc.data ? ` (venceu em ${new Date(`${doc.data}T00:00:00`).toLocaleDateString("pt-BR")})` : ""}`,
+        }))
+    })
+
   return {
     programadosHoje: servicosHoje.filter((s) => s.status === "agendado").length,
     realizadosHoje: servicosHoje.filter((s) => s.status === "executado").length,
@@ -119,16 +181,15 @@ function computeMetrics(clientes: any[], servicos: ServicoSupabaseItem[], now = 
     realizadosSemana: servicosSemana.filter((s) => s.status === "executado").length,
     realizadosMes: servicosMes.filter((s) => s.status === "executado").length,
     osSemana,
-    pendenciasCriticas: clientes
-      .flatMap((c) => (Array.isArray(c.pendenciasCriticas) ? c.pendenciasCriticas.map((texto: string) => ({ cliente: c.nome, texto })) : [])),
+    pendenciasCriticas: [...pendenciasClientes, ...pendenciasManutencao, ...pendenciasEstoque, ...pendenciasEquipe],
     alertas: {
       osSemAssinatura: servicos.filter((s) => s.osStatus && s.osStatus !== "assinada_digitalizada").length,
       servicosVencidos: servicos.filter((s) => {
         const data = parseServiceDate(s.data)
         return data ? data < today && s.status !== "executado" && s.status !== "cancelado" : false
       }).length,
-      manutencaoVeiculo: 0,
-      equipamentoDefeito: 0,
+      manutencaoVeiculo: manutencoes.filter((m) => m.status === "Pendente").length,
+      equipamentoDefeito: produtos.filter((p) => p.ativo && p.estoqueAtual <= p.estoqueMinimo).length,
     },
   }
 }
@@ -136,13 +197,24 @@ function computeMetrics(clientes: any[], servicos: ServicoSupabaseItem[], now = 
 export default function DashboardPage() {
   const [clientes, setClientes] = useState<any[]>([])
   const [servicos, setServicos] = useState<ServicoSupabaseItem[]>([])
+  const [manutencoes, setManutencoes] = useState<ManutencaoPreventivaSupabaseItem[]>([])
+  const [veiculos, setVeiculos] = useState<VeiculoSupabaseItem[]>([])
+  const [produtos, setProdutos] = useState<ProdutoSupabaseItem[]>([])
+  const [equipe, setEquipe] = useState<EquipeMembroInput[]>([])
 
   useEffect(() => {
     let mounted = true
 
     const loadData = async () => {
       try {
-        const [clientesResult, servicosResult] = await Promise.allSettled([listClientesSupabase(), listServicosSupabase()])
+        const [clientesResult, servicosResult, manutencoesResult, veiculosResult, produtosResult, equipeResult] = await Promise.allSettled([
+          listClientesSupabase(),
+          listServicosSupabase(),
+          listManutencoesPreventivasSupabase(),
+          listVeiculosSupabase(),
+          listProdutosSupabase(),
+          listEquipeMembrosSupabase(),
+        ])
         if (!mounted) return
 
         if (clientesResult.status === "fulfilled") {
@@ -158,11 +230,43 @@ export default function DashboardPage() {
           console.error("Falha ao carregar servicos no dashboard", servicosResult.reason)
           setServicos([])
         }
+
+        if (manutencoesResult.status === "fulfilled") {
+          setManutencoes(manutencoesResult.value)
+        } else {
+          console.error("Falha ao carregar manutencoes no dashboard", manutencoesResult.reason)
+          setManutencoes([])
+        }
+
+        if (veiculosResult.status === "fulfilled") {
+          setVeiculos(veiculosResult.value)
+        } else {
+          console.error("Falha ao carregar veiculos no dashboard", veiculosResult.reason)
+          setVeiculos([])
+        }
+
+        if (produtosResult.status === "fulfilled") {
+          setProdutos(produtosResult.value)
+        } else {
+          console.error("Falha ao carregar produtos no dashboard", produtosResult.reason)
+          setProdutos([])
+        }
+
+        if (equipeResult.status === "fulfilled") {
+          setEquipe(equipeResult.value)
+        } else {
+          console.error("Falha ao carregar equipe no dashboard", equipeResult.reason)
+          setEquipe([])
+        }
       } catch (error) {
         console.error("Falha inesperada ao carregar dashboard do Supabase", error)
         if (!mounted) return
         setClientes([])
         setServicos([])
+        setManutencoes([])
+        setVeiculos([])
+        setProdutos([])
+        setEquipe([])
       }
     }
 
@@ -172,13 +276,16 @@ export default function DashboardPage() {
     }
   }, [])
 
-  const metrics = useMemo(() => computeMetrics(clientes, servicos, new Date()), [clientes, servicos])
+  const metrics = useMemo(
+    () => computeMetrics(clientes, servicos, manutencoes, veiculos, produtos, equipe, new Date()),
+    [clientes, servicos, manutencoes, veiculos, produtos, equipe],
+  )
 
   const alertas = [
     { tipo: "OS sem assinatura", quantidade: metrics.alertas.osSemAssinatura, cor: "bg-blue-500" },
     { tipo: "Serviços Vencidos", quantidade: metrics.alertas.servicosVencidos, cor: "bg-blue-400" },
     { tipo: "Manutenção de Veículo", quantidade: metrics.alertas.manutencaoVeiculo, cor: "bg-blue-200" },
-    { tipo: "Equipamento com defeito", quantidade: metrics.alertas.equipamentoDefeito, cor: "bg-gray-400" },
+    { tipo: "Estoque critico", quantidade: metrics.alertas.equipamentoDefeito, cor: "bg-gray-400" },
   ]
 
   return (
@@ -272,13 +379,13 @@ export default function DashboardPage() {
           <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">Pendências críticas</CardTitle></CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Descrição</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Origem</TableHead><TableHead>Descrição</TableHead></TableRow></TableHeader>
               <TableBody>
                 {metrics.pendenciasCriticas.length === 0 ? (
                   <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground">Nenhuma pendência crítica cadastrada</TableCell></TableRow>
                 ) : (
                   metrics.pendenciasCriticas.map((p, idx) => (
-                    <TableRow key={`${p.cliente}-${idx}`}><TableCell>{p.cliente}</TableCell><TableCell>{p.texto}</TableCell></TableRow>
+                    <TableRow key={`${p.origem}-${idx}`}><TableCell>{p.origem}</TableCell><TableCell>{p.texto}</TableCell></TableRow>
                   ))
                 )}
               </TableBody>
@@ -289,3 +396,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+

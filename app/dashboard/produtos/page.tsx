@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Package, Plus, Search, Pencil, Trash2, FileText, X, Truck } from 'lucide-react'
+import { Package, Plus, Search, Pencil, Trash2, FileText, X, Truck, Eye, Paperclip, Download } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -34,7 +34,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ensureFlowStoreInitialized, setFlowFornecedores, setFlowProdutos } from "@/lib/flow-store"
+import {
+  deleteFornecedorSupabase,
+  deleteNotaFiscalSupabase,
+  deleteProdutoSupabase,
+  getNotaFiscalArquivoUrl,
+  listFornecedoresSupabase,
+  listNotasFiscaisSupabase,
+  listProdutosSupabase,
+  type NotaFiscalHistorico,
+  registrarEntradaNotaFiscalSupabase,
+  upsertFornecedorSupabase,
+  upsertProdutoSupabase,
+} from "@/lib/supabase/estoque-repo"
+import { listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertDespesaNotaFiscalSupabase } from "@/lib/supabase/financeiro-repo"
 
 // Tipos
 type Categoria = "Item Quimico" | "Diluente" | "Consumivel" | "Equipamentos" | "EPIs"
@@ -42,9 +57,10 @@ type Unidade = "L" | "ml" | "g" | "kg" | "unid"
 type Status = "OK" | "Alerta" | "Critico"
 
 interface Produto {
-  id: number
+  id: string
   nome: string
   marca: string
+  fornecedorId: string
   fornecedor: string
   estoqueAtual: number
   estoqueMinimo: number
@@ -55,14 +71,14 @@ interface Produto {
 }
 
 interface ItemNF {
-  produtoId: number | null
+  produtoId: string | null
   quantidade: number
   unidade: Unidade
   custoUnitario: number
 }
 
 interface Fornecedor {
-  id: number
+  id: string
   razaoSocial: string
   cnpj: string
   telefone: string
@@ -79,8 +95,60 @@ interface Fornecedor {
   ativo: boolean
 }
 
+function isValidStringId(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0
+}
+
+function normalizeProdutos(items: unknown[]): Produto[] {
+  return items.flatMap((item) => {
+    if (!item || typeof item !== "object") return []
+    const maybeProduto = item as Partial<Produto>
+    if (!isValidStringId(maybeProduto.id)) return []
+
+    return [{
+      id: maybeProduto.id,
+      nome: maybeProduto.nome || "",
+      marca: maybeProduto.marca || "",
+      fornecedorId: maybeProduto.fornecedorId || "",
+      fornecedor: maybeProduto.fornecedor || "",
+      estoqueAtual: Number(maybeProduto.estoqueAtual) || 0,
+      estoqueMinimo: Number(maybeProduto.estoqueMinimo) || 0,
+      unidade: (maybeProduto.unidade as Unidade) || "unid",
+      categoria: (maybeProduto.categoria as Categoria) || "Consumivel",
+      custoUnitario: Number(maybeProduto.custoUnitario) || 0,
+      ativo: Boolean(maybeProduto.ativo ?? true),
+    }]
+  })
+}
+
+function normalizeFornecedores(items: unknown[]): Fornecedor[] {
+  return items.flatMap((item) => {
+    if (!item || typeof item !== "object") return []
+    const maybeFornecedor = item as Partial<Fornecedor>
+    if (!isValidStringId(maybeFornecedor.id)) return []
+
+    return [{
+      id: maybeFornecedor.id,
+      razaoSocial: maybeFornecedor.razaoSocial || "",
+      cnpj: maybeFornecedor.cnpj || "",
+      telefone: maybeFornecedor.telefone || "",
+      email: maybeFornecedor.email || "",
+      endereco: {
+        rua: maybeFornecedor.endereco?.rua || "",
+        numero: maybeFornecedor.endereco?.numero || "",
+        bairro: maybeFornecedor.endereco?.bairro || "",
+        cidade: maybeFornecedor.endereco?.cidade || "",
+        uf: maybeFornecedor.endereco?.uf || "",
+      },
+      nomeContato: maybeFornecedor.nomeContato || "",
+      observacoes: maybeFornecedor.observacoes || "",
+      ativo: Boolean(maybeFornecedor.ativo ?? true),
+    }]
+  })
+}
+
 // Mock database com produtos de dedetização
-const mockProdutos: Produto[] = [
+const mockProdutos = [
   {
     id: 1,
     nome: "Cipermetrina 25% CE",
@@ -207,7 +275,7 @@ const categorias: Categoria[] = ["Item Quimico", "Diluente", "Consumivel", "Equi
 const unidades: Unidade[] = ["L", "ml", "g", "kg", "unid"]
 const ufs = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
 
-const mockFornecedores: Fornecedor[] = [
+const mockFornecedores = [
   {
     id: 1,
     razaoSocial: "Distribuidora Quimica SA",
@@ -315,16 +383,73 @@ function formatTelefone(value: string): string {
     .replace(/(\d{5})(\d)/, "$1-$2")
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === "string") return error
+  if (error && typeof error === "object") {
+    const maybeMessage = (error as { message?: unknown; error_description?: unknown; details?: unknown })
+    if (typeof maybeMessage.message === "string") return maybeMessage.message
+    if (typeof maybeMessage.error_description === "string") return maybeMessage.error_description
+    if (typeof maybeMessage.details === "string") return maybeMessage.details
+    try {
+      return JSON.stringify(error)
+    } catch {
+      return "Ocorreu um erro inesperado."
+    }
+  }
+  return "Ocorreu um erro inesperado."
+}
+
 export default function EstoquePage() {
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+  const [notasFiscais, setNotasFiscais] = useState<NotaFiscalHistorico[]>([])
+  const [categoriasDespesa, setCategoriasDespesa] = useState<FinanceiroCategoriaItem[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [notaFiscalSelecionada, setNotaFiscalSelecionada] = useState<NotaFiscalHistorico | null>(null)
+  const [nfArquivo, setNfArquivo] = useState<File | null>(null)
+  const [abrindoArquivoId, setAbrindoArquivoId] = useState<string | null>(null)
+  const [searchNotaFiscal, setSearchNotaFiscal] = useState("")
+  const [nfError, setNfError] = useState<string | null>(null)
 
   useEffect(() => {
-    const store = ensureFlowStoreInitialized("operacional")
-    setProdutos(Array.isArray(store.produtos) ? (store.produtos as Produto[]) : [])
-    setFornecedores(Array.isArray(store.fornecedores) ? (store.fornecedores as Fornecedor[]) : [])
-    setLoaded(true)
+    let active = true
+
+    async function loadEstoque() {
+      try {
+        const [produtosDb, fornecedoresDb, notasDb, categoriasDb] = await Promise.all([
+          listProdutosSupabase(),
+          listFornecedoresSupabase(),
+          listNotasFiscaisSupabase(),
+          listFinanceiroCategoriasSupabase("despesa"),
+        ])
+
+        if (!active) return
+        setProdutos(produtosDb)
+        setFornecedores(fornecedoresDb)
+        setNotasFiscais(notasDb)
+        setCategoriasDespesa(categoriasDb.filter((item) => item.ativo))
+        setLoadError(null)
+      } catch (error) {
+        console.error("Falha ao carregar estoque do Supabase", error)
+        const store = ensureFlowStoreInitialized("operacional")
+        if (!active) return
+        setProdutos(Array.isArray(store.produtos) ? normalizeProdutos(store.produtos) : [])
+        setFornecedores(Array.isArray(store.fornecedores) ? normalizeFornecedores(store.fornecedores) : [])
+        setNotasFiscais([])
+        setCategoriasDespesa([])
+        setLoadError("Nao foi possivel carregar o estoque do Supabase. Exibindo dados locais, se houver.")
+      } finally {
+        if (active) setLoaded(true)
+      }
+    }
+
+    void loadEstoque()
+
+    return () => {
+      active = false
+    }
   }, [])
 
   useEffect(() => {
@@ -347,7 +472,7 @@ export default function EstoquePage() {
   const [formData, setFormData] = useState({
     nome: "",
     marca: "",
-    fornecedor: "",
+    fornecedorId: "",
     categoria: "" as Categoria | "",
     unidade: "" as Unidade | "",
     estoqueMinimo: "",
@@ -372,39 +497,41 @@ export default function EstoquePage() {
 
   // Formulário Nota Fiscal
   const [nfData, setNfData] = useState({
-    fornecedorId: null as number | null,
+    fornecedorId: null as string | null,
     numeroNF: "",
     dataNF: "",
     itens: [{ produtoId: null, quantidade: 0, unidade: "unid" as Unidade, custoUnitario: 0 }] as ItemNF[],
+    registrarDespesa: false,
+    categoriaDespesaId: "",
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleCadastrar = (e: React.FormEvent) => {
+  const handleCadastrar = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.categoria || !formData.unidade) return
+    if (!formData.categoria || !formData.unidade || !formData.fornecedorId) return
     const categoria = formData.categoria
     const unidade = formData.unidade
     
-    const novoProduto: Produto = {
-      id: Math.max(...produtos.map(p => p.id)) + 1,
+    const fornecedorSelecionado = fornecedores.find((f) => f.id === formData.fornecedorId)
+    const novoProduto = await upsertProdutoSupabase({
       nome: formData.nome,
       marca: formData.marca,
-      fornecedor: formData.fornecedor,
+      fornecedorId: formData.fornecedorId,
       estoqueAtual: 0, // Estoque começa zerado
       estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
       unidade,
       categoria,
       custoUnitario: 0, // Será definido na entrada de NF
       ativo: formData.ativo,
-    }
-    setProdutos([...produtos, novoProduto])
+    })
+    setProdutos([...produtos, { ...novoProduto, fornecedor: fornecedorSelecionado?.razaoSocial || novoProduto.fornecedor }])
     setFormData({
       nome: "",
       marca: "",
-      fornecedor: "",
+      fornecedorId: "",
       categoria: "",
       unidade: "",
       estoqueMinimo: "",
@@ -418,7 +545,7 @@ export default function EstoquePage() {
     setFormData({
       nome: produto.nome,
       marca: produto.marca,
-      fornecedor: produto.fornecedor,
+      fornecedorId: produto.fornecedorId,
       categoria: produto.categoria,
       unidade: produto.unidade,
       estoqueMinimo: produto.estoqueMinimo.toString(),
@@ -426,33 +553,30 @@ export default function EstoquePage() {
     })
   }
 
-  const handleSalvarEdicao = (e: React.FormEvent) => {
+  const handleSalvarEdicao = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editingProduct || !formData.categoria || !formData.unidade) return
+    if (!editingProduct || !formData.categoria || !formData.unidade || !formData.fornecedorId) return
     const categoria = formData.categoria
     const unidade = formData.unidade
     
-    setProdutos(
-      produtos.map((p) =>
-        p.id === editingProduct.id
-          ? {
-              ...p,
-              nome: formData.nome,
-              marca: formData.marca,
-              fornecedor: formData.fornecedor,
-              categoria,
-              unidade,
-              estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
-              ativo: formData.ativo,
-            }
-          : p
-      )
-    )
+    const produtoSalvo = await upsertProdutoSupabase({
+      id: editingProduct.id,
+      nome: formData.nome,
+      marca: formData.marca,
+      fornecedorId: formData.fornecedorId,
+      estoqueAtual: editingProduct.estoqueAtual,
+      estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
+      unidade,
+      categoria,
+      custoUnitario: editingProduct.custoUnitario,
+      ativo: formData.ativo,
+    })
+    setProdutos(produtos.map((p) => (p.id === editingProduct.id ? produtoSalvo : p)))
     setEditingProduct(null)
     setFormData({
       nome: "",
       marca: "",
-      fornecedor: "",
+      fornecedorId: "",
       categoria: "",
       unidade: "",
       estoqueMinimo: "",
@@ -460,7 +584,8 @@ export default function EstoquePage() {
     })
   }
 
-  const handleExcluir = (id: number) => {
+  const handleExcluir = async (id: string) => {
+    await deleteProdutoSupabase(id)
     setProdutos(produtos.filter((p) => p.id !== id))
   }
 
@@ -483,27 +608,24 @@ export default function EstoquePage() {
     setEditingFornecedor(null)
   }
 
-  const handleCadastrarFornecedor = (e: React.FormEvent) => {
+  const handleCadastrarFornecedor = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!fornecedorForm.razaoSocial || !fornecedorForm.cnpj || !fornecedorForm.telefone || !fornecedorForm.email) return
 
-    const novoFornecedor: Fornecedor = {
-      id: Math.max(0, ...fornecedores.map(f => f.id)) + 1,
+    const novoFornecedor = await upsertFornecedorSupabase({
       razaoSocial: fornecedorForm.razaoSocial,
       cnpj: fornecedorForm.cnpj,
       telefone: fornecedorForm.telefone,
       email: fornecedorForm.email,
-      endereco: {
-        rua: fornecedorForm.rua,
-        numero: fornecedorForm.numero,
-        bairro: fornecedorForm.bairro,
-        cidade: fornecedorForm.cidade,
-        uf: fornecedorForm.uf,
-      },
+      rua: fornecedorForm.rua,
+      numero: fornecedorForm.numero,
+      bairro: fornecedorForm.bairro,
+      cidade: fornecedorForm.cidade,
+      uf: fornecedorForm.uf,
       nomeContato: fornecedorForm.nomeContato,
       observacoes: fornecedorForm.observacoes,
       ativo: fornecedorForm.ativo,
-    }
+    })
     setFornecedores([...fornecedores, novoFornecedor])
     resetFornecedorForm()
   }
@@ -526,37 +648,31 @@ export default function EstoquePage() {
     })
   }
 
-  const handleSalvarFornecedor = (e: React.FormEvent) => {
+  const handleSalvarFornecedor = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingFornecedor) return
 
-    setFornecedores(
-      fornecedores.map((f) =>
-        f.id === editingFornecedor.id
-          ? {
-              ...f,
-              razaoSocial: fornecedorForm.razaoSocial,
-              cnpj: fornecedorForm.cnpj,
-              telefone: fornecedorForm.telefone,
-              email: fornecedorForm.email,
-              endereco: {
-                rua: fornecedorForm.rua,
-                numero: fornecedorForm.numero,
-                bairro: fornecedorForm.bairro,
-                cidade: fornecedorForm.cidade,
-                uf: fornecedorForm.uf,
-              },
-              nomeContato: fornecedorForm.nomeContato,
-              observacoes: fornecedorForm.observacoes,
-              ativo: fornecedorForm.ativo,
-            }
-          : f
-      )
-    )
+    const fornecedorSalvo = await upsertFornecedorSupabase({
+      id: editingFornecedor.id,
+      razaoSocial: fornecedorForm.razaoSocial,
+      cnpj: fornecedorForm.cnpj,
+      telefone: fornecedorForm.telefone,
+      email: fornecedorForm.email,
+      rua: fornecedorForm.rua,
+      numero: fornecedorForm.numero,
+      bairro: fornecedorForm.bairro,
+      cidade: fornecedorForm.cidade,
+      uf: fornecedorForm.uf,
+      nomeContato: fornecedorForm.nomeContato,
+      observacoes: fornecedorForm.observacoes,
+      ativo: fornecedorForm.ativo,
+    })
+    setFornecedores(fornecedores.map((f) => (f.id === editingFornecedor.id ? fornecedorSalvo : f)))
     resetFornecedorForm()
   }
 
-  const handleExcluirFornecedor = (id: number) => {
+  const handleExcluirFornecedor = async (id: string) => {
+    await deleteFornecedorSupabase(id)
     setFornecedores(fornecedores.filter((f) => f.id !== id))
   }
 
@@ -581,28 +697,150 @@ export default function EstoquePage() {
     setNfData({ ...nfData, itens: newItens })
   }
 
-  const handleEntradaNF = () => {
-    // Atualiza o estoque com os itens da NF
-    const updatedProdutos = produtos.map(produto => {
-      const item = nfData.itens.find(i => i.produtoId === produto.id)
-      if (item) {
-        return {
-          ...produto,
-          estoqueAtual: produto.estoqueAtual + item.quantidade,
-          custoUnitario: item.custoUnitario > 0 ? item.custoUnitario : produto.custoUnitario,
+  const handleEntradaNF = async () => {
+    try {
+      setNfError(null)
+      const itensSelecionados = nfData.itens.filter((item) => item.produtoId)
+      if (itensSelecionados.length === 0) return
+
+      await registrarEntradaNotaFiscalSupabase({
+        fornecedorId: nfData.fornecedorId || "",
+        numeroNF: nfData.numeroNF,
+        dataNF: nfData.dataNF,
+        itens: itensSelecionados.map((item) => ({
+          produtoId: item.produtoId || "",
+          quantidade: item.quantidade,
+          unidade: item.unidade,
+          custoUnitario: item.custoUnitario,
+        })),
+        arquivo: nfArquivo,
+      })
+
+      await Promise.all(
+        itensSelecionados.map(async (item) => {
+          const produtoAtual = produtos.find((produto) => produto.id === item.produtoId)
+          if (!produtoAtual) return
+
+          await upsertProdutoSupabase({
+            id: produtoAtual.id,
+            nome: produtoAtual.nome,
+            marca: produtoAtual.marca,
+            fornecedorId: produtoAtual.fornecedorId,
+            estoqueAtual: produtoAtual.estoqueAtual + item.quantidade,
+            estoqueMinimo: produtoAtual.estoqueMinimo,
+            unidade: produtoAtual.unidade,
+            categoria: produtoAtual.categoria,
+            custoUnitario: item.custoUnitario > 0 ? item.custoUnitario : produtoAtual.custoUnitario,
+            ativo: produtoAtual.ativo,
+          })
+        })
+      )
+
+      if (nfData.registrarDespesa) {
+        const totalDespesa = itensSelecionados.reduce((sum, item) => sum + item.quantidade * item.custoUnitario, 0)
+        if (totalDespesa > 0) {
+          await upsertDespesaNotaFiscalSupabase({
+            numeroDocumento: nfData.numeroNF,
+            fornecedorId: nfData.fornecedorId || undefined,
+            descricao: `Entrada NF ${nfData.numeroNF}`,
+            categoriaId: nfData.categoriaDespesaId || undefined,
+            categoria: categoriasDespesa.find((item) => item.id === nfData.categoriaDespesaId)?.nome,
+            valor: totalDespesa,
+            dataCompetencia: nfData.dataNF,
+            dataVencimento: nfData.dataNF,
+            observacoes: `Despesa gerada pela entrada da nota fiscal ${nfData.numeroNF}`,
+          })
         }
       }
-      return produto
-    })
-    
-    setProdutos(updatedProdutos)
-    setNfData({
-      fornecedorId: null,
-      numeroNF: "",
-      dataNF: "",
-      itens: [{ produtoId: null, quantidade: 0, unidade: "unid", custoUnitario: 0 }],
-    })
-    setIsNFModalOpen(false)
+
+      setProdutos(await listProdutosSupabase())
+      setNotasFiscais(await listNotasFiscaisSupabase())
+      setNfData({
+        fornecedorId: null,
+        numeroNF: "",
+        dataNF: "",
+        itens: [{ produtoId: null, quantidade: 0, unidade: "unid", custoUnitario: 0 }],
+        registrarDespesa: false,
+        categoriaDespesaId: "",
+      })
+      setNfArquivo(null)
+      setIsNFModalOpen(false)
+    } catch (error) {
+      console.error("Falha ao registrar nota fiscal", error)
+      setNfError(getErrorMessage(error))
+    }
+  }
+
+  const formatFileSize = (size: number) => {
+    if (!size) return "-"
+    if (size < 1024) return `${size} B`
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const handleAbrirArquivoNota = async (nota: NotaFiscalHistorico) => {
+    if (!nota.arquivoStorageBucket || !nota.arquivoStoragePath) return
+    try {
+      setNfError(null)
+      setAbrindoArquivoId(nota.id)
+      const signedUrl = await getNotaFiscalArquivoUrl(nota.arquivoStorageBucket, nota.arquivoStoragePath)
+      window.open(signedUrl, "_blank", "noopener,noreferrer")
+    } catch (error) {
+      console.error("Falha ao abrir anexo da nota", error)
+      setNfError(getErrorMessage(error))
+    } finally {
+      setAbrindoArquivoId(null)
+    }
+  }
+
+  const handleExcluirNotaFiscal = async (nota: NotaFiscalHistorico) => {
+    const confirmed = window.confirm(`Excluir a nota fiscal ${nota.numeroNF} e estornar os itens no estoque?`)
+    if (!confirmed) return
+
+    try {
+      setNfError(null)
+      await Promise.all(
+        nota.itens.map(async (item) => {
+          const produtoAtual = produtos.find((produto) => produto.id === item.produtoId)
+          if (!produtoAtual) return
+
+          await upsertProdutoSupabase({
+            id: produtoAtual.id,
+            nome: produtoAtual.nome,
+            marca: produtoAtual.marca,
+            fornecedorId: produtoAtual.fornecedorId,
+            estoqueAtual: Math.max(0, produtoAtual.estoqueAtual - item.quantidade),
+            estoqueMinimo: produtoAtual.estoqueMinimo,
+            unidade: produtoAtual.unidade,
+            categoria: produtoAtual.categoria,
+            custoUnitario: produtoAtual.custoUnitario,
+            ativo: produtoAtual.ativo,
+          })
+        })
+      )
+
+      await deleteNotaFiscalSupabase(
+        nota.id,
+        nota.arquivoStorageBucket && nota.arquivoStoragePath
+          ? { bucket: nota.arquivoStorageBucket, path: nota.arquivoStoragePath }
+          : null,
+      )
+
+      const [produtosAtualizados, notasAtualizadas] = await Promise.all([
+        listProdutosSupabase(),
+        listNotasFiscaisSupabase(),
+      ])
+
+      setProdutos(produtosAtualizados)
+      setNotasFiscais(notasAtualizadas)
+
+      if (notaFiscalSelecionada?.id === nota.id) {
+        setNotaFiscalSelecionada(null)
+      }
+    } catch (error) {
+      console.error("Falha ao excluir nota fiscal", error)
+      setNfError(getErrorMessage(error))
+    }
   }
 
   const filteredFornecedores = fornecedores.filter(
@@ -615,6 +853,17 @@ export default function EstoquePage() {
   )
 
   const fornecedoresAtivos = fornecedores.filter(f => f.ativo)
+
+  const filteredNotasFiscais = notasFiscais.filter((nota) => {
+    const term = searchNotaFiscal.trim().toLowerCase()
+    if (!term) return true
+    return (
+      nota.numeroNF.toLowerCase().includes(term) ||
+      nota.fornecedor.toLowerCase().includes(term) ||
+      nota.dataNF.toLowerCase().includes(term) ||
+      nota.arquivoNome.toLowerCase().includes(term)
+    )
+  })
 
   const filteredProdutos = produtos.filter(
     (p) =>
@@ -637,6 +886,12 @@ export default function EstoquePage() {
             <p className="text-muted-foreground">Gestao completa de itens e insumos para dedetizacao</p>
           </div>
         </div>
+
+        {loadError ? (
+          <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {loadError}
+          </div>
+        ) : null}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full max-w-2xl grid-cols-4">
@@ -858,15 +1113,15 @@ export default function EstoquePage() {
                     <div className="space-y-2">
                       <Label htmlFor="fornecedor">Fornecedor *</Label>
                       <Select
-                        value={formData.fornecedor}
-                        onValueChange={(value) => setFormData({ ...formData, fornecedor: value })}
+                        value={formData.fornecedorId}
+                        onValueChange={(value) => setFormData({ ...formData, fornecedorId: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o fornecedor" />
                         </SelectTrigger>
                         <SelectContent>
                           {fornecedores.filter(f => f.ativo).map((fornecedor) => (
-                            <SelectItem key={fornecedor.id} value={fornecedor.razaoSocial}>
+                            <SelectItem key={fornecedor.id} value={fornecedor.id}>
                               {fornecedor.razaoSocial}
                             </SelectItem>
                           ))}
@@ -900,7 +1155,7 @@ export default function EstoquePage() {
                           setFormData({
                             nome: "",
                             marca: "",
-                            fornecedor: "",
+                            fornecedorId: "",
                             categoria: "",
                             unidade: "",
                             estoqueMinimo: "",
@@ -918,7 +1173,7 @@ export default function EstoquePage() {
           </TabsContent>
 
           {/* Entrada de Nota Fiscal */}
-          <TabsContent value="nf">
+          <TabsContent value="nf" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -930,12 +1185,18 @@ export default function EstoquePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {nfError ? (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    {nfError}
+                  </div>
+                ) : null}
+
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="nf-fornecedor">Fornecedor *</Label>
                     <Select
-                      value={nfData.fornecedorId?.toString() || ""}
-                      onValueChange={(value) => setNfData({ ...nfData, fornecedorId: parseInt(value) })}
+                      value={nfData.fornecedorId || ""}
+                      onValueChange={(value) => setNfData({ ...nfData, fornecedorId: value })}
                       disabled={fornecedoresAtivos.length === 0}
                     >
                       <SelectTrigger>
@@ -943,7 +1204,7 @@ export default function EstoquePage() {
                       </SelectTrigger>
                       <SelectContent>
                         {fornecedoresAtivos.map((f) => (
-                          <SelectItem key={f.id} value={f.id.toString()}>
+                          <SelectItem key={f.id} value={f.id}>
                             {f.razaoSocial}
                           </SelectItem>
                         ))}
@@ -972,6 +1233,66 @@ export default function EstoquePage() {
                   </div>
                 </div>
 
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="arquivoNF">Anexo da Nota</Label>
+                    <Input
+                      id="arquivoNF"
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.xml"
+                      onChange={(e) => setNfArquivo(e.target.files?.[0] || null)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Aceita PDF, imagem ou XML da nota fiscal.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-dashed p-4 text-sm">
+                    {nfArquivo ? (
+                      <div className="space-y-1">
+                        <p className="font-medium">{nfArquivo.name}</p>
+                        <p className="text-muted-foreground">{formatFileSize(nfArquivo.size)}</p>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">Nenhum arquivo anexado para esta entrada.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-medium">Cadastrar despesa no fluxo de caixa?</p>
+                      <p className="text-sm text-muted-foreground">Ao marcar, a entrada da NF tambem cria uma despesa financeira vinculada.</p>
+                    </div>
+                    <Checkbox
+                      checked={nfData.registrarDespesa}
+                      onCheckedChange={(checked) => setNfData({ ...nfData, registrarDespesa: checked === true })}
+                    />
+                  </div>
+
+                  {nfData.registrarDespesa ? (
+                    <div className="space-y-2">
+                      <Label>Categoria de despesa</Label>
+                      <Select
+                        value={nfData.categoriaDespesaId || "__none__"}
+                        onValueChange={(value) => setNfData({ ...nfData, categoriaDespesaId: value === "__none__" ? "" : value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Sem categoria</SelectItem>
+                          {categoriasDespesa.map((categoria) => (
+                            <SelectItem key={categoria.id} value={categoria.id}>
+                              {categoria.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                </div>
+
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label className="text-base font-semibold">Itens da Nota Fiscal</Label>
@@ -987,15 +1308,15 @@ export default function EstoquePage() {
                         <div className="space-y-2 md:col-span-1">
                           <Label>Item *</Label>
                           <Select
-                            value={item.produtoId?.toString() || ""}
-                            onValueChange={(value) => handleItemNFChange(index, "produtoId", parseInt(value))}
+                            value={item.produtoId || ""}
+                            onValueChange={(value) => handleItemNFChange(index, "produtoId", value)}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                             <SelectContent>
-                              {produtos.filter(p => p.ativo).map((p) => (
-                                <SelectItem key={p.id} value={p.id.toString()}>
+                              {produtos.filter((p) => p.ativo).map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
                                   {p.nome}
                                 </SelectItem>
                               ))}
@@ -1069,6 +1390,100 @@ export default function EstoquePage() {
                     <Package className="h-4 w-4 mr-2" />
                     Dar Entrada no Estoque
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Notas Fiscais Anteriores</CardTitle>
+                <CardDescription>
+                  Consulte entradas anteriores e abra o anexo salvo quando precisar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Pesquisar por numero, fornecedor, data ou nome do anexo..."
+                      className="pl-10"
+                      value={searchNotaFiscal}
+                      onChange={(e) => setSearchNotaFiscal(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Numero</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Fornecedor</TableHead>
+                        <TableHead>Itens</TableHead>
+                        <TableHead>Anexo</TableHead>
+                        <TableHead className="text-right">Acoes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredNotasFiscais.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                            Nenhuma nota fiscal encontrada.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredNotasFiscais.map((nota) => (
+                          <TableRow key={nota.id}>
+                            <TableCell className="font-medium">{nota.numeroNF}</TableCell>
+                            <TableCell>{nota.dataNF}</TableCell>
+                            <TableCell>{nota.fornecedor}</TableCell>
+                            <TableCell>{nota.itens.length}</TableCell>
+                            <TableCell>
+                              {nota.arquivoNome ? (
+                                <span className="inline-flex items-center gap-2 text-sm">
+                                  <Paperclip className="h-4 w-4" />
+                                  {nota.arquivoNome}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">Sem anexo</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button type="button" variant="outline" size="sm" onClick={() => setNotaFiscalSelecionada(nota)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Ver nota
+                                </Button>
+                                {nota.arquivoStoragePath ? (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => void handleAbrirArquivoNota(nota)}
+                                    disabled={abrindoArquivoId === nota.id}
+                                  >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    {abrindoArquivoId === nota.id ? "Abrindo..." : "Abrir anexo"}
+                                  </Button>
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => void handleExcluirNotaFiscal(nota)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4 text-destructive" />
+                                  Excluir
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
@@ -1329,6 +1744,72 @@ export default function EstoquePage() {
       </main>
 
       {/* Modal de confirmação (mantido para possível uso futuro) */}
+      <Dialog open={Boolean(notaFiscalSelecionada)} onOpenChange={(open) => !open && setNotaFiscalSelecionada(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Nota Fiscal {notaFiscalSelecionada?.numeroNF || ""}</DialogTitle>
+            <DialogDescription>
+              {notaFiscalSelecionada ? `${notaFiscalSelecionada.fornecedor} • ${notaFiscalSelecionada.dataNF}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {notaFiscalSelecionada ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-md border p-3 text-sm">
+                  <p className="font-medium">Fornecedor</p>
+                  <p className="text-muted-foreground">{notaFiscalSelecionada.fornecedor}</p>
+                </div>
+                <div className="rounded-md border p-3 text-sm">
+                  <p className="font-medium">Anexo</p>
+                  {notaFiscalSelecionada.arquivoNome ? (
+                    <div className="space-y-2">
+                      <p className="text-muted-foreground">
+                        {notaFiscalSelecionada.arquivoNome} • {formatFileSize(notaFiscalSelecionada.arquivoTamanho)}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleAbrirArquivoNota(notaFiscalSelecionada)}
+                        disabled={abrindoArquivoId === notaFiscalSelecionada.id}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        {abrindoArquivoId === notaFiscalSelecionada.id ? "Abrindo..." : "Visualizar anexo"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">Nenhum anexo salvo para esta nota.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produto</TableHead>
+                      <TableHead className="text-right">Quantidade</TableHead>
+                      <TableHead>Unidade</TableHead>
+                      <TableHead className="text-right">Custo Unitario</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {notaFiscalSelecionada.itens.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.produtoNome}</TableCell>
+                        <TableCell className="text-right">{item.quantidade}</TableCell>
+                        <TableCell>{item.unidade}</TableCell>
+                        <TableCell className="text-right">R$ {item.custoUnitario.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isNFModalOpen} onOpenChange={setIsNFModalOpen}>
         <DialogContent>
           <DialogHeader>

@@ -14,13 +14,15 @@ import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { 
   Search, Plus, Edit, UserPlus, Users, Trash2, MapPin, Phone, 
-  Building2, FileText, Upload, ChevronRight, Home, Save, X, Download
+  Building2, FileText, Upload, ChevronRight, Home, Save, X, Download, Eye
 } from 'lucide-react'
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ensureFlowStoreInitialized, loadFlowContratos, saveFlowContratos, setFlowClientes } from "@/lib/flow-store"
 import { isApiMode } from "@/lib/runtime-config"
 import { deleteClienteSupabase, listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
+import { listContratosSupabase, type ContratoSupabaseItem } from "@/lib/supabase/contratos-repo"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
 // Types
 type TipoCliente = "pf" | "pj"
@@ -60,6 +62,8 @@ type ClienteArquivo = {
   tamanho?: number
   origem?: string
   contratoId?: string
+  storageBucket?: string
+  storagePath?: string
 }
 
 type Cliente = {
@@ -158,6 +162,7 @@ export default function ClientesPage() {
   const [editingClient, setEditingClient] = useState<Cliente | null>(null)
   
   const [clientes, setClientes] = useState<Cliente[]>([])
+  const [contratosSupabase, setContratosSupabase] = useState<ContratoSupabaseItem[]>([])
   const [clientesLoaded, setClientesLoaded] = useState(false)
   const [isSavingCliente, setIsSavingCliente] = useState(false)
   const apiMode = isApiMode()
@@ -168,13 +173,15 @@ export default function ClientesPage() {
     const loadClientes = async () => {
       if (apiMode) {
         try {
-          const rows = await listClientesSupabase()
+          const [rows, contratosRows] = await Promise.all([listClientesSupabase(), listContratosSupabase()])
           if (!mounted) return
           setClientes(rows as Cliente[])
+          setContratosSupabase(contratosRows)
         } catch (error) {
           console.error("Falha ao carregar clientes no Supabase", error)
           if (!mounted) return
           setClientes([])
+          setContratosSupabase([])
         } finally {
           if (mounted) setClientesLoaded(true)
         }
@@ -184,6 +191,7 @@ export default function ClientesPage() {
       const store = ensureFlowStoreInitialized("operacional")
       if (!mounted) return
       setClientes(Array.isArray(store.clientes) ? (store.clientes as Cliente[]) : [])
+      setContratosSupabase([])
       setClientesLoaded(true)
     }
 
@@ -359,7 +367,19 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
   }
 
 
-  const baixarArquivoCliente = (arquivo: ClienteArquivo) => {
+  const baixarArquivoCliente = async (arquivo: ClienteArquivo) => {
+    if (arquivo?.storageBucket && arquivo?.storagePath) {
+      try {
+        const supabase = getSupabaseBrowserClient()
+        const { data, error } = await supabase.storage.from(arquivo.storageBucket).createSignedUrl(arquivo.storagePath, 60)
+        if (error) throw error
+        window.open(data.signedUrl, "_blank", "noopener,noreferrer")
+        return
+      } catch (error) {
+        console.error("Falha ao abrir arquivo do cliente no storage", error)
+      }
+    }
+
     if (!arquivo?.conteudoBase64 || !arquivo?.mimeType) return
     const href = `data:${arquivo.mimeType};base64,${arquivo.conteudoBase64}`
     const link = document.createElement("a")
@@ -397,6 +417,69 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
   const getSituacaoCliente = (cliente: Cliente): SituacaoContrato => {
     if (!cliente.possuiContrato) return ""
     return calcularSituacaoContrato(cliente.dataFimContrato, cliente.situacaoContrato)
+  }
+
+  const contratosPorCliente = useMemo(() => {
+    const source = apiMode
+      ? contratosSupabase.map((contrato) => ({
+          id: contrato.id,
+          clienteId: contrato.clienteId,
+          numero: contrato.numero,
+          descricao: contrato.descricao,
+          status: contrato.status,
+          dataInicio: contrato.dataInicio,
+          dataTermino: contrato.dataTermino,
+        }))
+      : loadFlowContratos()
+
+    const map = new Map<string, typeof source[number]>()
+    source.forEach((contrato) => {
+      if (!contrato?.clienteId) return
+      const current = map.get(String(contrato.clienteId))
+      if (!current) {
+        map.set(String(contrato.clienteId), contrato)
+        return
+      }
+
+      const currentDate = current.dataTermino || current.dataInicio || ""
+      const nextDate = contrato.dataTermino || contrato.dataInicio || ""
+      if (nextDate > currentDate) {
+        map.set(String(contrato.clienteId), contrato)
+      }
+    })
+    return map
+  }, [apiMode, contratosSupabase])
+
+  const getContratoResumoCliente = (cliente: Cliente) => {
+    const contrato = contratosPorCliente.get(String(cliente.id))
+    if (contrato) {
+      const situacao = calcularSituacaoContrato(contrato.dataTermino || "", cliente.situacaoContrato)
+      return {
+        possuiContrato: true,
+        numero: contrato.numero || "",
+        situacao,
+      }
+    }
+
+    return {
+      possuiContrato: Boolean(cliente.possuiContrato),
+      numero: "",
+      situacao: getSituacaoCliente(cliente),
+    }
+  }
+
+  const getContratoArquivoCliente = (cliente: Cliente) => {
+    const arquivos = Array.isArray(cliente.arquivos) ? cliente.arquivos : []
+    const contratoAtual = contratosPorCliente.get(String(cliente.id))
+    const porContratoAtual = contratoAtual
+      ? arquivos.filter((arquivo) => arquivo.contratoId && String(arquivo.contratoId) === String(contratoAtual.id))
+      : []
+
+    const candidatos = (porContratoAtual.length > 0 ? porContratoAtual : arquivos).filter((arquivo) =>
+      String(arquivo.origem || "").includes("contrato"),
+    )
+
+    return candidatos.sort((a, b) => String(b.criadoEm || "").localeCompare(String(a.criadoEm || "")))[0] || null
   }
 
   const contratosPorId = new Map(loadFlowContratos().map((contrato) => [String(contrato.id), contrato]))
@@ -508,7 +591,8 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
 
   const filteredClientes = clientes.filter((cliente) => {
     const term = searchTerm.toLowerCase()
-    const situacaoCliente = getSituacaoCliente(cliente)
+    const contratoResumo = getContratoResumoCliente(cliente)
+    const situacaoCliente = contratoResumo.situacao
     const matchesSearch =
       cliente.nome.toLowerCase().includes(term) ||
       cliente.telefone.includes(searchTerm) ||
@@ -518,15 +602,15 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
     const matchesContrato = (() => {
       switch (contractFilter) {
         case "com_contrato":
-          return cliente.possuiContrato
+          return contratoResumo.possuiContrato
         case "sem_contrato":
-          return !cliente.possuiContrato
+          return !contratoResumo.possuiContrato
         case "em_dia":
-          return cliente.possuiContrato && situacaoCliente === "Em dia"
+          return contratoResumo.possuiContrato && situacaoCliente === "Em dia"
         case "a_vencer":
-          return cliente.possuiContrato && situacaoCliente === "A vencer"
+          return contratoResumo.possuiContrato && situacaoCliente === "A vencer"
         case "vencido":
-          return cliente.possuiContrato && situacaoCliente === "Vencido"
+          return contratoResumo.possuiContrato && situacaoCliente === "Vencido"
         default:
           return true
       }
@@ -681,6 +765,11 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                     ) : (
                       filteredClientes.map((cliente) => (
                         <TableRow key={cliente.id}>
+                          {(() => {
+                            const contratoResumo = getContratoResumoCliente(cliente)
+                            const contratoArquivo = getContratoArquivoCliente(cliente)
+                            return (
+                              <>
                           <TableCell>
                             <Badge variant="outline">
                               {cliente.tipoCliente === "pf" ? "PF" : "PJ"}
@@ -689,11 +778,15 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                           <TableCell className="font-medium">{cliente.nome}</TableCell>
                           <TableCell>{cliente.telefone}</TableCell>
                           <TableCell>{cliente.email}</TableCell>
-                          <TableCell>{cliente.tipoCliente === "pf" ? cliente.cpf : cliente.cnpj}</TableCell>                          <TableCell>
-                            {cliente.possuiContrato ? (
-                              <Badge variant={getSituacaoCliente(cliente) === "Em dia" ? "default" : getSituacaoCliente(cliente) === "A vencer" ? "secondary" : "destructive"}>
-                                {getSituacaoCliente(cliente)}
-                              </Badge>
+                          <TableCell>{cliente.tipoCliente === "pf" ? cliente.cpf : cliente.cnpj}</TableCell>
+                          <TableCell>
+                            {contratoResumo.possuiContrato ? (
+                              <div className="flex flex-col gap-1">
+                                {contratoResumo.numero ? <span className="text-xs text-muted-foreground">{contratoResumo.numero}</span> : null}
+                                <Badge variant={contratoResumo.situacao === "Em dia" ? "default" : contratoResumo.situacao === "A vencer" ? "secondary" : "destructive"}>
+                                  {contratoResumo.situacao || "Com contrato"}
+                                </Badge>
+                              </div>
                             ) : (
                               <span className="text-muted-foreground text-sm">Sem contrato</span>
                             )}
@@ -705,6 +798,16 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
+                              {contratoArquivo ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => void baixarArquivoCliente(contratoArquivo)}
+                                  title="Ver contrato"
+                                >
+                                  <Eye className="h-4 w-4 text-primary" />
+                                </Button>
+                              ) : null}
                               <Button variant="ghost" size="sm" onClick={() => handleEdit(cliente)} title="Editar cliente">
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -713,6 +816,9 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                               </Button>
                             </div>
                           </TableCell>
+                              </>
+                            )
+                          })()}
                         </TableRow>
                       ))
                     )}
