@@ -1,6 +1,8 @@
 "use client"
 
+import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
 export type ContratoSupabaseItemInput = {
   id?: string
@@ -76,6 +78,12 @@ export async function listContratosSupabase(): Promise<ContratoSupabaseItem[]> {
 }
 
 export async function upsertContratoSupabase(input: ContratoSupabaseInput): Promise<ContratoSupabaseItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "contratos.edit" : "contratos.create",
+    "Voce nao possui permissao para salvar contratos.",
+  )
+
   const supabase = getSupabaseBrowserClient()
 
   const payload = {
@@ -124,10 +132,27 @@ export async function upsertContratoSupabase(input: ContratoSupabaseInput): Prom
     .single()
 
   if (error) throw error
-  return mapDbToContrato(data)
+  const contrato = mapDbToContrato(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "contrato",
+    entityId: contratoId,
+    entityLabel: contrato.numero,
+    description: isEditing ? "Contrato atualizado no sistema." : "Novo contrato cadastrado no sistema.",
+    metadata: {
+      clienteId: contrato.clienteId,
+      status: contrato.status,
+      tipoContrato: contrato.tipoContrato,
+    },
+  })
+
+  return contrato
 }
 
 export async function addClienteArquivoContratoSupabase(input: ClienteArquivoContratoInput): Promise<void> {
+  await assertPermissionSupabase("contratos.generate", "Voce nao possui permissao para gerar documentos de contrato.")
+
   const supabase = getSupabaseBrowserClient()
   const bucket = "contratos-docx"
   const path = `${input.clienteId}/${input.contratoId}/${Date.now()}-${sanitizeFileName(input.nome)}`
@@ -151,4 +176,17 @@ export async function addClienteArquivoContratoSupabase(input: ClienteArquivoCon
   })
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "generate",
+    entity: "contrato_arquivo",
+    entityId: input.contratoId,
+    entityLabel: input.nome,
+    description: "Arquivo de contrato gerado e vinculado ao cliente.",
+    metadata: {
+      clienteId: input.clienteId,
+      contratoId: input.contratoId,
+      origem: input.origem,
+    },
+  })
 }

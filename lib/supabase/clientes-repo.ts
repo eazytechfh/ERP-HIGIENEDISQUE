@@ -1,6 +1,8 @@
 "use client"
 
+import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
 export type ClienteLocalInput = {
   id?: string
@@ -192,6 +194,12 @@ export async function listClientesSupabase(): Promise<ClienteInput[]> {
 }
 
 export async function upsertClienteSupabase(input: ClienteInput): Promise<ClienteInput> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "clientes.edit" : "clientes.create",
+    "Voce nao possui permissao para salvar clientes.",
+  )
+
   const supabase = getSupabaseBrowserClient()
 
   const payload = mapClienteToDb(input)
@@ -275,10 +283,26 @@ export async function upsertClienteSupabase(input: ClienteInput): Promise<Client
     .single()
 
   if (fullError) throw fullError
-  return mapDbToCliente(full)
+  const cliente = mapDbToCliente(full)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "cliente",
+    entityId: clienteId,
+    entityLabel: cliente.nome,
+    description: isEditing ? "Cliente atualizado no sistema." : "Novo cliente cadastrado no sistema.",
+    metadata: {
+      status: cliente.status,
+      tipoCliente: cliente.tipoCliente,
+    },
+  })
+
+  return cliente
 }
 
 export async function deleteClienteSupabase(clienteId: string): Promise<void> {
+  await assertPermissionSupabase("clientes.delete", "Voce nao possui permissao para excluir clientes.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("clientes")
@@ -286,4 +310,12 @@ export async function deleteClienteSupabase(clienteId: string): Promise<void> {
     .eq("id", clienteId)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "cliente",
+    entityId: clienteId,
+    entityLabel: clienteId,
+    description: "Cliente removido do sistema.",
+  })
 }

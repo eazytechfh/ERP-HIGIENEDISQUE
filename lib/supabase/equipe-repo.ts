@@ -1,8 +1,11 @@
 "use client"
 
+import type { AppPermissionKey, AppRole } from "@/lib/access-control"
+import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
-export type EquipeRole = "admin" | "operacional" | "financeiro" | "tecnico"
+export type EquipeRole = AppRole
 
 export type EquipeMembroInput = {
   id?: string
@@ -20,6 +23,7 @@ export type EquipeMembroInput = {
   situacao: "Ativo" | "Inativo"
   emailAcesso: string
   perfilAcesso: EquipeRole | ""
+  permissions?: AppPermissionKey[]
 }
 
 function mapDbToEquipe(row: any): EquipeMembroInput {
@@ -39,6 +43,7 @@ function mapDbToEquipe(row: any): EquipeMembroInput {
     situacao: (row.situacao || "Ativo") as EquipeMembroInput["situacao"],
     emailAcesso: row.email_acesso || "",
     perfilAcesso: (row.perfil_acesso || "") as EquipeMembroInput["perfilAcesso"],
+    permissions: Array.isArray(row.permissions) ? row.permissions : [],
   }
 }
 
@@ -76,7 +81,7 @@ export async function listEquipeMembrosSupabase(): Promise<EquipeMembroInput[]> 
   const membros = (data || []).map(mapDbToEquipe)
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("user_id, nome, role, ativo")
+    .select("user_id, nome, role, ativo, permissions")
 
   if (profilesError) throw profilesError
 
@@ -99,6 +104,7 @@ export async function listEquipeMembrosSupabase(): Promise<EquipeMembroInput[]> 
         situacao: profile.ativo === false ? "Inativo" : "Ativo",
         emailAcesso: "",
         perfilAcesso: (profile.role || "") as EquipeMembroInput["perfilAcesso"],
+        permissions: Array.isArray(profile.permissions) ? profile.permissions : [],
       })
     )
 
@@ -106,6 +112,12 @@ export async function listEquipeMembrosSupabase(): Promise<EquipeMembroInput[]> 
 }
 
 export async function upsertEquipeMembroSupabase(input: EquipeMembroInput): Promise<EquipeMembroInput> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "equipe.edit" : "equipe.create",
+    "Voce nao possui permissao para salvar membros da equipe.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const payload = mapEquipeToDb(input)
 
@@ -116,10 +128,26 @@ export async function upsertEquipeMembroSupabase(input: EquipeMembroInput): Prom
     .single()
 
   if (error) throw error
-  return mapDbToEquipe(data)
+  const membro = mapDbToEquipe(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "equipe_membro",
+    entityId: membro.id || membro.userId || "",
+    entityLabel: membro.nome,
+    description: isEditing ? "Cadastro de equipe atualizado." : "Novo membro cadastrado na equipe.",
+    metadata: {
+      perfilAcesso: membro.perfilAcesso,
+      situacao: membro.situacao,
+    },
+  })
+
+  return membro
 }
 
 export async function deleteEquipeMembroSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("equipe.delete", "Voce nao possui permissao para excluir membros da equipe.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("equipe_membros")
@@ -127,4 +155,12 @@ export async function deleteEquipeMembroSupabase(id: string): Promise<void> {
     .eq("id", id)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "equipe_membro",
+    entityId: id,
+    entityLabel: id,
+    description: "Membro removido da equipe.",
+  })
 }

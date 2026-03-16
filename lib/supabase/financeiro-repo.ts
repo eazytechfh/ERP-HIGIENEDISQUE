@@ -1,6 +1,8 @@
 "use client"
 
+import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
 export type FinanceiroLancamentoTipo = "receita" | "despesa" | "investimento"
 export type FinanceiroLancamentoStatus = "programado" | "realizado" | "cancelado"
@@ -292,6 +294,12 @@ export async function listFinanceiroCategoriasSupabase(tipo?: FinanceiroLancamen
 }
 
 export async function upsertFinanceiroCategoriaSupabase(input: FinanceiroCategoriaInput): Promise<FinanceiroCategoriaItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "financeiro.edit" : "financeiro.create",
+    "Voce nao possui permissao para salvar categorias do financeiro.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase
     .from("financeiro_categorias")
@@ -300,7 +308,18 @@ export async function upsertFinanceiroCategoriaSupabase(input: FinanceiroCategor
     .single()
 
   if (error) throw error
-  return mapDbToCategoria(data)
+  const categoria = mapDbToCategoria(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "financeiro_categoria",
+    entityId: categoria.id,
+    entityLabel: categoria.nome,
+    description: isEditing ? "Categoria financeira atualizada." : "Categoria financeira criada.",
+    metadata: { tipo: categoria.tipo },
+  })
+
+  return categoria
 }
 
 export async function listFinanceiroLancamentosSupabase(): Promise<FinanceiroLancamentoItem[]> {
@@ -317,6 +336,12 @@ export async function listFinanceiroLancamentosSupabase(): Promise<FinanceiroLan
 }
 
 export async function upsertFinanceiroLancamentoSupabase(input: FinanceiroLancamentoInput): Promise<FinanceiroLancamentoItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "financeiro.edit" : "financeiro.create",
+    "Voce nao possui permissao para salvar lancamentos financeiros.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const { data: saved, error: saveError } = await supabase
     .from("financeiro_lancamentos")
@@ -333,13 +358,38 @@ export async function upsertFinanceiroLancamentoSupabase(input: FinanceiroLancam
     .single()
 
   if (error) throw error
-  return mapDbToLancamento(data)
+  const lancamento = mapDbToLancamento(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "financeiro_lancamento",
+    entityId: lancamento.id,
+    entityLabel: lancamento.descricao,
+    description: isEditing ? "Lancamento financeiro atualizado." : "Lancamento financeiro criado.",
+    metadata: {
+      tipo: lancamento.tipo,
+      status: lancamento.status,
+      valor: lancamento.valor,
+    },
+  })
+
+  return lancamento
 }
 
 export async function deleteFinanceiroLancamentoSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("financeiro.delete", "Voce nao possui permissao para excluir lancamentos financeiros.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase.from("financeiro_lancamentos").delete().eq("id", id)
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "financeiro_lancamento",
+    entityId: id,
+    entityLabel: id,
+    description: "Lancamento financeiro excluido.",
+  })
 }
 
 export async function listFinanceiroDocumentosSupabase(tipo?: FinanceiroDocumentoTipo): Promise<FinanceiroDocumentoItem[]> {
@@ -361,6 +411,12 @@ export async function listFinanceiroDocumentosSupabase(tipo?: FinanceiroDocument
 }
 
 export async function upsertFinanceiroDocumentoSupabase(input: FinanceiroDocumentoInput): Promise<FinanceiroDocumentoItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "financeiro.edit" : "financeiro.create",
+    "Voce nao possui permissao para salvar documentos financeiros.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const { data: saved, error: saveError } = await supabase
     .from("financeiro_documentos")
@@ -377,13 +433,37 @@ export async function upsertFinanceiroDocumentoSupabase(input: FinanceiroDocumen
     .single()
 
   if (error) throw error
-  return mapDbToDocumento(data)
+  const documento = mapDbToDocumento(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "financeiro_documento",
+    entityId: documento.id,
+    entityLabel: documento.numero,
+    description: isEditing ? "Documento financeiro atualizado." : "Documento financeiro criado.",
+    metadata: {
+      tipo: documento.tipo,
+      valorServico: documento.valorServico,
+    },
+  })
+
+  return documento
 }
 
 export async function deleteFinanceiroDocumentoSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("financeiro.delete", "Voce nao possui permissao para excluir documentos financeiros.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase.from("financeiro_documentos").delete().eq("id", id)
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "financeiro_documento",
+    entityId: id,
+    entityLabel: id,
+    description: "Documento financeiro excluido.",
+  })
 }
 
 export async function upsertReceitaServicoSupabase(input: {
@@ -465,6 +545,8 @@ export async function upsertDespesaNotaFiscalSupabase(input: {
 }
 
 export async function cancelLancamentoServicoSupabase(servicoId: string, observacao?: string): Promise<void> {
+  await assertPermissionSupabase("financeiro.edit", "Voce nao possui permissao para cancelar lancamentos do servico.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("financeiro_lancamentos")
@@ -477,4 +559,13 @@ export async function cancelLancamentoServicoSupabase(servicoId: string, observa
     .is("deleted_at", null)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "cancel",
+    entity: "financeiro_lancamento",
+    entityId: servicoId,
+    entityLabel: servicoId,
+    description: "Lancamento financeiro de servico cancelado.",
+    metadata: { observacao: observacao || "" },
+  })
 }

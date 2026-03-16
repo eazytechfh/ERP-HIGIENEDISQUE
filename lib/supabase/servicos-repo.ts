@@ -1,6 +1,8 @@
 "use client"
 
+import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
 export type ServicoSupabaseItem = {
   id: string
@@ -156,6 +158,12 @@ export async function listServicosSupabase(): Promise<ServicoSupabaseItem[]> {
 }
 
 export async function upsertServicoSupabase(input: ServicoSupabaseInput): Promise<ServicoSupabaseItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "servicos.edit" : "servicos.create",
+    "Voce nao possui permissao para salvar servicos.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase
     .from("servicos")
@@ -164,10 +172,27 @@ export async function upsertServicoSupabase(input: ServicoSupabaseInput): Promis
     .single()
 
   if (error) throw error
-  return mapDbToServico(data)
+  const servico = mapDbToServico(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "servico",
+    entityId: servico.id,
+    entityLabel: servico.osNumber,
+    description: isEditing ? "Servico/OS atualizado no sistema." : "Novo servico/OS cadastrado no sistema.",
+    metadata: {
+      cliente: servico.cliente,
+      status: servico.status,
+      osStatus: servico.osStatus,
+    },
+  })
+
+  return servico
 }
 
 export async function deleteServicoSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("servicos.delete", "Voce nao possui permissao para excluir servicos.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("servicos")
@@ -175,6 +200,14 @@ export async function deleteServicoSupabase(id: string): Promise<void> {
     .eq("id", id)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "servico",
+    entityId: id,
+    entityLabel: id,
+    description: "Servico/OS excluido do sistema.",
+  })
 }
 
 export async function uploadOSAssinadaServicoSupabase(input: {
@@ -188,6 +221,8 @@ export async function uploadOSAssinadaServicoSupabase(input: {
   storagePath: string
   tamanho: number
 }> {
+  await assertPermissionSupabase("servicos.generate_os", "Voce nao possui permissao para gerar ou anexar OS.")
+
   const supabase = getSupabaseBrowserClient()
   const bucket = "os-documentos"
   const path = `${input.clienteId || "sem-cliente"}/${input.servicoId}/assinada-${Date.now()}-${sanitizeFileName(input.arquivo.name)}`
@@ -198,6 +233,18 @@ export async function uploadOSAssinadaServicoSupabase(input: {
   })
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "generate",
+    entity: "servico_os",
+    entityId: input.servicoId,
+    entityLabel: input.arquivo.name,
+    description: "OS assinada anexada ao servico.",
+    metadata: {
+      clienteId: input.clienteId || "",
+      arquivo: input.arquivo.name,
+    },
+  })
 
   return {
     nome: input.arquivo.name,

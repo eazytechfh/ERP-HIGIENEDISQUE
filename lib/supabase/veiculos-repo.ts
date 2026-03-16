@@ -1,6 +1,8 @@
 "use client"
 
+import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
 export type VeiculoSupabaseItem = {
   id: string
@@ -99,6 +101,12 @@ export async function listVeiculosSupabase(): Promise<VeiculoSupabaseItem[]> {
 }
 
 export async function upsertVeiculoSupabase(input: VeiculoSupabaseInput): Promise<VeiculoSupabaseItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "veiculos.edit" : "veiculos.create",
+    "Voce nao possui permissao para salvar veiculos.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase
     .from("veiculos")
@@ -107,10 +115,22 @@ export async function upsertVeiculoSupabase(input: VeiculoSupabaseInput): Promis
     .single()
 
   if (error) throw error
-  return mapDbToVeiculo(data)
+  const veiculo = mapDbToVeiculo(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "veiculo",
+    entityId: veiculo.id,
+    entityLabel: veiculo.placa,
+    description: isEditing ? "Veiculo atualizado no sistema." : "Novo veiculo cadastrado no sistema.",
+  })
+
+  return veiculo
 }
 
 export async function deleteVeiculoSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("veiculos.delete", "Voce nao possui permissao para excluir veiculos.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("veiculos")
@@ -118,6 +138,14 @@ export async function deleteVeiculoSupabase(id: string): Promise<void> {
     .eq("id", id)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "veiculo",
+    entityId: id,
+    entityLabel: id,
+    description: "Veiculo excluido do sistema.",
+  })
 }
 
 export async function listManutencoesPreventivasSupabase(): Promise<ManutencaoPreventivaSupabaseItem[]> {
@@ -135,6 +163,12 @@ export async function listManutencoesPreventivasSupabase(): Promise<ManutencaoPr
 export async function upsertManutencaoPreventivaSupabase(
   input: ManutencaoPreventivaSupabaseInput,
 ): Promise<ManutencaoPreventivaSupabaseItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "veiculos.edit" : "veiculos.create",
+    "Voce nao possui permissao para salvar manutencoes preventivas.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase
     .from("manutencoes_preventivas")
@@ -143,10 +177,22 @@ export async function upsertManutencaoPreventivaSupabase(
     .single()
 
   if (error) throw error
-  return mapDbToManutencao(data)
+  const manutencao = mapDbToManutencao(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "manutencao_preventiva",
+    entityId: manutencao.id,
+    entityLabel: manutencao.descricao,
+    description: isEditing ? "Manutencao preventiva atualizada." : "Manutencao preventiva cadastrada.",
+  })
+
+  return manutencao
 }
 
 export async function deleteManutencaoPreventivaSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("veiculos.delete", "Voce nao possui permissao para excluir manutencoes preventivas.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("manutencoes_preventivas")
@@ -154,4 +200,12 @@ export async function deleteManutencaoPreventivaSupabase(id: string): Promise<vo
     .eq("id", id)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "manutencao_preventiva",
+    entityId: id,
+    entityLabel: id,
+    description: "Manutencao preventiva excluida.",
+  })
 }

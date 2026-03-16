@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useAccess } from "@/components/access-provider"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { LogOut, Menu } from "lucide-react"
@@ -10,20 +11,24 @@ import { isApiMode } from "@/lib/runtime-config"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
 const navigation = [
-  { name: "Dashboard Principal", href: "/dashboard" },
-  { name: "Clientes", href: "/dashboard/clientes" },
-  { name: "Historico de Servicos", href: "/dashboard/historico" },
-  { name: "Cadastro de Servicos", href: "/dashboard/servicos" },
-  { name: "Estoque", href: "/dashboard/produtos" },
-  { name: "Cadastro Equipe", href: "/dashboard/equipe" },
-  { name: "Veiculos", href: "/dashboard/veiculos" },
-  { name: "Financeiro", href: "/dashboard/financeiro" },
-]
+  { name: "Dashboard Principal", href: "/dashboard", permission: "dashboard.view" },
+  { name: "Clientes", href: "/dashboard/clientes", permission: "clientes.view" },
+  { name: "Historico de Servicos", href: "/dashboard/historico", permission: "servicos.view" },
+  { name: "Cadastro de Servicos", href: "/dashboard/servicos", permission: "servicos.view" },
+  { name: "Estoque", href: "/dashboard/produtos", permission: "estoque.view" },
+  { name: "Cadastro Equipe", href: "/dashboard/equipe", permission: "equipe.view" },
+  { name: "Veiculos", href: "/dashboard/veiculos", permission: "veiculos.view" },
+  { name: "Financeiro", href: "/dashboard/financeiro", permission: "financeiro.view" },
+  { name: "Logs", href: "/dashboard/logs", permission: "logs.view" },
+] as const
 
 export function ErpHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { can, profile } = useAccess()
+
+  const allowedNavigation = navigation.filter((item) => can(item.permission))
 
   const handleLogout = async () => {
     if (isApiMode()) {
@@ -47,12 +52,14 @@ export function ErpHeader() {
             </div>
             <div className="hidden md:block">
               <h1 className="text-xl font-bold text-foreground">HIGIENE DISQUE</h1>
-              <p className="text-xs text-muted-foreground">Sistema ERP</p>
+              <p className="text-xs text-muted-foreground">
+                Sistema ERP{profile ? ` | ${profile.nome || profile.role}` : ""}
+              </p>
             </div>
           </div>
 
           <nav className="hidden lg:flex items-center gap-1">
-            {navigation.map((item) => (
+            {allowedNavigation.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -86,7 +93,7 @@ export function ErpHeader() {
 
         {mobileMenuOpen && (
           <nav className="lg:hidden py-4 space-y-1 border-t">
-            {navigation.map((item) => (
+            {allowedNavigation.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

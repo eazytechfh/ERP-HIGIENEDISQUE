@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { getDefaultPermissionsForRole, isPermissionKey } from "@/lib/access-control"
 
 type CreateUserBody = {
   email?: string
   password?: string
   nome?: string
   role?: "admin" | "operacional" | "financeiro" | "tecnico"
+  permissions?: string[]
 }
 
 function getEnv(name: string): string {
@@ -52,6 +54,9 @@ export async function POST(req: Request) {
     const role = body.role && ["admin", "operacional", "financeiro", "tecnico"].includes(body.role)
       ? body.role
       : "operacional"
+    const permissions = Array.isArray(body.permissions)
+      ? Array.from(new Set(body.permissions.filter(isPermissionKey)))
+      : getDefaultPermissionsForRole(role)
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email e senha sao obrigatorios" }, { status: 400 })
@@ -77,6 +82,7 @@ export async function POST(req: Request) {
       nome,
       role,
       ativo: true,
+      permissions,
     })
 
     if (upsertProfileError) {
@@ -89,6 +95,7 @@ export async function POST(req: Request) {
         email: created.user.email,
         nome,
         role,
+        permissions,
       },
     })
   } catch (error) {

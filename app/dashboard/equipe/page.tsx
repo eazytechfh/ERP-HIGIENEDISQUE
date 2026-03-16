@@ -1,16 +1,20 @@
 'use client'
 
 import { useEffect, useState } from "react"
+import { useAccess } from "@/components/access-provider"
 import { ErpHeader } from "@/components/erp-header"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getDefaultPermissionsForRole, PERMISSION_SECTIONS, type AppPermissionKey } from "@/lib/access-control"
+import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
   deleteEquipeMembroSupabase,
@@ -19,6 +23,7 @@ import {
   type EquipeMembroInput,
   type EquipeRole,
 } from "@/lib/supabase/equipe-repo"
+import { upsertUserAccessProfileSupabase } from "@/lib/supabase/profiles-repo"
 import { Edit, Search, Trash2, UserPlus, Users } from "lucide-react"
 
 type FormData = EquipeMembroInput & {
@@ -40,11 +45,13 @@ const INITIAL_FORM_DATA: FormData = {
   situacao: "Ativo",
   emailAcesso: "",
   perfilAcesso: "",
+  permissions: [],
   senhaAcesso: "",
   confirmarSenhaAcesso: "",
 }
 
 export default function EquipePage() {
+  const { can, refreshProfile } = useAccess()
   const [membros, setMembros] = useState<EquipeMembroInput[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -54,6 +61,7 @@ export default function EquipePage() {
   const [submitError, setSubmitError] = useState("")
   const [submitSuccess, setSubmitSuccess] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const canManageAccess = can("equipe.manage_access")
 
   const loadMembros = async () => {
     setLoading(true)
@@ -85,11 +93,29 @@ export default function EquipePage() {
       ...(field === "emailAcesso" && !value
         ? {
             perfilAcesso: "",
+            permissions: [],
             senhaAcesso: "",
             confirmarSenhaAcesso: "",
           }
         : {}),
+      ...(field === "perfilAcesso" && typeof value === "string" && value
+        ? {
+            permissions: getDefaultPermissionsForRole(value as EquipeRole),
+          }
+        : {}),
     }))
+  }
+
+  const handlePermissionToggle = (permission: AppPermissionKey, checked: boolean) => {
+    setFormData((prev) => {
+      const currentPermissions = Array.isArray(prev.permissions) ? prev.permissions : []
+      return {
+        ...prev,
+        permissions: checked
+          ? Array.from(new Set([...currentPermissions, permission]))
+          : currentPermissions.filter((item) => item !== permission),
+      }
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,9 +128,14 @@ export default function EquipePage() {
       let userId = formData.userId
       let emailAcesso = formData.emailAcesso.trim().toLowerCase()
       let perfilAcesso = formData.perfilAcesso
+      let permissions = (formData.permissions || []) as AppPermissionKey[]
       let createdAuth = false
 
       if (emailAcesso && !userId) {
+        if (!canManageAccess) {
+          throw new Error("Somente administradores podem criar ou configurar acessos de usuario.")
+        }
+
         if (formData.senhaAcesso.length < 6) {
           throw new Error("A senha de acesso deve ter ao menos 6 caracteres.")
         }
@@ -135,12 +166,13 @@ export default function EquipePage() {
             password: formData.senhaAcesso,
             nome: formData.nome.trim(),
             role: perfilAcesso,
+            permissions,
           }),
         })
 
         const payload = (await response.json()) as {
           error?: string
-          user?: { id: string; email?: string; role?: EquipeRole }
+          user?: { id: string; email?: string; role?: EquipeRole; permissions?: AppPermissionKey[] }
         }
 
         if (!response.ok || !payload.user) {
@@ -150,7 +182,18 @@ export default function EquipePage() {
         userId = payload.user.id
         emailAcesso = payload.user.email || emailAcesso
         perfilAcesso = payload.user.role || perfilAcesso
+        permissions = payload.user.permissions || permissions
         createdAuth = true
+      }
+
+      if (userId && canManageAccess && perfilAcesso) {
+        await upsertUserAccessProfileSupabase({
+          userId,
+          nome: formData.nome.trim(),
+          role: perfilAcesso,
+          ativo: formData.situacao === "Ativo",
+          permissions,
+        })
       }
 
       const saved = await upsertEquipeMembroSupabase({
@@ -169,13 +212,39 @@ export default function EquipePage() {
         situacao: formData.situacao,
         emailAcesso,
         perfilAcesso: perfilAcesso || "",
+        permissions,
       })
+      const savedWithPermissions: EquipeMembroInput = {
+        ...saved,
+        userId,
+        emailAcesso,
+        perfilAcesso: perfilAcesso || "",
+        permissions,
+      }
+
+      if (userId && canManageAccess && perfilAcesso) {
+        await safeAuditLogSupabase({
+          action: createdAuth ? "create" : "update",
+          entity: "user_access",
+          entityId: userId,
+          entityLabel: formData.nome.trim(),
+          description: createdAuth ? "Usuario criado com permissoes personalizadas." : "Permissoes de usuario atualizadas.",
+          metadata: {
+            role: perfilAcesso,
+            permissions,
+            ativo: formData.situacao === "Ativo",
+          },
+        })
+      }
 
       setMembros((prev) => {
-        const exists = prev.some((item) => item.id === saved.id)
-        return exists ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]
+        const exists = prev.some((item) => item.id === savedWithPermissions.id || (savedWithPermissions.userId && item.userId === savedWithPermissions.userId))
+        return exists
+          ? prev.map((item) => (item.id === savedWithPermissions.id || (savedWithPermissions.userId && item.userId === savedWithPermissions.userId) ? savedWithPermissions : item))
+          : [savedWithPermissions, ...prev]
       })
 
+      await refreshProfile()
       setSubmitSuccess(createdAuth ? "Membro salvo e usuario criado no Supabase com sucesso." : "Membro salvo no Supabase com sucesso.")
       setEditingId(null)
       setFormData(INITIAL_FORM_DATA)
@@ -193,6 +262,11 @@ export default function EquipePage() {
     setEditingId(membro.id || null)
     setFormData({
       ...membro,
+      permissions: membro.permissions?.length
+        ? membro.permissions
+        : membro.perfilAcesso
+          ? getDefaultPermissionsForRole(membro.perfilAcesso)
+          : [],
       senhaAcesso: "",
       confirmarSenhaAcesso: "",
     })
@@ -306,6 +380,9 @@ export default function EquipePage() {
                                     <Badge variant="secondary">Com login</Badge>
                                     <div className="text-xs text-muted-foreground">{membro.emailAcesso}</div>
                                     <div className="text-xs uppercase text-muted-foreground">{membro.perfilAcesso}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {membro.permissions?.length || 0} permissoes
+                                    </div>
                                   </div>
                                 ) : (
                                   <Badge variant="outline">Sem login</Badge>
@@ -438,7 +515,7 @@ export default function EquipePage() {
                         <Switch
                           id="temAcesso"
                           checked={Boolean(formData.emailAcesso || formData.userId)}
-                          disabled={Boolean(formData.userId)}
+                          disabled={Boolean(formData.userId) || !canManageAccess}
                           onCheckedChange={(checked) => {
                             if (!checked) {
                               handleInputChange("emailAcesso", "")
@@ -447,6 +524,12 @@ export default function EquipePage() {
                         />
                       </div>
                     </div>
+
+                    {!canManageAccess ? (
+                      <Alert>
+                        <AlertDescription>Somente administradores podem criar usuarios e alterar permissoes de acesso.</AlertDescription>
+                      </Alert>
+                    ) : null}
 
                     {formData.userId ? (
                       <Alert>
@@ -462,7 +545,11 @@ export default function EquipePage() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="perfilAcesso">Perfil de acesso *</Label>
-                          <Select value={formData.perfilAcesso || "operacional"} onValueChange={(value) => handleInputChange("perfilAcesso", value as EquipeRole)} disabled={Boolean(formData.userId)}>
+                          <Select
+                            value={formData.perfilAcesso || "operacional"}
+                            onValueChange={(value) => handleInputChange("perfilAcesso", value as EquipeRole)}
+                            disabled={!canManageAccess}
+                          >
                             <SelectTrigger id="perfilAcesso"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="admin">Administrador</SelectItem>
@@ -484,6 +571,35 @@ export default function EquipePage() {
                             </div>
                           </>
                         ) : null}
+                      </div>
+                    ) : null}
+
+                    {Boolean(formData.emailAcesso || formData.userId) && canManageAccess && formData.perfilAcesso ? (
+                      <div className="space-y-4 rounded-md border border-dashed p-4">
+                        <div>
+                          <h4 className="text-sm font-semibold">Permissoes detalhadas</h4>
+                          <p className="text-sm text-muted-foreground">
+                            O administrador pode ajustar visualizacao e acoes disponiveis para esse usuario.
+                          </p>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {PERMISSION_SECTIONS.map((section) => (
+                            <div key={section.title} className="space-y-3 rounded-md border p-3">
+                              <p className="text-sm font-medium">{section.title}</p>
+                              <div className="space-y-2">
+                                {section.items.map((item) => (
+                                  <label key={item.key} className="flex items-center gap-3 text-sm">
+                                    <Checkbox
+                                      checked={(formData.permissions || []).includes(item.key)}
+                                      onCheckedChange={(checked) => handlePermissionToggle(item.key, checked === true)}
+                                    />
+                                    <span>{item.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ) : null}
                   </div>

@@ -1,6 +1,8 @@
 "use client"
 
+import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
 export type EstoqueCategoria = "Item Quimico" | "Diluente" | "Consumivel" | "Equipamentos" | "EPIs"
 export type EstoqueUnidade = "L" | "ml" | "g" | "kg" | "unid"
@@ -238,6 +240,12 @@ export async function listProdutosSupabase(): Promise<ProdutoSupabaseItem[]> {
 }
 
 export async function upsertProdutoSupabase(input: ProdutoSupabaseInput): Promise<ProdutoSupabaseItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "estoque.edit" : "estoque.create",
+    "Voce nao possui permissao para salvar produtos.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const { data: saved, error: saveError } = await supabase
     .from("produtos")
@@ -254,10 +262,22 @@ export async function upsertProdutoSupabase(input: ProdutoSupabaseInput): Promis
     .single()
 
   if (error) throw error
-  return mapDbToProduto(data)
+  const produto = mapDbToProduto(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "produto",
+    entityId: produto.id,
+    entityLabel: produto.nome,
+    description: isEditing ? "Produto atualizado no estoque." : "Novo produto cadastrado no estoque.",
+  })
+
+  return produto
 }
 
 export async function deleteProdutoSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("estoque.delete", "Voce nao possui permissao para excluir produtos.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("produtos")
@@ -265,6 +285,14 @@ export async function deleteProdutoSupabase(id: string): Promise<void> {
     .eq("id", id)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "produto",
+    entityId: id,
+    entityLabel: id,
+    description: "Produto excluido do estoque.",
+  })
 }
 
 export async function listFornecedoresSupabase(): Promise<FornecedorSupabaseItem[]> {
@@ -280,6 +308,12 @@ export async function listFornecedoresSupabase(): Promise<FornecedorSupabaseItem
 }
 
 export async function upsertFornecedorSupabase(input: FornecedorSupabaseInput): Promise<FornecedorSupabaseItem> {
+  const isEditing = Boolean(input.id)
+  await assertPermissionSupabase(
+    isEditing ? "estoque.edit" : "estoque.create",
+    "Voce nao possui permissao para salvar fornecedores.",
+  )
+
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase
     .from("fornecedores")
@@ -288,10 +322,22 @@ export async function upsertFornecedorSupabase(input: FornecedorSupabaseInput): 
     .single()
 
   if (error) throw error
-  return mapDbToFornecedor(data)
+  const fornecedor = mapDbToFornecedor(data)
+
+  await safeAuditLogSupabase({
+    action: isEditing ? "update" : "create",
+    entity: "fornecedor",
+    entityId: fornecedor.id,
+    entityLabel: fornecedor.razaoSocial,
+    description: isEditing ? "Fornecedor atualizado no sistema." : "Novo fornecedor cadastrado no sistema.",
+  })
+
+  return fornecedor
 }
 
 export async function deleteFornecedorSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("estoque.delete", "Voce nao possui permissao para excluir fornecedores.")
+
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("fornecedores")
@@ -299,9 +345,19 @@ export async function deleteFornecedorSupabase(id: string): Promise<void> {
     .eq("id", id)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "fornecedor",
+    entityId: id,
+    entityLabel: id,
+    description: "Fornecedor excluido do sistema.",
+  })
 }
 
 export async function registrarEntradaNotaFiscalSupabase(input: NotaFiscalEntradaInput): Promise<string> {
+  await assertPermissionSupabase("estoque.create", "Voce nao possui permissao para registrar nota fiscal.")
+
   const supabase = getSupabaseBrowserClient()
 
   const { data: notaSalva, error: notaError } = await supabase
@@ -359,6 +415,18 @@ export async function registrarEntradaNotaFiscalSupabase(input: NotaFiscalEntrad
     if (updateArquivoError) throw updateArquivoError
   }
 
+  await safeAuditLogSupabase({
+    action: "create",
+    entity: "nota_fiscal_entrada",
+    entityId: String(notaSalva.id),
+    entityLabel: input.numeroNF,
+    description: "Entrada de nota fiscal registrada no estoque.",
+    metadata: {
+      fornecedorId: input.fornecedorId || "",
+      itens: input.itens.length,
+    },
+  })
+
   return String(notaSalva.id)
 }
 
@@ -396,6 +464,8 @@ export async function deleteNotaFiscalSupabase(
   id: string,
   arquivo?: { bucket: string; path: string } | null,
 ): Promise<void> {
+  await assertPermissionSupabase("estoque.delete", "Voce nao possui permissao para excluir notas fiscais.")
+
   const supabase = getSupabaseBrowserClient()
 
   if (arquivo?.bucket && arquivo?.path) {
@@ -409,4 +479,12 @@ export async function deleteNotaFiscalSupabase(
     .eq("id", id)
 
   if (error) throw error
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "nota_fiscal_entrada",
+    entityId: id,
+    entityLabel: id,
+    description: "Nota fiscal removida do estoque.",
+  })
 }
