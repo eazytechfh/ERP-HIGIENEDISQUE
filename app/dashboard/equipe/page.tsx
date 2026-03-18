@@ -27,6 +27,7 @@ import { upsertUserAccessProfileSupabase } from "@/lib/supabase/profiles-repo"
 import { Edit, Search, Trash2, UserPlus, Users } from "lucide-react"
 
 type FormData = EquipeMembroInput & {
+  criarLogin: boolean
   senhaAcesso: string
   confirmarSenhaAcesso: string
 }
@@ -46,6 +47,7 @@ const INITIAL_FORM_DATA: FormData = {
   emailAcesso: "",
   perfilAcesso: "",
   permissions: [],
+  criarLogin: false,
   senhaAcesso: "",
   confirmarSenhaAcesso: "",
 }
@@ -62,6 +64,7 @@ export default function EquipePage() {
   const [submitSuccess, setSubmitSuccess] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const canManageAccess = can("equipe.manage_access")
+  const accessEnabled = Boolean(formData.criarLogin || formData.emailAcesso || formData.userId)
 
   const loadMembros = async () => {
     setLoading(true)
@@ -92,6 +95,7 @@ export default function EquipePage() {
       ...(field === "cnh" && value === "Nao" ? { cnhValidade: "" } : {}),
       ...(field === "emailAcesso" && !value
         ? {
+            criarLogin: false,
             perfilAcesso: "",
             permissions: [],
             senhaAcesso: "",
@@ -131,9 +135,13 @@ export default function EquipePage() {
       let permissions = (formData.permissions || []) as AppPermissionKey[]
       let createdAuth = false
 
-      if (emailAcesso && !userId) {
+      if (accessEnabled && !userId) {
         if (!canManageAccess) {
           throw new Error("Somente administradores podem criar ou configurar acessos de usuario.")
+        }
+
+        if (!emailAcesso) {
+          throw new Error("Preencha o email de acesso para criar o login.")
         }
 
         if (formData.senhaAcesso.length < 6) {
@@ -267,6 +275,7 @@ export default function EquipePage() {
         : membro.perfilAcesso
           ? getDefaultPermissionsForRole(membro.perfilAcesso)
           : [],
+      criarLogin: Boolean(membro.emailAcesso || membro.userId),
       senhaAcesso: "",
       confirmarSenhaAcesso: "",
     })
@@ -514,9 +523,10 @@ export default function EquipePage() {
                         <Label htmlFor="temAcesso" className="text-sm">Criar login</Label>
                         <Switch
                           id="temAcesso"
-                          checked={Boolean(formData.emailAcesso || formData.userId)}
+                          checked={accessEnabled}
                           disabled={Boolean(formData.userId) || !canManageAccess}
                           onCheckedChange={(checked) => {
+                            handleInputChange("criarLogin", checked)
                             if (!checked) {
                               handleInputChange("emailAcesso", "")
                             }
@@ -537,11 +547,11 @@ export default function EquipePage() {
                       </Alert>
                     ) : null}
 
-                    {Boolean(formData.emailAcesso || formData.userId) ? (
+                    {accessEnabled ? (
                       <div className="grid gap-6 md:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor="emailAcesso">Email de acesso *</Label>
-                          <Input id="emailAcesso" type="email" value={formData.emailAcesso} onChange={(e) => handleInputChange("emailAcesso", e.target.value)} disabled={Boolean(formData.userId)} required={Boolean(formData.emailAcesso || formData.userId)} />
+                          <Input id="emailAcesso" type="email" value={formData.emailAcesso} onChange={(e) => handleInputChange("emailAcesso", e.target.value)} disabled={Boolean(formData.userId)} required={accessEnabled} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="perfilAcesso">Perfil de acesso *</Label>
@@ -563,18 +573,18 @@ export default function EquipePage() {
                           <>
                             <div className="space-y-2">
                               <Label htmlFor="senhaAcesso">Senha provisoria *</Label>
-                              <Input id="senhaAcesso" type="password" value={formData.senhaAcesso} onChange={(e) => handleInputChange("senhaAcesso", e.target.value)} required={Boolean(formData.emailAcesso)} />
+                              <Input id="senhaAcesso" type="password" value={formData.senhaAcesso} onChange={(e) => handleInputChange("senhaAcesso", e.target.value)} required={accessEnabled && !Boolean(formData.userId)} />
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="confirmarSenhaAcesso">Confirmar senha *</Label>
-                              <Input id="confirmarSenhaAcesso" type="password" value={formData.confirmarSenhaAcesso} onChange={(e) => handleInputChange("confirmarSenhaAcesso", e.target.value)} required={Boolean(formData.emailAcesso)} />
+                              <Input id="confirmarSenhaAcesso" type="password" value={formData.confirmarSenhaAcesso} onChange={(e) => handleInputChange("confirmarSenhaAcesso", e.target.value)} required={accessEnabled && !Boolean(formData.userId)} />
                             </div>
                           </>
                         ) : null}
                       </div>
                     ) : null}
 
-                    {Boolean(formData.emailAcesso || formData.userId) && canManageAccess && formData.perfilAcesso ? (
+                    {accessEnabled && canManageAccess && formData.perfilAcesso ? (
                       <div className="space-y-4 rounded-md border border-dashed p-4">
                         <div>
                           <h4 className="text-sm font-semibold">Permissoes detalhadas</h4>
