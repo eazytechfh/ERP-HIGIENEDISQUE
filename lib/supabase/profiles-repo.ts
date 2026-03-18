@@ -3,6 +3,7 @@
 import { getDefaultPermissionsForRole, hasPermission, type AppPermissionKey, type AppRole, normalizePermissions } from "@/lib/access-control"
 import { isApiMode } from "@/lib/runtime-config"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { withTimeout } from "@/lib/with-timeout"
 
 export type UserAccessProfile = {
   userId: string
@@ -24,6 +25,35 @@ function mapProfile(row: any): UserAccessProfile {
     ativo: row.ativo !== false,
     permissions: normalizedPermissions.length > 0 ? normalizedPermissions : getDefaultPermissionsForRole(role),
   }
+}
+
+async function bootstrapCurrentProfile(): Promise<UserAccessProfile | null> {
+  const supabase = getSupabaseBrowserClient()
+  const { data: sessionData, error: sessionError } = await withTimeout(
+    supabase.auth.getSession(),
+    8000,
+    "Tempo esgotado ao validar a sessao atual.",
+  )
+
+  if (sessionError || !sessionData.session?.access_token) {
+    return null
+  }
+
+  const response = await withTimeout(
+    fetch("/api/auth/bootstrap-profile", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}`,
+      },
+    }),
+    8000,
+    "Tempo esgotado ao recuperar o perfil de acesso.",
+  )
+
+  if (!response.ok) return null
+
+  const payload = (await response.json()) as { profile?: any }
+  return payload.profile ? mapProfile(payload.profile) : null
 }
 
 export function getCachedCurrentProfile(): UserAccessProfile | null {
@@ -54,17 +84,32 @@ export async function getCurrentUserAccessProfileSupabase(force = false): Promis
   if (cachedProfile && !force) return cachedProfile
 
   const supabase = getSupabaseBrowserClient()
-  const { data: authData, error: authError } = await supabase.auth.getUser()
+  const { data: authData, error: authError } = await withTimeout(
+    supabase.auth.getUser(),
+    8000,
+    "Tempo esgotado ao validar o usuario autenticado.",
+  )
   if (authError || !authData.user) return null
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("user_id, nome, role, ativo, permissions")
-    .eq("user_id", authData.user.id)
-    .maybeSingle()
+  const { data, error } = await withTimeout(
+    supabase
+      .from("profiles")
+      .select("user_id, nome, role, ativo, permissions")
+      .eq("user_id", authData.user.id)
+      .maybeSingle(),
+    8000,
+    "Tempo esgotado ao carregar o perfil de acesso.",
+  )
 
   if (error) throw error
-  if (!data) return null
+  if (!data) {
+    const recoveredProfile = await bootstrapCurrentProfile()
+    if (recoveredProfile) {
+      setCachedCurrentProfile(recoveredProfile)
+      return recoveredProfile
+    }
+    return null
+  }
 
   const profile = mapProfile(data)
   setCachedCurrentProfile(profile)

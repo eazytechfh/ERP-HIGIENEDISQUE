@@ -7,6 +7,7 @@ import { AccessProvider, useAccess } from "@/components/access-provider"
 import { hasPermission } from "@/lib/access-control"
 import { isApiMode } from "@/lib/runtime-config"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { withTimeout } from "@/lib/with-timeout"
 
 function DashboardAccessGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname()
@@ -52,13 +53,21 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
     const supabase = getSupabaseBrowserClient()
 
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error || !data.session) {
+    void withTimeout(
+      supabase.auth.getSession(),
+      8000,
+      "Tempo esgotado ao validar a sessao.",
+    )
+      .then(({ data, error }) => {
+        if (error || !data.session) {
+          router.replace("/")
+          return
+        }
+        setReady(true)
+      })
+      .catch(() => {
         router.replace("/")
-        return
-      }
-      setReady(true)
-    })
+      })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {

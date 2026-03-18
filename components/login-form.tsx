@@ -10,6 +10,7 @@ import { findLocalTestUser } from "@/lib/local-test-users"
 import { Eye, EyeOff, Shield } from "lucide-react"
 import { isApiMode } from "@/lib/runtime-config"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { withTimeout } from "@/lib/with-timeout"
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
@@ -26,13 +27,28 @@ export function LoginForm() {
     try {
       if (isApiMode()) {
         const supabase = getSupabaseBrowserClient()
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
+        const { error: signInError } = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+          }),
+          10000,
+          "Tempo esgotado ao tentar entrar. Tente novamente.",
+        )
 
         if (signInError) {
           setError(signInError.message || "Falha no login. Verifique email e senha.")
+          return
+        }
+
+        const { data: sessionData, error: sessionError } = await withTimeout(
+          supabase.auth.getSession(),
+          8000,
+          "Tempo esgotado ao confirmar a sessao de acesso.",
+        )
+
+        if (sessionError || !sessionData.session) {
+          setError("Login efetuado, mas a sessao nao foi confirmada. Tente novamente.")
           return
         }
 
@@ -52,6 +68,8 @@ export function LoginForm() {
       }
 
       setError("Usuario ou senha incorretos. Tente novamente.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nao foi possivel concluir o login.")
     } finally {
       setIsLoading(false)
     }
