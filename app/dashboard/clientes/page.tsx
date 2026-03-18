@@ -1,6 +1,7 @@
 "use client"
 
 import { ErpHeader } from "@/components/erp-header"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -164,27 +165,45 @@ export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [contratosSupabase, setContratosSupabase] = useState<ContratoSupabaseItem[]>([])
   const [clientesLoaded, setClientesLoaded] = useState(false)
+  const [loadError, setLoadError] = useState("")
   const [isSavingCliente, setIsSavingCliente] = useState(false)
   const apiMode = isApiMode()
 
   useEffect(() => {
     let mounted = true
 
-    const loadClientes = async () => {
-      if (apiMode) {
-        try {
-          const [rows, contratosRows] = await Promise.all([listClientesSupabase(), listContratosSupabase()])
-          if (!mounted) return
-          setClientes(rows as Cliente[])
-          setContratosSupabase(contratosRows)
-        } catch (error) {
-          console.error("Falha ao carregar clientes no Supabase", error)
-          if (!mounted) return
-          setClientes([])
-          setContratosSupabase([])
-        } finally {
-          if (mounted) setClientesLoaded(true)
-        }
+      const loadClientes = async () => {
+        if (apiMode) {
+          try {
+            setLoadError("")
+            const [clientesResult, contratosResult] = await Promise.allSettled([
+              listClientesSupabase(),
+              listContratosSupabase(),
+            ])
+            if (!mounted) return
+
+            if (clientesResult.status === "fulfilled") {
+              setClientes(clientesResult.value as Cliente[])
+            } else {
+              console.error("Falha ao carregar clientes no Supabase", clientesResult.reason)
+              setClientes([])
+              setLoadError("Nao foi possivel carregar os clientes do Supabase para este usuario.")
+            }
+
+            if (contratosResult.status === "fulfilled") {
+              setContratosSupabase(contratosResult.value)
+            } else {
+              console.error("Falha ao carregar contratos no Supabase", contratosResult.reason)
+              setContratosSupabase([])
+              setLoadError((prev) =>
+                prev
+                  ? `${prev} O carregamento de contratos tambem falhou.`
+                  : "Os clientes abriram com restricoes: nao foi possivel carregar os contratos vinculados.",
+              )
+            }
+          } finally {
+            if (mounted) setClientesLoaded(true)
+          }
         return
       }
 
@@ -695,6 +714,12 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
               <CardDescription>Busque e gerencie seus clientes</CardDescription>
             </CardHeader>
             <CardContent>
+              {loadError ? (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{loadError}</AlertDescription>
+                </Alert>
+              ) : null}
+
               <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="relative md:col-span-2">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
