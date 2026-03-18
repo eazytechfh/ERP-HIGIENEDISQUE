@@ -123,7 +123,7 @@ export function LoginForm() {
             </Button>
           </form>
 
-          {!isApiMode() && (
+          {!isApiMode() && process.env.NODE_ENV !== "production" && (
             <div className="mt-6 border-t pt-6">
               <div className="text-center text-sm text-muted-foreground">
                 <p className="mb-2">Credenciais de teste (modo local):</p>
