@@ -103,7 +103,14 @@ export async function getCurrentUserAccessProfileSupabase(force = false): Promis
     "Tempo esgotado ao carregar o perfil de acesso.",
   )
 
-  if (error) throw error
+  if (error) {
+    const recoveredProfile = await bootstrapCurrentProfile()
+    if (recoveredProfile) {
+      setCachedCurrentProfile(recoveredProfile)
+      return recoveredProfile
+    }
+    throw error
+  }
   if (!data) {
     const recoveredProfile = await bootstrapCurrentProfile()
     if (recoveredProfile) {

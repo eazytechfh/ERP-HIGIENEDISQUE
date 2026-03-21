@@ -89,7 +89,9 @@ export async function listEquipeMembrosSupabase(): Promise<EquipeMembroInput[]> 
     .from("profiles")
     .select("user_id, nome, role, ativo, permissions")
 
-  if (profilesError) throw profilesError
+  if (profilesError) {
+    return membros
+  }
 
   const existingUserIds = new Set(membros.map((item) => item.userId).filter(Boolean))
   const perfisSemFicha = (profiles || [])
