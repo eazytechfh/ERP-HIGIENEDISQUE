@@ -1,9 +1,9 @@
 "use client"
 
-import type { AppPermissionKey, AppRole } from "@/lib/access-control"
+import { hasPermission, type AppPermissionKey, type AppRole } from "@/lib/access-control"
 import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
+import { assertPermissionSupabase, getCurrentUserAccessProfileSupabase } from "@/lib/supabase/profiles-repo"
 
 export type EquipeRole = AppRole
 
@@ -79,6 +79,12 @@ export async function listEquipeMembrosSupabase(): Promise<EquipeMembroInput[]> 
   if (error) throw error
 
   const membros = (data || []).map(mapDbToEquipe)
+  const currentProfile = await getCurrentUserAccessProfileSupabase()
+  const canManageAccess = hasPermission(currentProfile?.permissions, "equipe.manage_access")
+  if (!canManageAccess) {
+    return membros
+  }
+
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
     .select("user_id, nome, role, ativo, permissions")

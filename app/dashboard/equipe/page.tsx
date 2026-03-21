@@ -270,7 +270,7 @@ export default function EquipePage() {
     setEditingId(membro.id || null)
     setFormData({
       ...membro,
-      permissions: membro.permissions?.length
+      permissions: Array.isArray(membro.permissions)
         ? membro.permissions
         : membro.perfilAcesso
           ? getDefaultPermissionsForRole(membro.perfilAcesso)

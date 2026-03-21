@@ -39,11 +39,20 @@ export async function POST(req: Request) {
 
     const { data: requesterProfile, error: requesterProfileError } = await supabaseAdmin
       .from("profiles")
-      .select("role")
+      .select("role, ativo, permissions")
       .eq("user_id", authData.user.id)
       .single()
 
-    if (requesterProfileError || requesterProfile?.role !== "admin") {
+    const requesterPermissions = Array.isArray(requesterProfile?.permissions)
+      ? requesterProfile.permissions.filter(isPermissionKey)
+      : []
+
+    if (
+      requesterProfileError ||
+      requesterProfile?.role !== "admin" ||
+      requesterProfile?.ativo === false ||
+      !requesterPermissions.includes("equipe.manage_access")
+    ) {
       return NextResponse.json({ error: "Apenas admin pode criar usuarios" }, { status: 403 })
     }
 

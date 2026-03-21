@@ -17,13 +17,15 @@ let cachedProfile: UserAccessProfile | null = null
 
 function mapProfile(row: any): UserAccessProfile {
   const role = (row.role || "operacional") as AppRole
-  const normalizedPermissions = normalizePermissions(row.permissions)
+  const normalizedPermissions = Array.isArray(row.permissions)
+    ? normalizePermissions(row.permissions)
+    : null
   return {
     userId: String(row.user_id),
     nome: row.nome || "",
     role,
     ativo: row.ativo !== false,
-    permissions: normalizedPermissions.length > 0 ? normalizedPermissions : getDefaultPermissionsForRole(role),
+    permissions: normalizedPermissions ?? getDefaultPermissionsForRole(role),
   }
 }
 
