@@ -176,21 +176,93 @@ function mapClienteToDb(cliente: ClienteInput) {
   }
 }
 
-export async function listClientesSupabase(): Promise<ClienteInput[]> {
+export type ListClientesParams = {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: string
+}
+
+export type ListClientesResult = {
+  data: ClienteInput[]
+  count: number
+}
+
+export async function listClientesSupabase(params?: ListClientesParams): Promise<ListClientesResult> {
+  const page = params?.page ?? 1
+  const pageSize = params?.pageSize ?? 20
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const supabase = getSupabaseBrowserClient()
+  let query = supabase
+    .from("clientes")
+    .select("*", { count: "exact" })
+    .is("deleted_at", null)
+    .order("nome", { ascending: true })
+    .range(from, to)
+
+  if (params?.search) {
+    const term = params.search.replace(/[%_]/g, "\\$&")
+    query = query.or(`nome.ilike.%${term}%,telefone.ilike.%${term}%,cpf.ilike.%${term}%,cnpj.ilike.%${term}%`)
+  }
+
+  if (params?.status && params.status !== "todos") {
+    query = query.eq("status", params.status)
+  }
+
+  const { data, error, count } = await query
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
+  return {
+    data: (data || []).map((row) => mapDbToCliente({ ...row, cliente_locais: [], cliente_contatos: [], cliente_arquivos: [] })),
+    count: count ?? 0,
+  }
+}
+
+export type ClientesMetricas = {
+  totalAtivos: number
+  totalAVencer: number
+  totalVencidos: number
+  total: number
+}
+
+export async function getClientesMetricasSupabase(): Promise<ClientesMetricas> {
+  const supabase = getSupabaseBrowserClient()
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  const em30Dias = new Date(hoje)
+  em30Dias.setDate(hoje.getDate() + 30)
+
+  const [totalRes, ativosRes, aVencerRes, vencidosRes] = await Promise.all([
+    supabase.from("clientes").select("*", { count: "exact", head: true }).is("deleted_at", null),
+    supabase.from("clientes").select("*", { count: "exact", head: true }).is("deleted_at", null).eq("status", "Ativo"),
+    supabase.from("clientes").select("*", { count: "exact", head: true })
+      .is("deleted_at", null).eq("status", "Ativo").eq("possui_contrato", true)
+      .gte("data_fim_contrato", hoje.toISOString().split("T")[0])
+      .lte("data_fim_contrato", em30Dias.toISOString().split("T")[0]),
+    supabase.from("clientes").select("*", { count: "exact", head: true })
+      .is("deleted_at", null).eq("status", "Ativo").eq("possui_contrato", true)
+      .lt("data_fim_contrato", hoje.toISOString().split("T")[0]),
+  ])
+
+  return {
+    total: totalRes.count ?? 0,
+    totalAtivos: ativosRes.count ?? 0,
+    totalAVencer: aVencerRes.count ?? 0,
+    totalVencidos: vencidosRes.count ?? 0,
+  }
+}
+
+export async function getClienteSupabase(clienteId: string): Promise<ClienteInput> {
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase
     .from("clientes")
-    .select(`
-      *,
-      cliente_locais(*),
-      cliente_contatos(*),
-      cliente_arquivos(*)
-    `)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
+    .select(`*, cliente_locais(*), cliente_contatos(*), cliente_arquivos(*)`)
+    .eq("id", clienteId)
+    .single()
 
-  if (error) throw error
-  return (data || []).map(mapDbToCliente)
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
+  return mapDbToCliente(data)
 }
 
 export async function upsertClienteSupabase(input: ClienteInput): Promise<ClienteInput> {
@@ -237,7 +309,7 @@ export async function upsertClienteSupabase(input: ClienteInput): Promise<Client
 
   if (locaisRows.length > 0) {
     const { error } = await supabase.from("cliente_locais").insert(locaisRows)
-    if (error) throw error
+    if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   }
 
   const contatosRows = emptyArray(input.contatos).map((c) => ({
@@ -251,7 +323,7 @@ export async function upsertClienteSupabase(input: ClienteInput): Promise<Client
 
   if (contatosRows.length > 0) {
     const { error } = await supabase.from("cliente_contatos").insert(contatosRows)
-    if (error) throw error
+    if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   }
 
   const arquivosRows = emptyArray(input.arquivos).map((a) => ({
@@ -268,7 +340,7 @@ export async function upsertClienteSupabase(input: ClienteInput): Promise<Client
 
   if (arquivosRows.length > 0) {
     const { error } = await supabase.from("cliente_arquivos").insert(arquivosRows)
-    if (error) throw error
+    if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   }
 
   const { data: full, error: fullError } = await supabase
@@ -309,7 +381,7 @@ export async function deleteClienteSupabase(clienteId: string): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", clienteId)
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",

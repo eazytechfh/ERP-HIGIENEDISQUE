@@ -73,7 +73,7 @@ export async function listContratosSupabase(): Promise<ContratoSupabaseItem[]> {
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToContrato)
 }
 
@@ -131,7 +131,7 @@ export async function upsertContratoSupabase(input: ContratoSupabaseInput): Prom
     .eq("id", contratoId)
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const contrato = mapDbToContrato(data)
 
   await safeAuditLogSupabase({
@@ -175,7 +175,7 @@ export async function addClienteArquivoContratoSupabase(input: ClienteArquivoCon
     contrato_id: input.contratoId,
   })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "generate",

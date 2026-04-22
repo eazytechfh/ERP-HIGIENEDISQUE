@@ -81,6 +81,6 @@ export async function listAuditLogsSupabase(limit = 200): Promise<AuditLogItem[]
     .order("created_at", { ascending: false })
     .limit(limit)
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapAuditLog)
 }

@@ -145,7 +145,7 @@ export async function upsertUserAccessProfileSupabase(input: {
     .select("user_id, nome, role, ativo, permissions")
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   const profile = mapProfile(data)
   if (cachedProfile?.userId === profile.userId) {
