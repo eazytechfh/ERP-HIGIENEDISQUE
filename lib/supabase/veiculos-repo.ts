@@ -96,7 +96,7 @@ export async function listVeiculosSupabase(): Promise<VeiculoSupabaseItem[]> {
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToVeiculo)
 }
 
@@ -114,7 +114,7 @@ export async function upsertVeiculoSupabase(input: VeiculoSupabaseInput): Promis
     .select("*")
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const veiculo = mapDbToVeiculo(data)
 
   await safeAuditLogSupabase({
@@ -137,7 +137,7 @@ export async function deleteVeiculoSupabase(id: string): Promise<void> {
     .delete()
     .eq("id", id)
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",
@@ -156,7 +156,7 @@ export async function listManutencoesPreventivasSupabase(): Promise<ManutencaoPr
     .is("deleted_at", null)
     .order("data_prevista", { ascending: true })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToManutencao)
 }
 
@@ -176,7 +176,7 @@ export async function upsertManutencaoPreventivaSupabase(
     .select("*")
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const manutencao = mapDbToManutencao(data)
 
   await safeAuditLogSupabase({
@@ -199,7 +199,7 @@ export async function deleteManutencaoPreventivaSupabase(id: string): Promise<vo
     .delete()
     .eq("id", id)
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",

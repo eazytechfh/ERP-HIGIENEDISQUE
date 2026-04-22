@@ -43,9 +43,9 @@ import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generati
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import { ConsumoEstoqueCard, type ConsumoItem, type ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
+import { getClienteSupabase, listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { buildLocaisPorCliente, mapClienteToServicoView } from "@/lib/supabase/clientes-view"
 import { setFlowServicos, toIsoDate, type FlowServico } from "@/lib/flow-store"
 import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
@@ -572,6 +572,12 @@ export default function ServicosPage() {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
   const [searchTerm, setSearchTerm] = useState("")
   const [clientesSupabase, setClientesSupabase] = useState<ClienteInput[]>([])
+  const [clientesTotalCount, setClientesTotalCount] = useState(0)
+  const [clientesPage, setClientesPage] = useState(1)
+  const [isLoadingClientes, setIsLoadingClientes] = useState(false)
+  const CLIENT_PAGE_SIZE = 20
+  const searchTermRef = useRef(searchTerm)
+  useEffect(() => { searchTermRef.current = searchTerm }, [searchTerm])
   const [contratosSupabase, setContratosSupabase] = useState<Contrato[]>([])
   const [equipesData, setEquipesData] = useState<Equipe[]>([])
   const [veiculosData, setVeiculosData] = useState<Veiculo[]>([])
@@ -580,12 +586,40 @@ export default function ServicosPage() {
   const [servicosDb, setServicosDb] = useState<ServicoSupabaseItem[]>([])
   const [pageError, setPageError] = useState("")
 
+  const loadClientesPaginados = useCallback(async (page: number, search: string) => {
+    setIsLoadingClientes(true)
+    try {
+      const result = await listClientesSupabase({ page, pageSize: CLIENT_PAGE_SIZE, search: search || undefined })
+      setClientesSupabase(result.data)
+      setClientesTotalCount(result.count)
+    } catch (err) {
+      console.error("Falha ao carregar clientes paginados", err)
+      setClientesSupabase([])
+      setClientesTotalCount(0)
+    } finally {
+      setIsLoadingClientes(false)
+    }
+  }, [])
+
+  // Busca com debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setClientesPage(1)
+      loadClientesPaginados(1, searchTerm)
+    }, searchTerm ? 400 : 0)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Mudança de página
+  useEffect(() => {
+    loadClientesPaginados(clientesPage, searchTermRef.current)
+  }, [clientesPage])
+
   useEffect(() => {
     let mounted = true
     const loadData = async () => {
       try {
-        const [clientesRows, contratosRows, equipeRows, veiculosRows, produtosRows, servicosRows, categoriasReceitaRows] = await Promise.all([
-          listClientesSupabase(),
+        const [contratosRows, equipeRows, veiculosRows, produtosRows, servicosRows, categoriasReceitaRows] = await Promise.all([
           listContratosSupabase(),
           listEquipeMembrosSupabase(),
           listVeiculosSupabase(),
@@ -595,8 +629,6 @@ export default function ServicosPage() {
         ])
 
         if (!mounted) return
-
-        setClientesSupabase(clientesRows)
         setContratosSupabase(
           contratosRows.map((contrato) => ({
             id: contrato.id,
@@ -629,9 +661,8 @@ export default function ServicosPage() {
         setServicosDb(servicosRows)
         setPageError("")
       } catch (error) {
-        console.error("Falha ao carregar clientes para servicos", error)
+        console.error("Falha ao carregar dados para servicos", error)
         if (mounted) {
-          setClientesSupabase([])
           setContratosSupabase([])
           setEquipesData([])
           setVeiculosData([])
@@ -894,33 +925,25 @@ export default function ServicosPage() {
     return "vetores"
   }
 
-  // Filtrar clientes
-  const filteredClientes = clientesData.filter((cliente) => {
-    const term = searchTerm.toLowerCase()
-    const enderecoMatch = (locaisPorClienteData[cliente.id] || []).some((local) =>
-      `${local.nome} ${local.endereco} ${local.numero} ${local.bairro} ${local.cidade} ${local.estado} ${local.cep}`
-        .toLowerCase()
-        .includes(term)
-    )
-
-    return (
-      cliente.nome.toLowerCase().includes(term) ||
-      cliente.telefone.includes(searchTerm) ||
-      cliente.cpfCnpj.includes(searchTerm) ||
-      enderecoMatch
-    )
-  })
+  const filteredClientes = clientesData // já paginado/filtrado pelo servidor
+  const clientesTotalPages = Math.ceil(clientesTotalCount / CLIENT_PAGE_SIZE)
 
   // Handlers
-  const handleClienteSelect = (cliente: Cliente) => {
+  const handleClienteSelect = async (cliente: Cliente) => {
     setClienteSelecionado(cliente)
-    setLocaisCliente(locaisPorClienteData[cliente.id] || [])
     setServiceRequest((prev) => ({
       ...prev,
       clientId: cliente.id,
       locationId: "",
       billing: { ...prev.billing, contractId: "", contractItemId: "" },
     }))
+    // Carrega locais completos do cliente selecionado
+    try {
+      const full = await getClienteSupabase(cliente.id)
+      setLocaisCliente(buildLocaisPorCliente([full])[cliente.id] || [])
+    } catch {
+      setLocaisCliente(locaisPorClienteData[cliente.id] || [])
+    }
   }
 
   const handleInputChange = (field: string, value: any) => {
@@ -1822,22 +1845,46 @@ const handleConfirmarAgendamentoFinal = async () => {
                   )}
 
                   <div className="space-y-2 max-h-[350px] overflow-y-auto">
-                    {filteredClientes.map((cliente) => (
-                      <div
-                        key={cliente.id}
-                        onClick={() => handleClienteSelect(cliente)}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          clienteSelecionado?.id === cliente.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50'
-                        }`}
-                      >
-                        <p className="font-medium">{cliente.nome}</p>
-                        <p className="text-sm text-muted-foreground">{cliente.telefone}</p>
-                        <p className="text-xs text-muted-foreground">{cliente.cpfCnpj}</p>
-                      </div>
-                    ))}
+                    {isLoadingClientes ? (
+                      <p className="py-4 text-center text-sm text-muted-foreground">Carregando...</p>
+                    ) : filteredClientes.length === 0 ? (
+                      <p className="py-4 text-center text-sm text-muted-foreground">Nenhum cliente encontrado</p>
+                    ) : (
+                      filteredClientes.map((cliente) => (
+                        <div
+                          key={cliente.id}
+                          onClick={() => void handleClienteSelect(cliente)}
+                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                            clienteSelecionado?.id === cliente.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <p className="font-medium">{cliente.nome}</p>
+                          <p className="text-sm text-muted-foreground">{cliente.telefone}</p>
+                          <p className="text-xs text-muted-foreground">{cliente.cpfCnpj}</p>
+                        </div>
+                      ))
+                    )}
                   </div>
+
+                  {clientesTotalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t mt-2">
+                      <Button variant="ghost" size="sm" className="gap-1 px-2"
+                        onClick={() => setClientesPage((p) => Math.max(1, p - 1))}
+                        disabled={clientesPage === 1 || isLoadingClientes}>
+                        ← Ant.
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {clientesPage}/{clientesTotalPages} ({clientesTotalCount.toLocaleString("pt-BR")} clientes)
+                      </span>
+                      <Button variant="ghost" size="sm" className="gap-1 px-2"
+                        onClick={() => setClientesPage((p) => Math.min(clientesTotalPages, p + 1))}
+                        disabled={clientesPage >= clientesTotalPages || isLoadingClientes}>
+                        Próx. →
+                      </Button>
+                    </div>
+                  )}
 
                   {clienteSelecionado && (
                     <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">

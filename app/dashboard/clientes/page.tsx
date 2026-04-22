@@ -17,11 +17,11 @@ import {
   Search, Plus, Edit, UserPlus, Users, Trash2, MapPin, Phone, 
   Building2, FileText, Upload, ChevronRight, Home, Save, X, Download, Eye
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ensureFlowStoreInitialized, loadFlowContratos, saveFlowContratos, setFlowClientes } from "@/lib/flow-store"
 import { isApiMode } from "@/lib/runtime-config"
-import { deleteClienteSupabase, listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
+import { deleteClienteSupabase, getClienteSupabase, listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { listContratosSupabase, type ContratoSupabaseItem } from "@/lib/supabase/contratos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
@@ -167,59 +167,71 @@ export default function ClientesPage() {
   const [clientesLoaded, setClientesLoaded] = useState(false)
   const [loadError, setLoadError] = useState("")
   const [isSavingCliente, setIsSavingCliente] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [isLoadingPage, setIsLoadingPage] = useState(false)
+  const PAGE_SIZE = 20
   const apiMode = isApiMode()
 
-  useEffect(() => {
-    let mounted = true
+  const loadClientes = useCallback(async (page: number, search: string, status: string) => {
+    if (!apiMode) return
+    setIsLoadingPage(true)
+    setLoadError("")
+    try {
+      const [clientesResult, contratosResult] = await Promise.allSettled([
+        listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined, status }),
+        listContratosSupabase(),
+      ])
 
-      const loadClientes = async () => {
-        if (apiMode) {
-          try {
-            setLoadError("")
-            const [clientesResult, contratosResult] = await Promise.allSettled([
-              listClientesSupabase(),
-              listContratosSupabase(),
-            ])
-            if (!mounted) return
-
-            if (clientesResult.status === "fulfilled") {
-              setClientes(clientesResult.value as Cliente[])
-            } else {
-              console.error("Falha ao carregar clientes no Supabase", clientesResult.reason)
-              setClientes([])
-              setLoadError("Nao foi possivel carregar os clientes do Supabase para este usuario.")
-            }
-
-            if (contratosResult.status === "fulfilled") {
-              setContratosSupabase(contratosResult.value)
-            } else {
-              console.error("Falha ao carregar contratos no Supabase", contratosResult.reason)
-              setContratosSupabase([])
-              setLoadError((prev) =>
-                prev
-                  ? `${prev} O carregamento de contratos tambem falhou.`
-                  : "Os clientes abriram com restricoes: nao foi possivel carregar os contratos vinculados.",
-              )
-            }
-          } finally {
-            if (mounted) setClientesLoaded(true)
-          }
-        return
+      if (clientesResult.status === "fulfilled") {
+        setClientes(clientesResult.value.data as Cliente[])
+        setTotalCount(clientesResult.value.count)
+      } else {
+        console.error("Falha ao carregar clientes no Supabase", clientesResult.reason)
+        setClientes([])
+        setTotalCount(0)
+        setLoadError("Nao foi possivel carregar os clientes do Supabase para este usuario.")
       }
 
-      const store = ensureFlowStoreInitialized("operacional")
-      if (!mounted) return
-      setClientes(Array.isArray(store.clientes) ? (store.clientes as Cliente[]) : [])
-      setContratosSupabase([])
+      if (contratosResult.status === "fulfilled") {
+        setContratosSupabase(contratosResult.value)
+      } else {
+        setContratosSupabase([])
+      }
+    } finally {
+      setIsLoadingPage(false)
       setClientesLoaded(true)
     }
-
-    loadClientes()
-
-    return () => {
-      mounted = false
-    }
   }, [apiMode])
+
+  // Carga inicial (modo local)
+  useEffect(() => {
+    if (apiMode) return
+    const store = ensureFlowStoreInitialized("operacional")
+    setClientes(Array.isArray(store.clientes) ? (store.clientes as Cliente[]) : [])
+    setContratosSupabase([])
+    setClientesLoaded(true)
+  }, [apiMode])
+
+  // Carga paginada com debounce na busca
+  useEffect(() => {
+    if (!apiMode) return
+    const timer = setTimeout(() => {
+      setCurrentPage(1)
+      loadClientes(1, searchTerm, statusFilter)
+    }, searchTerm ? 400 : 0)
+    return () => clearTimeout(timer)
+  }, [searchTerm, statusFilter, apiMode])
+
+  const searchTermRef = useRef(searchTerm)
+  const statusFilterRef = useRef(statusFilter)
+  useEffect(() => { searchTermRef.current = searchTerm }, [searchTerm])
+  useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
+
+  useEffect(() => {
+    if (!apiMode || !clientesLoaded) return
+    loadClientes(currentPage, searchTermRef.current, statusFilterRef.current)
+  }, [currentPage])
 
   useEffect(() => {
     if (!clientesLoaded || apiMode) return
@@ -345,10 +357,23 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
   }
 }
 
-  const handleEdit = (cliente: Cliente) => {
-    const { id, ...rest } = cliente
-    setFormData(rest)
-    setEditingClient(cliente)
+  const handleEdit = async (cliente: Cliente) => {
+    if (apiMode) {
+      try {
+        const full = await getClienteSupabase(cliente.id) as Cliente
+        const { id, ...rest } = full
+        setFormData(rest)
+        setEditingClient(full)
+      } catch {
+        const { id, ...rest } = cliente
+        setFormData(rest)
+        setEditingClient(cliente)
+      }
+    } else {
+      const { id, ...rest } = cliente
+      setFormData(rest)
+      setEditingClient(cliente)
+    }
     setActiveTab("cadastrar")
   }
 
@@ -609,35 +634,17 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
   }
 
   const filteredClientes = clientes.filter((cliente) => {
-    const term = searchTerm.toLowerCase()
+    if (contractFilter === "todos") return true
     const contratoResumo = getContratoResumoCliente(cliente)
     const situacaoCliente = contratoResumo.situacao
-    const matchesSearch =
-      cliente.nome.toLowerCase().includes(term) ||
-      cliente.telefone.includes(searchTerm) ||
-      cliente.cpf.includes(searchTerm) ||
-      cliente.cnpj.includes(searchTerm)
-
-    const matchesContrato = (() => {
-      switch (contractFilter) {
-        case "com_contrato":
-          return contratoResumo.possuiContrato
-        case "sem_contrato":
-          return !contratoResumo.possuiContrato
-        case "em_dia":
-          return contratoResumo.possuiContrato && situacaoCliente === "Em dia"
-        case "a_vencer":
-          return contratoResumo.possuiContrato && situacaoCliente === "A vencer"
-        case "vencido":
-          return contratoResumo.possuiContrato && situacaoCliente === "Vencido"
-        default:
-          return true
-      }
-    })()
-
-    const matchesStatus = statusFilter === "todos" || cliente.status === statusFilter
-
-    return matchesSearch && matchesContrato && matchesStatus
+    switch (contractFilter) {
+      case "com_contrato": return contratoResumo.possuiContrato
+      case "sem_contrato": return !contratoResumo.possuiContrato
+      case "em_dia": return contratoResumo.possuiContrato && situacaoCliente === "Em dia"
+      case "a_vencer": return contratoResumo.possuiContrato && situacaoCliente === "A vencer"
+      case "vencido": return contratoResumo.possuiContrato && situacaoCliente === "Vencido"
+      default: return true
+    }
   })
 
   return (
@@ -759,12 +766,41 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
               </div>
 
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">{filteredClientes.length} cliente(s) encontrado(s)</p>
+                <p className="text-sm text-muted-foreground">
+                  {apiMode
+                    ? `${totalCount.toLocaleString("pt-BR")} cliente(s) encontrado(s)`
+                    : `${filteredClientes.length} cliente(s) encontrado(s)`}
+                  {isLoadingPage && <span className="ml-2 text-muted-foreground/60">Carregando...</span>}
+                </p>
                 <Button type="button" variant="outline" className="gap-2" onClick={exportarClientesCsv}>
                   <Download className="h-4 w-4" />
                   Exportar CSV
                 </Button>
               </div>
+
+              {apiMode && totalCount > PAGE_SIZE && (
+                <div className="flex items-center justify-between mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1 || isLoadingPage}
+                  >
+                    ← Anterior
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {Math.ceil(totalCount / PAGE_SIZE)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))}
+                    disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE) || isLoadingPage}
+                  >
+                    Próxima →
+                  </Button>
+                </div>
+              )}
 
               <div className="rounded-md border">
                 <Table>

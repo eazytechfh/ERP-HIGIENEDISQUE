@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react"
 import { ErpHeader } from "@/components/erp-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, UserCheck, Calendar, CheckCircle2, Clock, AlertTriangle, AlertCircle } from "lucide-react"
+import { Users, UserCheck, Calendar, CheckCircle2, Clock, AlertTriangle, AlertCircle, TrendingUp, Package, Wrench, FileSignature, RefreshCw } from "lucide-react"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts"
-import { listClientesSupabase } from "@/lib/supabase/clientes-repo"
+import { getClientesMetricasSupabase, type ClientesMetricas } from "@/lib/supabase/clientes-repo"
 import { listServicosSupabase, type ServicoSupabaseItem } from "@/lib/supabase/servicos-repo"
 import { listProdutosSupabase, type ProdutoSupabaseItem } from "@/lib/supabase/estoque-repo"
 import { listManutencoesPreventivasSupabase, listVeiculosSupabase, type ManutencaoPreventivaSupabaseItem, type VeiculoSupabaseItem } from "@/lib/supabase/veiculos-repo"
@@ -67,7 +67,7 @@ function isPastDate(value: string, today: Date): boolean {
 }
 
 function computeMetrics(
-  clientes: any[],
+  clientesMetricas: ClientesMetricas,
   servicos: ServicoSupabaseItem[],
   manutencoes: ManutencaoPreventivaSupabaseItem[],
   veiculos: VeiculoSupabaseItem[],
@@ -79,19 +79,6 @@ function computeMetrics(
   today.setHours(0, 0, 0, 0)
   const weekStart = startOfWeekMonday(today)
   const weekEnd = endOfWeekSunday(today)
-
-  const clientesAtivosList = clientes.filter((c) => String(c.status || "Ativo").trim().toLowerCase() === "ativo")
-  const clientesComContratoAtivo = clientesAtivosList.filter((c) => c.possuiContrato)
-
-  const getSituacaoContratoCliente = (cliente: any) => {
-    if (!cliente.dataFimContrato) return ""
-    const dataFim = parseServiceDate(cliente.dataFimContrato)
-    if (!dataFim) return ""
-    const diffDays = Math.floor((dataFim.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    if (diffDays < 0) return "Vencido"
-    if (diffDays <= 30) return "A vencer"
-    return "Em dia"
-  }
 
   const servicosHoje = servicos.filter((s) => {
     const data = parseServiceDate(s.data)
@@ -122,16 +109,7 @@ function computeMetrics(
     }
   })
 
-  const pendenciasClientes = clientesComContratoAtivo
-    .map((c) => {
-      const situacao = getSituacaoContratoCliente(c)
-      if (situacao !== "A vencer" && situacao !== "Vencido") return null
-      return {
-        origem: c.nome || "Cliente sem nome",
-        texto: `Contrato com status: ${situacao}${c.dataFimContrato ? ` (fim em ${new Date(`${c.dataFimContrato}T00:00:00`).toLocaleDateString("pt-BR")})` : ""}`,
-      }
-    })
-    .filter((item): item is { origem: string; texto: string } => item !== null)
+  const pendenciasClientes: { origem: string; texto: string }[] = []
 
   const pendenciasManutencao = manutencoes
     .filter((m) => m.status === "Pendente")
@@ -172,10 +150,10 @@ function computeMetrics(
     programadosHoje: servicosHoje.filter((s) => s.status === "agendado").length,
     realizadosHoje: servicosHoje.filter((s) => s.status === "executado").length,
     pendentesHoje: servicosHoje.filter((s) => s.status === "agendado" || s.status === "em_execucao").length,
-    clientesAtivos: clientesAtivosList.length,
-    clientesAVencer: clientesComContratoAtivo.filter((c) => getSituacaoContratoCliente(c) === "A vencer").length,
-    clientesVencidos: clientesComContratoAtivo.filter((c) => getSituacaoContratoCliente(c) === "Vencido").length,
-    totalClientesResumo: clientes.length,
+    clientesAtivos: clientesMetricas.totalAtivos,
+    clientesAVencer: clientesMetricas.totalAVencer,
+    clientesVencidos: clientesMetricas.totalVencidos,
+    totalClientesResumo: clientesMetricas.total,
     programadosSemana: servicosSemana.filter((s) => s.status === "agendado").length,
     programadosMes: servicosMes.filter((s) => s.status === "agendado").length,
     realizadosSemana: servicosSemana.filter((s) => s.status === "executado").length,
@@ -195,12 +173,13 @@ function computeMetrics(
 }
 
 export default function DashboardPage() {
-  const [clientes, setClientes] = useState<any[]>([])
+  const [clientesMetricas, setClientesMetricas] = useState<ClientesMetricas>({ totalAtivos: 0, totalAVencer: 0, totalVencidos: 0, total: 0 })
   const [servicos, setServicos] = useState<ServicoSupabaseItem[]>([])
   const [manutencoes, setManutencoes] = useState<ManutencaoPreventivaSupabaseItem[]>([])
   const [veiculos, setVeiculos] = useState<VeiculoSupabaseItem[]>([])
   const [produtos, setProdutos] = useState<ProdutoSupabaseItem[]>([])
   const [equipe, setEquipe] = useState<EquipeMembroInput[]>([])
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
   useEffect(() => {
     let mounted = true
@@ -208,7 +187,7 @@ export default function DashboardPage() {
     const loadData = async () => {
       try {
         const [clientesResult, servicosResult, manutencoesResult, veiculosResult, produtosResult, equipeResult] = await Promise.allSettled([
-          listClientesSupabase(),
+          getClientesMetricasSupabase(),
           listServicosSupabase(),
           listManutencoesPreventivasSupabase(),
           listVeiculosSupabase(),
@@ -218,10 +197,10 @@ export default function DashboardPage() {
         if (!mounted) return
 
         if (clientesResult.status === "fulfilled") {
-          setClientes(clientesResult.value)
+          setClientesMetricas(clientesResult.value)
         } else {
           console.error("Falha ao carregar clientes no dashboard", clientesResult.reason)
-          setClientes([])
+          setClientesMetricas({ totalAtivos: 0, totalAVencer: 0, totalVencidos: 0, total: 0 })
         }
 
         if (servicosResult.status === "fulfilled") {
@@ -258,10 +237,11 @@ export default function DashboardPage() {
           console.error("Falha ao carregar equipe no dashboard", equipeResult.reason)
           setEquipe([])
         }
+        if (mounted) setLastUpdated(new Date())
       } catch (error) {
         console.error("Falha inesperada ao carregar dashboard do Supabase", error)
         if (!mounted) return
-        setClientes([])
+        setClientesMetricas({ totalAtivos: 0, totalAVencer: 0, totalVencidos: 0, total: 0 })
         setServicos([])
         setManutencoes([])
         setVeiculos([])
@@ -277,31 +257,69 @@ export default function DashboardPage() {
   }, [])
 
   const metrics = useMemo(
-    () => computeMetrics(clientes, servicos, manutencoes, veiculos, produtos, equipe, new Date()),
-    [clientes, servicos, manutencoes, veiculos, produtos, equipe],
+    () => computeMetrics(clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe, new Date()),
+    [clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe],
   )
 
   const alertas = [
-    { tipo: "OS sem assinatura", quantidade: metrics.alertas.osSemAssinatura, cor: "bg-blue-500" },
-    { tipo: "Serviços Vencidos", quantidade: metrics.alertas.servicosVencidos, cor: "bg-blue-400" },
-    { tipo: "Manutenção de Veículo", quantidade: metrics.alertas.manutencaoVeiculo, cor: "bg-blue-200" },
-    { tipo: "Estoque critico", quantidade: metrics.alertas.equipamentoDefeito, cor: "bg-gray-400" },
+    { tipo: "OS sem assinatura", quantidade: metrics.alertas.osSemAssinatura, icon: FileSignature, cor: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
+    { tipo: "Serviços Vencidos", quantidade: metrics.alertas.servicosVencidos, icon: AlertCircle, cor: "text-red-600", bg: "bg-red-50 border-red-200" },
+    { tipo: "Manutenção de Veículo", quantidade: metrics.alertas.manutencaoVeiculo, icon: Wrench, cor: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
+    { tipo: "Estoque crítico", quantidade: metrics.alertas.equipamentoDefeito, icon: Package, cor: "text-orange-600", bg: "bg-orange-50 border-orange-200" },
   ]
+
+  const taxaConclusaoHoje = metrics.programadosHoje + metrics.realizadosHoje > 0
+    ? Math.round((metrics.realizadosHoje / (metrics.programadosHoje + metrics.realizadosHoje)) * 100)
+    : 0
+
+  const dataAtual = new Date().toLocaleDateString("pt-BR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
 
   return (
     <div className="min-h-screen bg-muted/30">
       <ErpHeader />
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="mb-2 text-3xl font-bold text-foreground">Dashboard Principal</h1>
-          <p className="text-muted-foreground">Visão geral do sistema de gestão</p>
+        <div className="mb-6 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Dashboard Principal</h1>
+            <p className="mt-1 text-sm text-muted-foreground capitalize">{dataAtual}</p>
+          </div>
+          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+            <RefreshCw className="h-3 w-3" />
+            Atualizado às {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+          </p>
         </div>
 
         <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-          <Card className="border-blue-200 bg-blue-50"><CardContent className="p-4"><p className="text-xs font-medium text-muted-foreground">Serviços Programados Hoje</p><p className="text-3xl font-bold text-blue-600">{metrics.programadosHoje}</p></CardContent></Card>
-          <Card className="border-green-200 bg-green-50"><CardContent className="p-4"><p className="text-xs font-medium text-muted-foreground">Serviços Realizados Hoje</p><p className="text-3xl font-bold text-green-600">{metrics.realizadosHoje}</p></CardContent></Card>
-          <Card className="border-amber-200 bg-amber-50"><CardContent className="p-4"><p className="text-xs font-medium text-muted-foreground">Pendentes Hoje</p><p className="text-3xl font-bold text-amber-600">{metrics.pendentesHoje}</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-xs font-medium text-muted-foreground">Clientes Ativos</p><p className="text-3xl font-bold text-foreground">{metrics.clientesAtivos}</p></CardContent></Card>
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-muted-foreground">Programados Hoje</p>
+              <p className="text-3xl font-bold text-blue-600">{metrics.programadosHoje}</p>
+              <p className="mt-1 text-xs text-blue-500">{metrics.programadosSemana} esta semana</p>
+            </CardContent>
+          </Card>
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-muted-foreground">Realizados Hoje</p>
+              <p className="text-3xl font-bold text-green-600">{metrics.realizadosHoje}</p>
+              <p className="mt-1 text-xs text-green-500">{metrics.realizadosSemana} esta semana</p>
+            </CardContent>
+          </Card>
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-muted-foreground">Pendentes Hoje</p>
+              <p className="text-3xl font-bold text-amber-600">{metrics.pendentesHoje}</p>
+              <p className="mt-1 text-xs text-amber-500">aguardando execucao</p>
+            </CardContent>
+          </Card>
+          <Card className="border-purple-200 bg-purple-50">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-muted-foreground">Taxa de Conclusao</p>
+              <p className="text-3xl font-bold text-purple-600">{taxaConclusaoHoje}%</p>
+              <div className="mt-2 h-1.5 w-full rounded-full bg-purple-200">
+                <div className="h-1.5 rounded-full bg-purple-500 transition-all" style={{ width: `${taxaConclusaoHoje}%` }} />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="mb-6 grid gap-6 lg:grid-cols-3">
@@ -326,14 +344,19 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base font-semibold"><AlertTriangle className="h-4 w-4 text-amber-500" />Alertas</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {alertas.map((alerta) => (
-                  <div key={alerta.tipo} className="flex items-center gap-3">
-                    <div className={`h-3 w-3 rounded-sm ${alerta.cor}`}></div>
-                    <span className="flex-1 text-sm text-foreground">{alerta.tipo}</span>
-                    <span className="text-sm font-semibold text-muted-foreground">({alerta.quantidade})</span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {alertas.map((alerta) => {
+                  const Icon = alerta.icon
+                  return (
+                    <div key={alerta.tipo} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${alerta.quantidade > 0 ? alerta.bg : "bg-muted/30 border-border"}`}>
+                      <Icon className={`h-4 w-4 shrink-0 ${alerta.quantidade > 0 ? alerta.cor : "text-muted-foreground"}`} />
+                      <span className="flex-1 text-sm">{alerta.tipo}</span>
+                      <span className={`text-sm font-bold tabular-nums ${alerta.quantidade > 0 ? alerta.cor : "text-muted-foreground"}`}>
+                        {alerta.quantidade}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
@@ -376,17 +399,57 @@ export default function DashboardPage() {
         </div>
 
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base font-semibold">Pendências críticas</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between text-base font-semibold">
+              <span>Pendências críticas</span>
+              {metrics.pendenciasCriticas.length > 0 && (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{metrics.pendenciasCriticas.length}</span>
+              )}
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Origem</TableHead><TableHead>Descrição</TableHead></TableRow></TableHeader>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Origem</TableHead>
+                  <TableHead>Descrição</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {metrics.pendenciasCriticas.length === 0 ? (
-                  <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground">Nenhuma pendência crítica cadastrada</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={2} className="py-8 text-center text-muted-foreground">
+                      <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-green-500" />
+                      Nenhuma pendência crítica. Tudo em dia!
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  metrics.pendenciasCriticas.map((p, idx) => (
-                    <TableRow key={`${p.origem}-${idx}`}><TableCell>{p.origem}</TableCell><TableCell>{p.texto}</TableCell></TableRow>
-                  ))
+                  metrics.pendenciasCriticas.map((p, idx) => {
+                    const isManutencao = p.texto.toLowerCase().includes("manutencao")
+                    const isContrato = p.texto.toLowerCase().includes("contrato")
+                    const isEstoque = p.texto.toLowerCase().includes("estoque") || p.texto.toLowerCase().includes("critico")
+                    const isDoc = p.texto.toLowerCase().includes("nr") || p.texto.toLowerCase().includes("aso") || p.texto.toLowerCase().includes("vencido")
+                    const badge = isManutencao
+                      ? { label: "Veículo", cls: "bg-amber-100 text-amber-700" }
+                      : isContrato
+                      ? { label: "Contrato", cls: "bg-red-100 text-red-700" }
+                      : isEstoque
+                      ? { label: "Estoque", cls: "bg-orange-100 text-orange-700" }
+                      : isDoc
+                      ? { label: "Equipe", cls: "bg-purple-100 text-purple-700" }
+                      : { label: "Geral", cls: "bg-gray-100 text-gray-700" }
+                    return (
+                      <TableRow key={`${p.origem}-${idx}`}>
+                        <TableCell className="font-medium">{p.origem}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+                            <span>{p.texto}</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

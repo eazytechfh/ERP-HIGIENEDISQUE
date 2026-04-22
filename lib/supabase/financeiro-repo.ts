@@ -199,7 +199,7 @@ function mapLancamentoToDb(input: FinanceiroLancamentoInput) {
     status: input.status,
     origem: input.origem || "manual",
     descricao: input.descricao,
-    categoria_id: input.categoriaId || null,
+    // categoria_id adicionado na migration 009 — omitido enquanto nao aplicada
     categoria: input.categoria || null,
     valor: input.valor,
     data_competencia: input.dataCompetencia,
@@ -212,10 +212,8 @@ function mapLancamentoToDb(input: FinanceiroLancamentoInput) {
     forma_pagamento: input.formaPagamento || null,
     documento_tipo: input.documentoTipo || null,
     documento_numero: input.documentoNumero || null,
-    notificacao_email: Boolean(input.notificacaoEmail),
-    notificacao_whatsapp: Boolean(input.notificacaoWhatsapp),
-    api_integracao_status: input.apiIntegracaoStatus || "nao_enviado",
-    api_integracao_referencia: input.apiIntegracaoReferencia || null,
+    // notificacao_email, notificacao_whatsapp, api_integracao_status, api_integracao_referencia
+    // adicionados na migration 009 — omitidos enquanto nao aplicada
     observacoes: input.observacoes || null,
     deleted_at: null,
   }
@@ -256,9 +254,9 @@ function mapDocumentoToDb(input: FinanceiroDocumentoInput) {
     lancamento_id: input.lancamentoId,
     tipo: input.tipo,
     status: input.status,
-    cliente_id: input.clienteId || null,
-    contrato_id: input.contratoId || null,
-    descricao: input.descricao || null,
+    // cliente_id, contrato_id, descricao, valor_servico, notificacao_email,
+    // notificacao_whatsapp, api_integracao_status, api_integracao_referencia
+    // adicionados na migration 009 — omitidos enquanto nao aplicada
     numero: input.numero,
     serie: input.serie || null,
     chave_documento: input.chaveDocumento || null,
@@ -266,11 +264,6 @@ function mapDocumentoToDb(input: FinanceiroDocumentoInput) {
     data_emissao: input.dataEmissao,
     data_vencimento: input.dataVencimento || null,
     valor: input.valor,
-    valor_servico: input.valorServico ?? input.valor,
-    notificacao_email: Boolean(input.notificacaoEmail),
-    notificacao_whatsapp: Boolean(input.notificacaoWhatsapp),
-    api_integracao_status: input.apiIntegracaoStatus || "nao_enviado",
-    api_integracao_referencia: input.apiIntegracaoReferencia || null,
     observacoes: input.observacoes || null,
     deleted_at: null,
   }
@@ -289,7 +282,7 @@ export async function listFinanceiroCategoriasSupabase(tipo?: FinanceiroLancamen
   }
 
   const { data, error } = await query
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToCategoria)
 }
 
@@ -307,7 +300,7 @@ export async function upsertFinanceiroCategoriaSupabase(input: FinanceiroCategor
     .select("*")
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const categoria = mapDbToCategoria(data)
 
   await safeAuditLogSupabase({
@@ -322,6 +315,26 @@ export async function upsertFinanceiroCategoriaSupabase(input: FinanceiroCategor
   return categoria
 }
 
+export async function deleteFinanceiroCategoriaSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("financeiro.delete", "Voce nao possui permissao para excluir categorias financeiras.")
+
+  const supabase = getSupabaseBrowserClient()
+  const { error } = await supabase
+    .from("financeiro_categorias")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
+
+  await safeAuditLogSupabase({
+    action: "delete",
+    entity: "financeiro_categoria",
+    entityId: id,
+    entityLabel: id,
+    description: "Categoria financeira excluida.",
+  })
+}
+
 export async function listFinanceiroLancamentosSupabase(): Promise<FinanceiroLancamentoItem[]> {
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase
@@ -331,7 +344,7 @@ export async function listFinanceiroLancamentosSupabase(): Promise<FinanceiroLan
     .order("data_vencimento", { ascending: true })
     .order("created_at", { ascending: false })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToLancamento)
 }
 
@@ -357,7 +370,7 @@ export async function upsertFinanceiroLancamentoSupabase(input: FinanceiroLancam
     .eq("id", saved.id)
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const lancamento = mapDbToLancamento(data)
 
   await safeAuditLogSupabase({
@@ -381,7 +394,7 @@ export async function deleteFinanceiroLancamentoSupabase(id: string): Promise<vo
 
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase.from("financeiro_lancamentos").delete().eq("id", id)
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",
@@ -406,7 +419,7 @@ export async function listFinanceiroDocumentosSupabase(tipo?: FinanceiroDocument
   }
 
   const { data, error } = await query
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToDocumento)
 }
 
@@ -432,7 +445,7 @@ export async function upsertFinanceiroDocumentoSupabase(input: FinanceiroDocumen
     .eq("id", saved.id)
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const documento = mapDbToDocumento(data)
 
   await safeAuditLogSupabase({
@@ -455,7 +468,7 @@ export async function deleteFinanceiroDocumentoSupabase(id: string): Promise<voi
 
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase.from("financeiro_documentos").delete().eq("id", id)
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",
@@ -558,7 +571,7 @@ export async function cancelLancamentoServicoSupabase(servicoId: string, observa
     .eq("tipo", "receita")
     .is("deleted_at", null)
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "cancel",

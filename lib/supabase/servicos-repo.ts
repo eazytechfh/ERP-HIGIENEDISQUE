@@ -153,7 +153,7 @@ export async function listServicosSupabase(): Promise<ServicoSupabaseItem[]> {
     .is("deleted_at", null)
     .order("data", { ascending: false })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToServico)
 }
 
@@ -171,7 +171,7 @@ export async function upsertServicoSupabase(input: ServicoSupabaseInput): Promis
     .select("*")
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const servico = mapDbToServico(data)
 
   await safeAuditLogSupabase({
@@ -199,7 +199,7 @@ export async function deleteServicoSupabase(id: string): Promise<void> {
     .delete()
     .eq("id", id)
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",
@@ -232,7 +232,7 @@ export async function uploadOSAssinadaServicoSupabase(input: {
     contentType: input.arquivo.type || "application/octet-stream",
   })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "generate",
@@ -258,6 +258,6 @@ export async function uploadOSAssinadaServicoSupabase(input: {
 export async function getOSAssinadaArquivoUrl(storageBucket: string, storagePath: string): Promise<string> {
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase.storage.from(storageBucket).createSignedUrl(storagePath, 60)
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return data.signedUrl
 }

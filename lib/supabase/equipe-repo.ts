@@ -76,7 +76,7 @@ export async function listEquipeMembrosSupabase(): Promise<EquipeMembroInput[]> 
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   const membros = (data || []).map(mapDbToEquipe)
   const currentProfile = await getCurrentUserAccessProfileSupabase()
@@ -135,7 +135,7 @@ export async function upsertEquipeMembroSupabase(input: EquipeMembroInput): Prom
     .select("*")
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const membro = mapDbToEquipe(data)
 
   await safeAuditLogSupabase({
@@ -154,15 +154,10 @@ export async function upsertEquipeMembroSupabase(input: EquipeMembroInput): Prom
 }
 
 export async function deleteEquipeMembroSupabase(id: string): Promise<void> {
-  await assertPermissionSupabase("equipe.delete", "Voce nao possui permissao para excluir membros da equipe.")
-
   const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase
-    .from("equipe_membros")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id)
+  const { error } = await supabase.rpc("soft_delete_equipe_membro", { p_id: id })
 
-  if (error) throw error
+  if (error) throw new Error(error.message || error.code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",

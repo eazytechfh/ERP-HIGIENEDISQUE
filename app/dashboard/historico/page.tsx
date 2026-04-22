@@ -1,14 +1,13 @@
 "use client"
 
-import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ErpHeader } from "@/components/erp-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, CheckCircle2, Clock, XCircle, Bell, Calendar, FileText, Eye, Paperclip } from "lucide-react"
+import { Search, CheckCircle2, Clock, XCircle, Bell, Calendar, FileText, Eye, Paperclip, ChevronLeft, ChevronRight } from "lucide-react"
 import { toIsoDate } from "@/lib/flow-store"
 import { listClientesSupabase } from "@/lib/supabase/clientes-repo"
 import { mapClienteToServicoView } from "@/lib/supabase/clientes-view"
@@ -50,69 +49,86 @@ const statusMap: Record<string, ServicoHistorico["status"]> = {
   em_execucao: "Em execucao",
 }
 
+const PAGE_SIZE = 20
+
 export default function HistoricoPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCliente, setSelectedCliente] = useState<ClienteResumo | null>(null)
   const [clientes, setClientes] = useState<ClienteResumo[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [isLoadingClientes, setIsLoadingClientes] = useState(false)
   const [servicos, setServicos] = useState<ServicoHistorico[]>([])
   const [selectedServico, setSelectedServico] = useState<ServicoHistorico | null>(null)
   const [showOSDialog, setShowOSDialog] = useState(false)
 
+  const searchTermRef = useRef(searchTerm)
+  useEffect(() => { searchTermRef.current = searchTerm }, [searchTerm])
+
+  const loadClientes = useCallback(async (page: number, search: string) => {
+    setIsLoadingClientes(true)
+    try {
+      const result = await listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined })
+      setClientes(
+        result.data.map((c) => {
+          const view = mapClienteToServicoView(c)
+          return { id: view.id, nome: view.nome, telefone: view.telefone, email: view.email, empresa: view.empresa, cpfCnpj: view.cpfCnpj }
+        })
+      )
+      setTotalCount(result.count)
+    } catch (error) {
+      console.error("Falha ao carregar clientes no historico", error)
+      setClientes([])
+      setTotalCount(0)
+    } finally {
+      setIsLoadingClientes(false)
+    }
+  }, [])
+
+  // Busca com debounce — reseta para página 1
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentPage(1)
+      loadClientes(1, searchTerm)
+    }, searchTerm ? 400 : 0)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Mudança de página
+  useEffect(() => {
+    loadClientes(currentPage, searchTermRef.current)
+  }, [currentPage])
+
+  // Carrega serviços uma vez
   useEffect(() => {
     let mounted = true
-
-    const loadData = async () => {
-      try {
-        const [clientesRows, servicosRows] = await Promise.all([listClientesSupabase(), listServicosSupabase()])
+    listServicosSupabase()
+      .then((rows) => {
         if (!mounted) return
-
-        setClientes(
-          clientesRows.map((c) => {
-            const view = mapClienteToServicoView(c)
-            return {
-              id: view.id,
-              nome: view.nome,
-              telefone: view.telefone,
-              email: view.email,
-              empresa: view.empresa,
-              cpfCnpj: view.cpfCnpj,
-            }
-          })
-        )
-
         setServicos(
-          servicosRows.map((s) => ({
+          rows.map((s) => ({
             id: s.id,
             osNumber: s.osNumber,
             clienteId: s.clienteId,
             nome: s.servico,
             data: toIsoDate(s.data) || s.data,
-             status: statusMap[s.status] ?? "Programado",
-             valor: 0,
-             observacao: s.baixaObservacao || `OS ${s.osNumber} registrada no sistema`,
-             cliente: s.cliente,
-             local: s.local,
-             horario: s.horario,
-             tecnico: s.tecnico,
-             osDocumentoHtml: s.osDocumentoHtml,
-             osAssinada: s.osAssinada,
-             osAssinadaNome: s.osAssinadaNome,
-             osAssinadaStorageBucket: s.osAssinadaStorageBucket,
-             osAssinadaStoragePath: s.osAssinadaStoragePath,
-            }))
+            status: statusMap[s.status] ?? "Programado",
+            valor: 0,
+            observacao: s.baixaObservacao || `OS ${s.osNumber} registrada no sistema`,
+            cliente: s.cliente,
+            local: s.local,
+            horario: s.horario,
+            tecnico: s.tecnico,
+            osDocumentoHtml: s.osDocumentoHtml,
+            osAssinada: s.osAssinada,
+            osAssinadaNome: s.osAssinadaNome,
+            osAssinadaStorageBucket: s.osAssinadaStorageBucket,
+            osAssinadaStoragePath: s.osAssinadaStoragePath,
+          }))
         )
-      } catch (error) {
-        console.error("Falha ao carregar historico no Supabase", error)
-        if (!mounted) return
-        setClientes([])
-        setServicos([])
-      }
-    }
-
-    void loadData()
-    return () => {
-      mounted = false
-    }
+      })
+      .catch((err) => console.error("Falha ao carregar servicos no historico", err))
+    return () => { mounted = false }
   }, [])
 
   const notificacoes = useMemo(() => {
@@ -125,31 +141,21 @@ export default function HistoricoPage() {
     }))
   }, [servicos])
 
-  const filteredClientes = clientes.filter(
-    (cliente) =>
-      cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cliente.telefone.includes(searchTerm) ||
-      cliente.cpfCnpj.includes(searchTerm)
-  )
-
   const clienteServicos = selectedCliente ? servicos.filter((s) => s.clienteId === selectedCliente.id) : []
   const clienteNotificacoes = selectedCliente ? notificacoes.filter((n) => n.clienteId === selectedCliente.id) : []
 
   const servicosRealizados = clienteServicos.filter((s) => s.status === "Realizado").length
   const servicosProgramados = clienteServicos.filter((s) => s.status === "Programado" || s.status === "Em execucao").length
   const servicosCancelados = clienteServicos.filter((s) => s.status === "Cancelado").length
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Realizado":
-        return "bg-green-500/10 text-green-700 border-green-200"
+      case "Realizado": return "bg-green-500/10 text-green-700 border-green-200"
       case "Programado":
-      case "Em execucao":
-        return "bg-blue-500/10 text-blue-700 border-blue-200"
-      case "Cancelado":
-        return "bg-red-500/10 text-red-700 border-red-200"
-      default:
-        return ""
+      case "Em execucao": return "bg-blue-500/10 text-blue-700 border-blue-200"
+      case "Cancelado": return "bg-red-500/10 text-red-700 border-red-200"
+      default: return ""
     }
   }
 
@@ -168,24 +174,11 @@ export default function HistoricoPage() {
   <title>${osNumberValue}</title>
   <style>
     body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111827; }
-    .h-4 { height: 1rem; }
-    .h-16 { height: 4rem; }
-    .min-h-\[40px\] { min-height: 40px; }
-    .min-h-\[60px\] { min-height: 60px; }
-    .inline-flex { display: inline-flex; }
-    .leading-tight { line-height: 1.25; }
-    .align-top { vertical-align: top; }
-    .space-y-1 > * + * { margin-top: 0.25rem; }
     table { border-collapse: collapse; width: 100%; }
-    @media print {
-      body { margin: 0; padding: 10px; }
-      .no-print { display: none; }
-    }
+    @media print { body { margin: 0; padding: 10px; } .no-print { display: none; } }
   </style>
 </head>
-<body>
-  ${contentHtml}
-</body>
+<body>${contentHtml}</body>
 </html>`
 
   const handleVerOS = (servico: ServicoHistorico) => {
@@ -222,41 +215,83 @@ export default function HistoricoPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Painel esquerdo — lista paginada de clientes */}
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle>Selecionar Cliente</CardTitle>
-              <CardDescription>Busque e selecione um cliente</CardDescription>
+              <CardDescription>
+                {totalCount > 0 ? `${totalCount.toLocaleString("pt-BR")} clientes` : "Busque e selecione um cliente"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-4">
+              <div className="mb-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
-                  <Input placeholder="Buscar cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Nome, telefone, CPF ou CNPJ..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
               </div>
 
-              <div className="max-h-[600px] space-y-2 overflow-y-auto">
-                {filteredClientes.length === 0 ? (
+              <div className="max-h-[520px] space-y-2 overflow-y-auto">
+                {isLoadingClientes ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">Carregando...</p>
+                ) : clientes.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">Nenhum cliente encontrado</p>
                 ) : (
-                  filteredClientes.map((cliente) => (
+                  clientes.map((cliente) => (
                     <div
                       key={cliente.id}
                       onClick={() => setSelectedCliente(cliente)}
-                      className={`cursor-pointer rounded-lg border p-4 transition-all hover:shadow-md ${
+                      className={`cursor-pointer rounded-lg border p-3 transition-all hover:shadow-md ${
                         selectedCliente?.id === cliente.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                       }`}
                     >
-                      <h3 className="font-semibold text-foreground">{cliente.nome}</h3>
-                      <p className="text-sm text-muted-foreground">{cliente.empresa}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{cliente.telefone}</p>
+                      <h3 className="font-semibold text-foreground text-sm">{cliente.nome}</h3>
+                      {cliente.empresa && cliente.empresa !== cliente.nome && (
+                        <p className="text-xs text-muted-foreground">{cliente.empresa}</p>
+                      )}
+                      <p className="mt-1 text-xs text-muted-foreground">{cliente.telefone || cliente.cpfCnpj}</p>
                     </div>
                   ))
                 )}
               </div>
+
+              {/* Paginação */}
+              {totalPages > 1 && (
+                <div className="mt-3 flex items-center justify-between border-t pt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1 || isLoadingClientes}
+                    className="gap-1 px-2"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Ant.
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {currentPage}/{totalPages}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages || isLoadingClientes}
+                    className="gap-1 px-2"
+                  >
+                    Próx.
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          {/* Painel direito */}
           <div className="space-y-6 lg:col-span-2">
             {!selectedCliente ? (
               <Card>
