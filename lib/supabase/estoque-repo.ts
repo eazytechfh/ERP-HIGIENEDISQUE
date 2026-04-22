@@ -235,7 +235,7 @@ export async function listProdutosSupabase(): Promise<ProdutoSupabaseItem[]> {
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToProduto)
 }
 
@@ -261,7 +261,7 @@ export async function upsertProdutoSupabase(input: ProdutoSupabaseInput): Promis
     .eq("id", saved.id)
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const produto = mapDbToProduto(data)
 
   await safeAuditLogSupabase({
@@ -276,15 +276,10 @@ export async function upsertProdutoSupabase(input: ProdutoSupabaseInput): Promis
 }
 
 export async function deleteProdutoSupabase(id: string): Promise<void> {
-  await assertPermissionSupabase("estoque.delete", "Voce nao possui permissao para excluir produtos.")
-
   const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase
-    .from("produtos")
-    .delete()
-    .eq("id", id)
+  const { error } = await supabase.rpc("soft_delete_produto", { p_id: id })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",
@@ -303,7 +298,7 @@ export async function listFornecedoresSupabase(): Promise<FornecedorSupabaseItem
     .is("deleted_at", null)
     .order("razao_social", { ascending: true })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToFornecedor)
 }
 
@@ -321,7 +316,7 @@ export async function upsertFornecedorSupabase(input: FornecedorSupabaseInput): 
     .select("*")
     .single()
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   const fornecedor = mapDbToFornecedor(data)
 
   await safeAuditLogSupabase({
@@ -336,15 +331,10 @@ export async function upsertFornecedorSupabase(input: FornecedorSupabaseInput): 
 }
 
 export async function deleteFornecedorSupabase(id: string): Promise<void> {
-  await assertPermissionSupabase("estoque.delete", "Voce nao possui permissao para excluir fornecedores.")
-
   const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase
-    .from("fornecedores")
-    .delete()
-    .eq("id", id)
+  const { error } = await supabase.rpc("soft_delete_fornecedor", { p_id: id })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",
@@ -446,7 +436,7 @@ export async function listNotasFiscaisSupabase(): Promise<NotaFiscalHistorico[]>
     .order("data_nf", { ascending: false })
     .order("created_at", { ascending: false })
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToNotaFiscal)
 }
 
@@ -456,7 +446,7 @@ export async function getNotaFiscalArquivoUrl(
 ): Promise<string> {
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 10)
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return data.signedUrl
 }
 
@@ -478,7 +468,7 @@ export async function deleteNotaFiscalSupabase(
     .delete()
     .eq("id", id)
 
-  if (error) throw error
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   await safeAuditLogSupabase({
     action: "delete",

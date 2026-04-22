@@ -97,7 +97,8 @@ export default function NovoContratoPage() {
 
     const loadClientes = async () => {
       try {
-        const rows = await listClientesSupabase()
+        const result = await listClientesSupabase({ pageSize: 9999 })
+        const rows = result.data
         if (!mounted) return
         setClientesCompletos(rows)
         setClientesDisponiveis(rows.map(mapClienteToResumoView))
@@ -450,24 +451,43 @@ export default function NovoContratoPage() {
         ? Math.max(1, (terminoDate.getFullYear() - inicioDate.getFullYear()) * 12 + (terminoDate.getMonth() - inicioDate.getMonth()))
         : "-"
 
-    const templateData = {
-      "NOME DA EMPRESA": "Higiene Disque",
+    const servicosListaFormatada = itensDetalhados
+      .map((item) => {
+        const partes = [item.nome, item.frequencia, item.limites].filter(Boolean)
+        return partes.join(" - ")
+      })
+      .join("\n") || "-"
+
+    const tipoEnderecoFormatado = enderecoPrincipal?.tipoAmbiente || "Local de servico"
+
+    const templateData: Record<string, string> = {
+      // ── Variáveis do template TEMPLATE HIGIENE DISQUE_CONTRATO.docx ──
+      "EMPRESA CONTRATANTE": clienteCompleto.nome,
+      "CNPJ": clienteSelecionado.cpfCnpj || "-",
+      "ENDEREÇO": clienteEndereco,
       "NOME DO CLIENTE": clienteSelecionado.nome,
-      CNPJ: clienteSelecionado.cpfCnpj || "-",
-      "ENDERE?O COMPLETO": clienteEndereco,
+      "Serviços Inclusos no Contrato": servicosListaFormatada,
+      "TIPO ENDEREÇO": tipoEnderecoFormatado,
+      "Data de Inicio": formatarDataBR(dataInicio),
+      "Data de Término/ Renovação": formatarDataBR(dataTermino),
+      "VALOR MENSAL": valorMensalNormalizado || "-",
+      "DIA DE VENCIMENTO": diaVencimento || "-",
+      "Data de Hoje": new Date().toLocaleDateString("pt-BR"),
+      // ── Variáveis legadas / extras ──
+      "NOME DA EMPRESA": "Higiene Disque",
+      "ENDERE\u00C7O COMPLETO": clienteEndereco,
       "NOME DO LOCAL": nomeDoLocal,
-      "ENDERE?O DO LOCAL1": formatarEnderecoLocal(locaisCliente[0]) || "-",
-      "ENDERE?O DO LOCAL2": formatarEnderecoLocal(locaisCliente[1]) || "-",
-      "ENDERE?O DO LOCAL3": formatarEnderecoLocal(locaisCliente[2]) || "-",
-      "ENDERE?O DO LOCAL4": formatarEnderecoLocal(locaisCliente[3]) || "-",
-      "NOME DOS SERVI?OS": itensDetalhados.map((item) => item.nome).join(", ") || "-",
-      "NOME DO SERVI?O 1": nomesServicos[0],
-      "NOME DO SERVI?O 2": nomesServicos[1],
-      "NOME DO SERVI?O 3": nomesServicos[2],
-      "NOME DO SERVI?O 4": nomesServicos[3],
-      "NOME DO SERVI?O 5": nomesServicos[4],
-      "(Especifica??o do servi?o)": especificacaoServico,
-      "PERIODO DO SERVI?O DO SERVI?O": periodoServico,
+      "ENDERE\u00C7O DO LOCAL1": formatarEnderecoLocal(locaisCliente[0]) || "-",
+      "ENDERE\u00C7O DO LOCAL2": formatarEnderecoLocal(locaisCliente[1]) || "-",
+      "ENDERE\u00C7O DO LOCAL3": formatarEnderecoLocal(locaisCliente[2]) || "-",
+      "ENDERE\u00C7O DO LOCAL4": formatarEnderecoLocal(locaisCliente[3]) || "-",
+      "NOME DOS SERVI\u00C7OS": itensDetalhados.map((item) => item.nome).join(", ") || "-",
+      "NOME DO SERVI\u00C7O 1": nomesServicos[0],
+      "NOME DO SERVI\u00C7O 2": nomesServicos[1],
+      "NOME DO SERVI\u00C7O 3": nomesServicos[2],
+      "NOME DO SERVI\u00C7O 4": nomesServicos[3],
+      "NOME DO SERVI\u00C7O 5": nomesServicos[4],
+      "PERIODO DO SERVI\u00C7O": periodoServico,
       "(PERIODO EM MESES)": String(periodoEmMeses),
       "Periodo mensal ou Anual": periodoMensalOuAnual,
       VALOR: valorMensalNormalizado || "-",
@@ -484,16 +504,14 @@ export default function NovoContratoPage() {
       CLIENTE_TELEFONE: clienteSelecionado.telefone || "-",
       CLIENTE_EMAIL: clienteSelecionado.email || "-",
       CLIENTE_ENDERECO: clienteEndereco,
-      SERVICOS_LISTA: itensDetalhados.map((item, index) => `${index + 1}. ${item.nome} (${item.frequencia || "Sem frequencia"})`).join("\n"),
+      SERVICOS_LISTA: servicosListaFormatada,
       VALOR_MENSAL: valorMensalNormalizado,
-      VALOR_EXTENSO: valorMensalNormalizado,
       DIA_VENCIMENTO: diaVencimento || "-",
       REAJUSTE_ANUAL: reajusteAnual || "-",
       MULTA_CONTRATUAL: multaContratual || "-",
       EXIGE_APROVACAO: exigeAprovacao ? "Sim" : "Nao",
       ADICIONAL_DESCRICAO: adicionalDescricao || "-",
       OBSERVACOES_CONTRATUAIS: observacoesContratuais || "-",
-      OBSERVACOES_INTERNAS: observacoesInternas || "-",
       CIDADE_ASSINATURA: enderecoPrincipal?.cidade || "Niteroi",
       DATA_ASSINATURA_EXTENSO: dataAssinaturaExtenso,
       GERADO_EM: new Date().toLocaleDateString("pt-BR"),
