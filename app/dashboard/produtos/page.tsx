@@ -904,11 +904,37 @@ export default function EstoquePage() {
           {/* Visualizar Estoque */}
           <TabsContent value="visualizar" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Itens em Estoque</CardTitle>
-                <CardDescription>
-                  Visualize e gerencie todos os itens cadastrados
-                </CardDescription>
+              <CardHeader className="flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Itens em Estoque</CardTitle>
+                  <CardDescription>
+                    Visualize e gerencie todos os itens cadastrados
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 bg-transparent whitespace-nowrap shrink-0"
+                  onClick={() => {
+                    const cabecalho = ["Nome", "Marca", "Fornecedor", "Categoria", "Estoque Atual", "Unidade", "Estoque Min.", "Status", "Custo Unitario (R$)", "Ativo"]
+                    const linhas = filteredProdutos.map((p) => {
+                      const status = calcularStatus(p.estoqueAtual, p.estoqueMinimo)
+                      return [p.nome, p.marca, p.fornecedor, p.categoria, p.estoqueAtual, p.unidade, p.estoqueMinimo, status, p.custoUnitario.toFixed(2), p.ativo ? "Sim" : "Nao"]
+                        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
+                    })
+                    const csv = [cabecalho.join(","), ...linhas].join("\n")
+                    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement("a")
+                    a.href = url
+                    a.download = `estoque-${new Date().toISOString().slice(0, 10)}.csv`
+                    a.click()
+                    URL.revokeObjectURL(url)
+                  }}
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar Estoque
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="mb-4">
