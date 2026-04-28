@@ -268,6 +268,40 @@ const agendadosStatusConfig = {
   cancelado: { label: "Cancelado", color: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
 }
 
+function isServicoAtrasado(servico: ServicoAgendado): boolean {
+  if (servico.status === "concluido" || servico.status === "cancelado") return false
+  // data no formato DD/MM/YYYY
+  const parts = servico.data.split("/")
+  if (parts.length !== 3) return false
+  const dataServico = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]))
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  return dataServico < hoje
+}
+
+function exportarCSV(servicos: ServicoAgendado[]) {
+  const cabecalho = ["OS", "Cliente", "Servico", "Local", "Data", "Horario", "Tecnico", "Status", "Status OS"]
+  const linhas = servicos.map((s) => [
+    s.osNumber,
+    s.cliente,
+    s.servico,
+    s.local,
+    s.data,
+    s.horario,
+    s.tecnico,
+    isServicoAtrasado(s) ? "Atrasado" : agendadosStatusConfig[s.status]?.label ?? s.status,
+    s.osStatus,
+  ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+  const csv = [cabecalho.join(","), ...linhas].join("\n")
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `servicos-agendados-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 const osStatusConfigMap = {
   gerada: { label: "OS Gerada", variant: "secondary" as const },
   impressa: { label: "OS Impressa", variant: "default" as const },
@@ -467,18 +501,29 @@ function ServicosAgendadosContent({
             <CardTitle>Lista de Servicos</CardTitle>
             <CardDescription>Todos os servicos agendados com suas ordens de servico</CardDescription>
           </div>
-          <div className="w-full md:w-[240px]">
-            <Label className="text-xs text-muted-foreground">Assinatura da OS</Label>
-            <Select value={filtroAssinatura} onValueChange={(value) => setFiltroAssinatura(value as "todos" | "assinadas" | "sem_assinatura")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="assinadas">Somente assinadas</SelectItem>
-                <SelectItem value="sem_assinatura">Sem assinatura</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-full md:w-[240px]">
+              <Label className="text-xs text-muted-foreground">Assinatura da OS</Label>
+              <Select value={filtroAssinatura} onValueChange={(value) => setFiltroAssinatura(value as "todos" | "assinadas" | "sem_assinatura")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="assinadas">Somente assinadas</SelectItem>
+                  <SelectItem value="sem_assinatura">Sem assinatura</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 bg-transparent whitespace-nowrap"
+              onClick={() => exportarCSV(servicosFiltrados)}
+            >
+              <FileText className="h-4 w-4" />
+              Exportar CSV
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -487,11 +532,17 @@ function ServicosAgendadosContent({
               <div key={servico.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-primary">{servico.osNumber}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${agendadosStatusConfig[servico.status].color}`}>
                         {agendadosStatusConfig[servico.status].label}
                       </span>
+                      {isServicoAtrasado(servico) && (
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-600 text-white flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Atrasado
+                        </span>
+                      )}
                       <Badge variant={osStatusConfigMap[servico.osStatus]?.variant || "secondary"}>
                         {osStatusConfigMap[servico.osStatus]?.label || servico.osStatus}
                       </Badge>
