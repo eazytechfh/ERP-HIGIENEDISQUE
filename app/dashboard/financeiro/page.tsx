@@ -339,8 +339,11 @@ function EmissaoSection({
 }: EmissaoSectionProps) {
   const clientesFiltrados = useMemo(() => {
     const term = filterTerm.trim().toLowerCase()
-    if (!term) return clientes
-    return clientes.filter((cliente) =>
+    const unicos = clientes.filter(
+      (c, idx, arr) => arr.findIndex((x) => String(x.id) === String(c.id)) === idx
+    )
+    if (!term) return unicos
+    return unicos.filter((cliente) =>
       [cliente.nome, cliente.email, cliente.telefone, cliente.cnpj, cliente.cpf].join(" ").toLowerCase().includes(term),
     )
   }, [clientes, filterTerm])
@@ -683,9 +686,12 @@ function ClienteSearchInput({
   }, [value, selected?.nome])
 
   const filtered = useMemo(() => {
+    const unicos = clientes.filter(
+      (c, idx, arr) => arr.findIndex((x) => String(x.id) === String(c.id)) === idx
+    )
     const q = query.trim().toLowerCase()
-    if (!q) return clientes
-    return clientes.filter((c) =>
+    if (!q) return unicos
+    return unicos.filter((c) =>
       [c.nome, c.cpf, c.cnpj, c.locais?.[0]?.endereco, c.locais?.[0]?.cidade].join(" ").toLowerCase().includes(q)
     )
   }, [clientes, query])
@@ -1553,7 +1559,11 @@ export default function FinanceiroPage() {
           listFinanceiroDocumentosSupabase(),
         ])
         if (!mounted) return
-        setClientes(clientesResult.data)
+        // Deduplicar clientes por ID (evita duplicatas no banco)
+        const clientesUnicos = clientesResult.data.filter(
+          (c, idx, arr) => arr.findIndex((x) => String(x.id) === String(c.id)) === idx
+        )
+        setClientes(clientesUnicos)
         setContratos(contratosRows)
         setFornecedores(fornecedoresRows)
         setCategorias(categoriasRows)
