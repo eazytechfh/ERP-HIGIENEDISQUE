@@ -133,6 +133,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, AppPermissionKey[]> = {
     "servicos.view",
     "servicos.create",
     "servicos.edit",
+    "servicos.delete",
     "servicos.generate_os",
     "estoque.view",
     "estoque.create",
