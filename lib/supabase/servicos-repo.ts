@@ -211,6 +211,54 @@ export async function deleteServicoSupabase(id: string): Promise<void> {
   })
 }
 
+// ── Tipos de Serviço ────────────────────────────────────────────────────────
+
+export type TipoServico = {
+  id: string
+  nome: string
+  categoria: "pragas" | "reservatorio_potavel" | "outro"
+  ativo: boolean
+}
+
+export async function listTiposServicoSupabase(): Promise<TipoServico[]> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("tipos_servico")
+    .select("id, nome, categoria, ativo")
+    .eq("ativo", true)
+    .order("nome", { ascending: true })
+  if (error) throw new Error(error.message || JSON.stringify(error))
+  return (data || []) as TipoServico[]
+}
+
+export async function upsertTipoServicoSupabase(input: {
+  id?: string
+  nome: string
+  categoria: string
+}): Promise<TipoServico> {
+  await assertPermissionSupabase("servicos.edit", "Voce nao possui permissao para gerenciar tipos de servico.")
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("tipos_servico")
+    .upsert({ id: input.id, nome: input.nome.trim(), categoria: input.categoria, ativo: true })
+    .select("id, nome, categoria, ativo")
+    .single()
+  if (error) throw new Error(error.message || JSON.stringify(error))
+  return data as TipoServico
+}
+
+export async function deleteTipoServicoSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("servicos.edit", "Voce nao possui permissao para excluir tipos de servico.")
+  const supabase = getSupabaseBrowserClient()
+  const { error } = await supabase
+    .from("tipos_servico")
+    .update({ ativo: false })
+    .eq("id", id)
+  if (error) throw new Error(error.message || JSON.stringify(error))
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export async function uploadOSAssinadaServicoSupabase(input: {
   servicoId: string
   clienteId?: string

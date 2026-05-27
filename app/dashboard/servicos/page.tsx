@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { useAccess } from "@/components/access-provider"
 
 import { ErpHeader } from "@/components/erp-header"
 import { Button } from "@/components/ui/button"
@@ -36,7 +37,8 @@ import {
   Clock,
   Truck,
   Printer,
-  Eye
+  Eye,
+  Settings
 } from 'lucide-react'
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
 import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
@@ -52,7 +54,7 @@ import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
 import { listEquipeMembrosSupabase } from "@/lib/supabase/equipe-repo"
 import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
 import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
-import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, type ServicoSupabaseItem } from "@/lib/supabase/servicos-repo"
+import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 
 // Tipos
@@ -622,6 +624,7 @@ export default function ServicosPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const clienteIdParam = searchParams.get("clienteId")
+  const { can } = useAccess()
 
   // Estados principais
   const [activeTab, setActiveTab] = useState("nova-solicitacao")
@@ -640,6 +643,10 @@ export default function ServicosPage() {
   const [produtosData, setProdutosData] = useState<any[]>([])
   const [categoriasFinanceirasReceita, setCategoriasFinanceirasReceita] = useState<FinanceiroCategoriaItem[]>([])
   const [servicosDb, setServicosDb] = useState<ServicoSupabaseItem[]>([])
+  const [tiposServico, setTiposServico] = useState<TipoServico[]>([])
+  const [showTiposDialog, setShowTiposDialog] = useState(false)
+  const [tipoForm, setTipoForm] = useState({ nome: "", categoria: "outro" as TipoServico["categoria"] })
+  const [tipoFormError, setTipoFormError] = useState("")
   const [pageError, setPageError] = useState("")
 
   const loadClientesPaginados = useCallback(async (page: number, search: string) => {
@@ -675,13 +682,14 @@ export default function ServicosPage() {
     let mounted = true
     const loadData = async () => {
       try {
-        const [contratosRows, equipeRows, veiculosRows, produtosRows, servicosRows, categoriasReceitaRows] = await Promise.all([
+        const [contratosRows, equipeRows, veiculosRows, produtosRows, servicosRows, categoriasReceitaRows, tiposRows] = await Promise.all([
           listContratosSupabase(),
           listEquipeMembrosSupabase(),
           listVeiculosSupabase(),
           listProdutosSupabase(),
           listServicosSupabase(),
           listFinanceiroCategoriasSupabase("receita"),
+          listTiposServicoSupabase(),
         ])
 
         if (!mounted) return
@@ -715,6 +723,7 @@ export default function ServicosPage() {
         setProdutosData(produtosRows)
         setCategoriasFinanceirasReceita(categoriasReceitaRows.filter((item) => item.ativo))
         setServicosDb(servicosRows)
+        setTiposServico(tiposRows)
         setPageError("")
       } catch (error) {
         console.error("Falha ao carregar dados para servicos", error)
@@ -1807,6 +1816,38 @@ const handleConfirmarAgendamentoFinal = async () => {
 
   const temEquipeCaminhao = serviceRequest.schedule.teamIds.some((teamId) => equipesData.find((e) => e.id === teamId)?.tipo === "equipe_caminhao")
   const mostrarVeiculo = serviceRequest.serviceType === "esgotamento" || temEquipeCaminhao
+
+  const getTipoNome = (serviceType: string): string => {
+    if (!serviceType) return "-"
+    if (serviceType.startsWith("outro_")) {
+      const id = serviceType.replace("outro_", "")
+      const tipo = tiposServico.find((t) => t.id === id)
+      return tipo?.nome || "Outro"
+    }
+    const tipo = tiposServico.find((t) => t.categoria === serviceType)
+    return tipo?.nome || serviceType
+  }
+
+  const handleSalvarTipo = async () => {
+    if (!tipoForm.nome.trim()) { setTipoFormError("Informe o nome do tipo."); return }
+    setTipoFormError("")
+    try {
+      const salvo = await upsertTipoServicoSupabase({ nome: tipoForm.nome, categoria: tipoForm.categoria })
+      setTiposServico((prev) => [...prev.filter((t) => t.id !== salvo.id), salvo].sort((a, b) => a.nome.localeCompare(b.nome)))
+      setTipoForm({ nome: "", categoria: "outro" })
+    } catch (err) {
+      setTipoFormError(err instanceof Error ? err.message : "Erro ao salvar tipo.")
+    }
+  }
+
+  const handleExcluirTipo = async (id: string) => {
+    try {
+      await deleteTipoServicoSupabase(id)
+      setTiposServico((prev) => prev.filter((t) => t.id !== id))
+    } catch (err) {
+      setTipoFormError(err instanceof Error ? err.message : "Erro ao excluir tipo.")
+    }
+  }
   const equipesSelecionadas = equipesData.filter((e) => serviceRequest.schedule.teamIds.includes(e.id))
   const nomesResponsaveisSelecionados = equipesSelecionadas.map((e) => e.nome)
   const veiculoSelecionado = veiculosData.find((v) => v.id === serviceRequest.schedule.vehicleId)
@@ -1979,7 +2020,19 @@ const handleConfirmarAgendamentoFinal = async () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="serviceType">Tipo de Serviço *</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="serviceType">Tipo de Serviço *</Label>
+                        {can("servicos.edit") && (
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowTiposDialog(true)}
+                          >
+                            <Settings className="h-3 w-3" />
+                            Gerenciar tipos
+                          </button>
+                        )}
+                      </div>
                       <Select
                         value={serviceRequest.serviceType}
                         onValueChange={(value) => handleInputChange("serviceType", value)}
@@ -1988,11 +2041,11 @@ const handleConfirmarAgendamentoFinal = async () => {
                           <SelectValue placeholder="Selecione o tipo" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pragas">Controle de Pragas</SelectItem>
-                          <SelectItem value="reservatorio_potavel">Limpeza de Reservatório (Potável)</SelectItem>
-                          <SelectItem value="esgotamento">Esgotamento / Reservatório de Água Usada</SelectItem>
-                          <SelectItem value="desentupimento">Desentupimento</SelectItem>
-                          <SelectItem value="outro">Outro</SelectItem>
+                          {tiposServico.map((tipo) => (
+                            <SelectItem key={tipo.id} value={tipo.categoria === "outro" ? `outro_${tipo.id}` : tipo.categoria}>
+                              {tipo.nome}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       {errors.serviceType && <p className="text-sm text-destructive">{errors.serviceType}</p>}
@@ -2548,14 +2601,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Tipo de Serviço</p>
-                      <p className="font-medium">
-                        {serviceRequest.serviceType === "pragas" && "Controle de Pragas"}
-                        {serviceRequest.serviceType === "reservatorio_potavel" && "Limpeza de Reservatório"}
-                        {serviceRequest.serviceType === "esgotamento" && "Esgotamento"}
-                        {serviceRequest.serviceType === "desentupimento" && "Desentupimento"}
-                        {serviceRequest.serviceType === "outro" && "Outro"}
-                        {!serviceRequest.serviceType && "-"}
-                      </p>
+                      <p className="font-medium">{getTipoNome(serviceRequest.serviceType)}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Data/Horário</p>
@@ -2614,12 +2660,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   </h3>
                   <div className="space-y-2 text-sm p-4 bg-muted/50 rounded-lg">
                     <p><span className="text-muted-foreground">Serviço:</span> {serviceRequest.serviceName}</p>
-                    <p><span className="text-muted-foreground">Tipo:</span> {
-                      serviceRequest.serviceType === "pragas" ? "Controle de Pragas" :
-                      serviceRequest.serviceType === "reservatorio_potavel" ? "Limpeza de Reservatório (Potável)" :
-                      serviceRequest.serviceType === "esgotamento" ? "Esgotamento" :
-                      serviceRequest.serviceType === "desentupimento" ? "Desentupimento" : "Outro"
-                    }</p>
+                    <p><span className="text-muted-foreground">Tipo:</span> {getTipoNome(serviceRequest.serviceType)}</p>
                     <p><span className="text-muted-foreground">Local:</span> {localSelecionado?.nome}</p>
                     {serviceRequest.warrantyDays && (
                       <p><span className="text-muted-foreground">Garantia:</span> {serviceRequest.warrantyDays} dias</p>
@@ -2794,12 +2835,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                     )}
                     <div className="flex justify-between py-2 border-b">
                       <span className="text-muted-foreground">Tipo de Serviço</span>
-                      <span className="font-medium">
-                        {serviceRequest.serviceType === "pragas" ? "Controle de Pragas" :
-                         serviceRequest.serviceType === "reservatorio_potavel" ? "Limpeza de Reservatório" :
-                         serviceRequest.serviceType === "esgotamento" ? "Esgotamento" :
-                         serviceRequest.serviceType === "desentupimento" ? "Desentupimento" : "Outro"}
-                      </span>
+                      <span className="font-medium">{getTipoNome(serviceRequest.serviceType)}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b">
                       <span className="text-muted-foreground">Nome do Serviço</span>
@@ -3376,6 +3412,84 @@ const handleConfirmarAgendamentoFinal = async () => {
             </Button>
             <Button variant="destructive" onClick={handleConfirmarCancelamento}>
               Confirmar cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Gerenciar Tipos de Serviço */}
+      <Dialog open={showTiposDialog} onOpenChange={setShowTiposDialog}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Tipos de Serviço</DialogTitle>
+            <DialogDescription>
+              Gerencie os tipos de serviço disponíveis para agendamento.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {tiposServico.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhum tipo cadastrado.</p>
+              )}
+              {tiposServico.map((tipo) => (
+                <div key={tipo.id} className="flex items-center justify-between gap-2 p-2 border rounded-md bg-muted/30">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{tipo.nome}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {tipo.categoria === "pragas" ? "Controle de Pragas" :
+                       tipo.categoria === "reservatorio_potavel" ? "Reservatório Potável" : "Outro"}
+                    </p>
+                  </div>
+                  {can("servicos.edit") && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                      onClick={() => handleExcluirTipo(tipo.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {can("servicos.edit") && (
+              <div className="border-t pt-4 space-y-3">
+                <p className="text-sm font-medium">Adicionar novo tipo</p>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Nome do tipo (ex: Higienização de Ar-Condicionado)"
+                    value={tipoForm.nome}
+                    onChange={(e) => setTipoForm((prev) => ({ ...prev, nome: e.target.value }))}
+                  />
+                  <Select
+                    value={tipoForm.categoria}
+                    onValueChange={(v) => setTipoForm((prev) => ({ ...prev, categoria: v as TipoServico["categoria"] }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pragas">Controle de Pragas</SelectItem>
+                      <SelectItem value="reservatorio_potavel">Reservatório Potável</SelectItem>
+                      <SelectItem value="outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {tipoFormError && <p className="text-sm text-destructive">{tipoFormError}</p>}
+                <Button className="w-full" onClick={handleSalvarTipo}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar tipo
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTiposDialog(false)} className="bg-transparent">
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>
