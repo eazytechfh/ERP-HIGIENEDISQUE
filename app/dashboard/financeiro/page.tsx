@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { differenceInDays, format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import {
@@ -20,11 +20,13 @@ import {
   LayoutDashboard,
   List,
   PlusCircle,
+  Loader2,
   Receipt,
   Search,
   Tag,
   Trash2,
   Wallet,
+  X,
 } from "lucide-react"
 import {
   Area,
@@ -316,8 +318,6 @@ type EmissaoSectionProps = {
   contratos: ContratoSupabaseItem[]
   categorias: FinanceiroCategoriaItem[]
   documentos: FinanceiroDocumentoItem[]
-  filterTerm: string
-  setFilterTerm: React.Dispatch<React.SetStateAction<string>>
   onEmitir: () => void
   onDelete: (id: string) => void
 }
@@ -332,21 +332,66 @@ function EmissaoSection({
   contratos,
   categorias,
   documentos,
-  filterTerm,
-  setFilterTerm,
   onEmitir,
   onDelete,
 }: EmissaoSectionProps) {
-  const clientesFiltrados = useMemo(() => {
-    const term = filterTerm.trim().toLowerCase()
-    const unicos = clientes.filter(
-      (c, idx, arr) => arr.findIndex((x) => String(x.id) === String(c.id)) === idx
-    )
-    if (!term) return unicos
-    return unicos.filter((cliente) =>
-      [cliente.nome, cliente.email, cliente.telefone, cliente.cnpj, cliente.cpf].join(" ").toLowerCase().includes(term),
-    )
-  }, [clientes, filterTerm])
+  const [clienteSearch, setClienteSearch] = useState("")
+  const [clienteResults, setClienteResults] = useState<ClienteInput[]>([])
+  const [clienteSearching, setClienteSearching] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [selectedCliente, setSelectedCliente] = useState<{ id: string; nome: string } | null>(() => {
+    if (!form.clienteId) return null
+    const found = clientes.find((c) => String(c.id) === form.clienteId)
+    return found ? { id: String(found.id), nome: found.nome } : null
+  })
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  useEffect(() => {
+    const term = clienteSearch.trim()
+    if (term.length < 2) {
+      setClienteResults([])
+      setShowDropdown(false)
+      return
+    }
+    const timer = setTimeout(async () => {
+      setClienteSearching(true)
+      try {
+        const result = await listClientesSupabase({ pageSize: 8, search: term })
+        setClienteResults(result.data || [])
+        setShowDropdown(true)
+      } finally {
+        setClienteSearching(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [clienteSearch])
+
+  const handleSelectCliente = (cliente: ClienteInput) => {
+    const id = String(cliente.id)
+    setSelectedCliente({ id, nome: cliente.nome })
+    setClienteSearch("")
+    setShowDropdown(false)
+    setForm((prev) => ({
+      ...prev,
+      clienteId: id,
+      contratoId: getContratoAtual(contratos, id)?.id || "",
+    }))
+  }
+
+  const handleClearCliente = () => {
+    setSelectedCliente(null)
+    setForm((prev) => ({ ...prev, clienteId: "", contratoId: "" }))
+  }
 
   const contratoAtual = getContratoAtual(contratos, form.clienteId)
   const contratosCliente = contratos.filter((contrato) => contrato.clienteId === form.clienteId && contrato.status === "ativo")
@@ -371,73 +416,54 @@ function EmissaoSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
-        <Card className="h-fit">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Clientes</CardTitle>
-            <CardDescription>Selecione para emitir</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="relative">
-              <Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
-              <Input className="pl-9 h-9 text-sm" placeholder="Buscar cliente..." value={filterTerm} onChange={(e) => setFilterTerm(e.target.value)} />
-            </div>
-            <div className="space-y-1.5 max-h-[460px] overflow-auto pr-1">
-              {clientesFiltrados.map((cliente) => (
-                <button
-                  key={String(cliente.id)}
-                  type="button"
-                  className={`w-full rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
-                    form.clienteId === String(cliente.id)
-                      ? "border-primary bg-primary/5 text-primary font-medium"
-                      : "hover:bg-muted/50 border-transparent"
-                  }`}
-                  onClick={() =>
-                    setForm((prev) => ({
-                      ...prev,
-                      clienteId: String(cliente.id),
-                      contratoId: getContratoAtual(contratos, String(cliente.id))?.id || "",
-                    }))
-                  }
-                >
-                  <p className="font-medium leading-tight">{cliente.nome}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{cliente.email || cliente.telefone || "Sem contato"}</p>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-base">{tipo === "boleto" ? "Dados do Boleto" : "Dados da Nota Fiscal"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-2" ref={dropdownRef}>
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cliente</Label>
-                <Select
-                  value={form.clienteId || "__none__"}
-                  onValueChange={(value) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      clienteId: value === "__none__" ? "" : value,
-                      contratoId: value === "__none__" ? "" : getContratoAtual(contratos, value)?.id || "",
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Selecione</SelectItem>
-                    {clientes.map((cliente) => (
-                      <SelectItem key={String(cliente.id)} value={String(cliente.id)}>
-                        {cliente.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {selectedCliente ? (
+                  <div className="flex items-center gap-2 rounded-md border px-3 py-2 bg-primary/5 border-primary/30">
+                    <span className="flex-1 text-sm font-medium text-primary">{selectedCliente.nome}</span>
+                    <button type="button" onClick={handleClearCliente} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="h-4 w-4 absolute left-3 top-2.5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      className="pl-9 pr-9"
+                      placeholder="Digite o nome do cliente..."
+                      value={clienteSearch}
+                      onChange={(e) => setClienteSearch(e.target.value)}
+                      autoComplete="off"
+                    />
+                    {clienteSearching && (
+                      <Loader2 className="h-4 w-4 absolute right-3 top-2.5 animate-spin text-muted-foreground" />
+                    )}
+                    {showDropdown && (
+                      <div className="absolute z-20 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                        {clienteResults.length > 0 ? clienteResults.map((cliente) => (
+                          <button
+                            key={String(cliente.id)}
+                            type="button"
+                            className="w-full px-3 py-2.5 text-left text-sm hover:bg-muted/60 flex flex-col border-b last:border-0"
+                            onMouseDown={(e) => { e.preventDefault(); handleSelectCliente(cliente) }}
+                          >
+                            <span className="font-medium">{cliente.nome}</span>
+                            <span className="text-xs text-muted-foreground">{cliente.email || cliente.telefone || ""}</span>
+                          </button>
+                        )) : (
+                          <p className="px-3 py-2.5 text-sm text-muted-foreground">Nenhum cliente encontrado</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contrato vinculado</Label>
@@ -1539,8 +1565,6 @@ export default function FinanceiroPage() {
   const [documentos, setDocumentos] = useState<FinanceiroDocumentoItem[]>([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState("")
-  const [clienteFilterBoleto, setClienteFilterBoleto] = useState("")
-  const [clienteFilterNf, setClienteFilterNf] = useState("")
   const [boletoForm, setBoletoForm] = useState<DocumentoEmitirForm>(buildDocumentoInitialForm)
   const [nfForm, setNfForm] = useState<DocumentoEmitirForm>(buildDocumentoInitialForm)
   const [fluxoForm, setFluxoForm] = useState<FluxoForm>(buildFluxoInitialForm)
@@ -1551,7 +1575,7 @@ export default function FinanceiroPage() {
     const loadData = async () => {
       try {
         const [clientesResult, contratosRows, fornecedoresRows, categoriasRows, lancamentosRows, documentosRows] = await Promise.all([
-          listClientesSupabase({ pageSize: 9999 }),
+          listClientesSupabase({ pageSize: 100 }),
           listContratosSupabase(),
           listFornecedoresSupabase(),
           listFinanceiroCategoriasSupabase(),
@@ -2133,8 +2157,6 @@ export default function FinanceiroPage() {
               contratos={contratos}
               categorias={categoriasReceita}
               documentos={boletos}
-              filterTerm={clienteFilterBoleto}
-              setFilterTerm={setClienteFilterBoleto}
               onEmitir={() => void emitDocument("boleto", boletoForm)}
               onDelete={(id) => void handleExcluirDocumento(id)}
             />
@@ -2151,8 +2173,6 @@ export default function FinanceiroPage() {
               contratos={contratos}
               categorias={categoriasReceita}
               documentos={notasFiscais}
-              filterTerm={clienteFilterNf}
-              setFilterTerm={setClienteFilterNf}
               onEmitir={() => void emitDocument("nota_fiscal", nfForm)}
               onDelete={(id) => void handleExcluirDocumento(id)}
             />
