@@ -154,8 +154,10 @@ export async function upsertEquipeMembroSupabase(input: EquipeMembroInput): Prom
 }
 
 export async function deleteEquipeMembroSupabase(id: string): Promise<void> {
+  await assertPermissionSupabase("equipe.delete", "Voce nao possui permissao para excluir membros da equipe.")
+
   const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase.rpc("soft_delete_equipe_membro", { p_id: id })
+  const { error } = await supabase.from("equipe_membros").delete().eq("id", id)
 
   if (error) throw new Error(error.message || error.code || JSON.stringify(error))
 
