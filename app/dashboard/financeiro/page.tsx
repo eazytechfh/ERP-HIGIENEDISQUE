@@ -144,7 +144,10 @@ function getErrorMessage(error: unknown): string {
 }
 
 function toNumber(value: string) {
-  return Number(String(value || "0").replace(/[^\d,.-]/g, "").replace(",", ".")) || 0
+  const s = String(value || "0").replace(/[^\d,.-]/g, "")
+  // Formato BR (vírgula = decimal, ponto = milhar): "2.000,50" → 2000.5
+  if (s.includes(",")) return Number(s.replace(/\./g, "").replace(",", ".")) || 0
+  return Number(s) || 0
 }
 
 function todayIso() {

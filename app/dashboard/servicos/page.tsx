@@ -1828,7 +1828,7 @@ const handleConfirmarAgendamentoFinal = async () => {
       billingMode: serviceRequest.billing.mode,
       contractId: serviceRequest.billing.contractId,
       contractItemId: serviceRequest.billing.contractItemId,
-      billingValue: Number(String(serviceRequest.billing.price || "0").replace(",", ".")) || 0,
+      billingValue: Number(String(serviceRequest.billing.price || "0").replace(/\./g, "").replace(",", ".")) || 0,
       paymentMethod: serviceRequest.billing.paymentMethod,
       billingDocument: serviceRequest.billing.mode === "adicional"
         ? serviceRequest.billing.billingDocument === "nota_fiscal"
