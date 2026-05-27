@@ -252,7 +252,7 @@ export async function deleteTipoServicoSupabase(id: string): Promise<void> {
   const supabase = getSupabaseBrowserClient()
   const { error } = await supabase
     .from("tipos_servico")
-    .update({ ativo: false })
+    .delete()
     .eq("id", id)
   if (error) throw new Error(error.message || JSON.stringify(error))
 }
