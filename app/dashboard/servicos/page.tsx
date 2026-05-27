@@ -448,14 +448,19 @@ function ServicosAgendadosContent({
 }) {
   const [filtroAssinatura, setFiltroAssinatura] = useState<"todos" | "assinadas" | "sem_assinatura">("todos")
 
-  const osAssinada = (servico: ServicoAgendado) =>
-    typeof servico.osFoiAssinada === "boolean" ? servico.osFoiAssinada : servico.osStatus === "assinada_digitalizada"
+  const osAssinada = useCallback((servico: ServicoAgendado) =>
+    typeof servico.osFoiAssinada === "boolean" ? servico.osFoiAssinada : servico.osStatus === "assinada_digitalizada",
+    []
+  )
 
-  const servicosFiltrados = servicos.filter((servico) => {
-    if (filtroAssinatura === "assinadas") return osAssinada(servico)
-    if (filtroAssinatura === "sem_assinatura") return !osAssinada(servico)
-    return true
-  })
+  const servicosFiltrados = useMemo(() =>
+    servicos.filter((servico) => {
+      if (filtroAssinatura === "assinadas") return osAssinada(servico)
+      if (filtroAssinatura === "sem_assinatura") return !osAssinada(servico)
+      return true
+    }),
+    [servicos, filtroAssinatura, osAssinada]
+  )
 
   return (
     <div className="space-y-6">

@@ -72,6 +72,7 @@ export async function listContratosSupabase(): Promise<ContratoSupabaseItem[]> {
     .select("*, contrato_itens(*)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
+    .limit(200)
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToContrato)

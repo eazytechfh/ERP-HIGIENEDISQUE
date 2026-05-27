@@ -152,6 +152,7 @@ export async function listServicosSupabase(): Promise<ServicoSupabaseItem[]> {
     .select("*")
     .is("deleted_at", null)
     .order("data", { ascending: false })
+    .limit(300)
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToServico)

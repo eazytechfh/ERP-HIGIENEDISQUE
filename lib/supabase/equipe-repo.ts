@@ -75,6 +75,7 @@ export async function listEquipeMembrosSupabase(): Promise<EquipeMembroInput[]> 
     .select("*")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
+    .limit(100)
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 

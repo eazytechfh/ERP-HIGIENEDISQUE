@@ -234,6 +234,7 @@ export async function listProdutosSupabase(): Promise<ProdutoSupabaseItem[]> {
     .select("*, fornecedores(id, razao_social)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
+    .limit(300)
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToProduto)

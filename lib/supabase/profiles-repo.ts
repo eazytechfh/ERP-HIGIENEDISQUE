@@ -14,6 +14,8 @@ export type UserAccessProfile = {
 }
 
 let cachedProfile: UserAccessProfile | null = null
+let cacheExpiresAt: number = 0
+const CACHE_TTL_MS = 30 * 60 * 1000
 
 function mapProfile(row: any): UserAccessProfile {
   const role = (row.role || "operacional") as AppRole
@@ -60,11 +62,15 @@ async function bootstrapCurrentProfile(): Promise<UserAccessProfile | null> {
 }
 
 export function getCachedCurrentProfile(): UserAccessProfile | null {
+  if (cachedProfile && Date.now() > cacheExpiresAt) {
+    cachedProfile = null
+  }
   return cachedProfile
 }
 
 export function setCachedCurrentProfile(profile: UserAccessProfile | null) {
   cachedProfile = profile
+  cacheExpiresAt = profile ? Date.now() + CACHE_TTL_MS : 0
 }
 
 export function buildLocalAdminProfile(): UserAccessProfile {
@@ -84,7 +90,7 @@ export async function getCurrentUserAccessProfileSupabase(force = false): Promis
     return localProfile
   }
 
-  if (cachedProfile && !force) return cachedProfile
+  if (getCachedCurrentProfile() && !force) return cachedProfile
 
   const supabase = getSupabaseBrowserClient()
   const { data: authData, error: authError } = await withTimeout(

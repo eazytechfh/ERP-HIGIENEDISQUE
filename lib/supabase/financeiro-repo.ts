@@ -343,6 +343,7 @@ export async function listFinanceiroLancamentosSupabase(): Promise<FinanceiroLan
     .is("deleted_at", null)
     .order("data_vencimento", { ascending: true })
     .order("created_at", { ascending: false })
+    .limit(500)
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToLancamento)
@@ -413,6 +414,7 @@ export async function listFinanceiroDocumentosSupabase(tipo?: FinanceiroDocument
     .is("deleted_at", null)
     .order("data_emissao", { ascending: false })
     .order("created_at", { ascending: false })
+    .limit(300)
 
   if (tipo) {
     query = query.eq("tipo", tipo)
