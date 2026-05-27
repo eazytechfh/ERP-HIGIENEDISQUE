@@ -2424,22 +2424,6 @@ const handleConfirmarAgendamentoFinal = async () => {
                                   </Select>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <label className="flex items-center gap-3 rounded-lg border p-3">
-                                    <Checkbox
-                                      checked={serviceRequest.billing.notifyEmail || false}
-                                      onCheckedChange={(checked) => handleBillingChange("notifyEmail", checked === true)}
-                                    />
-                                    <span className="text-sm">Notificar por email</span>
-                                  </label>
-                                  <label className="flex items-center gap-3 rounded-lg border p-3">
-                                    <Checkbox
-                                      checked={serviceRequest.billing.notifyWhatsapp || false}
-                                      onCheckedChange={(checked) => handleBillingChange("notifyWhatsapp", checked === true)}
-                                    />
-                                    <span className="text-sm">Notificar por WhatsApp</span>
-                                  </label>
-                                </div>
                               </>
                             ) : null}
                           </button>
