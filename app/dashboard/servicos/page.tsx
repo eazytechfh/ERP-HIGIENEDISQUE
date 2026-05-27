@@ -1503,7 +1503,7 @@ export default function ServicosPage() {
       osAssinadaStoragePath?: string
       osAssinadaTamanho?: number
     },
-  ) => {
+  ): Promise<{ financeiroErro?: string }> => {
     const saved = await upsertServicoSupabase({
       id: servico.id,
       osNumber: servico.osNumber,
@@ -1544,10 +1544,7 @@ export default function ServicosPage() {
 
     if (servico.registerRevenueInCashFlow && saved.cobrancaModo === "adicional") {
       if (saved.valorCobranca <= 0) {
-        setToastMessage("Serviço salvo. Atenção: receita não registrada no financeiro pois o valor é R$ 0,00.")
-        setShowToast(true)
-        setTimeout(() => setShowToast(false), 4000)
-        return
+        return { financeiroErro: "valor informado é R$ 0,00 — informe o valor do serviço para registrar no financeiro" }
       }
       try {
         await upsertReceitaServicoSupabase({
@@ -1565,12 +1562,11 @@ export default function ServicosPage() {
           observacoes: saved.motivoAdicional || undefined,
         })
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Erro desconhecido"
-        setToastMessage(`Serviço salvo, mas falha ao registrar no financeiro: ${msg}`)
-        setShowToast(true)
-        setTimeout(() => setShowToast(false), 6000)
+        return { financeiroErro: err instanceof Error ? err.message : "erro desconhecido ao registrar no financeiro" }
       }
     }
+
+    return {}
   }
 
   const handleAtualizarStatusAgendada = async (id: string, status: StatusAgendado) => {
@@ -1850,10 +1846,14 @@ const handleConfirmarAgendamentoFinal = async () => {
     }
     try {
       setPageError("")
-      await persistServicoAgendado(novoServico)
+      const { financeiroErro } = await persistServicoAgendado(novoServico)
 
-      // Aviso nao bloqueante se for Vetores e nao houver consumo registrado
-      if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
+      if (financeiroErro) {
+        setPageError(`Serviço salvo! Mas a receita NÃO foi registrada no financeiro: ${financeiroErro}`)
+        setToastMessage("Serviço salvo. Verifique o aviso sobre o financeiro acima.")
+        setShowToast(true)
+        setTimeout(() => { setShowToast(false); setActiveTab("agendados") }, 4000)
+      } else if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
         setToastMessage("Aviso: Voce ainda nao registrou consumo de produtos. Isso pode ser preenchido apos a execucao.")
         setShowToast(true)
         setTimeout(() => {
