@@ -449,6 +449,9 @@ function ServicosAgendadosContent({
   onExcluirOS: (id: string) => void
 }) {
   const [filtroAssinatura, setFiltroAssinatura] = useState<"todos" | "assinadas" | "sem_assinatura">("todos")
+  const [filtroStatus, setFiltroStatus] = useState<"todos" | StatusAgendado>("todos")
+  const [filtroDataInicio, setFiltroDataInicio] = useState("")
+  const [filtroDataFim, setFiltroDataFim] = useState("")
 
   const osAssinada = useCallback((servico: ServicoAgendado) =>
     typeof servico.osFoiAssinada === "boolean" ? servico.osFoiAssinada : servico.osStatus === "assinada_digitalizada",
@@ -457,11 +460,21 @@ function ServicosAgendadosContent({
 
   const servicosFiltrados = useMemo(() =>
     servicos.filter((servico) => {
-      if (filtroAssinatura === "assinadas") return osAssinada(servico)
-      if (filtroAssinatura === "sem_assinatura") return !osAssinada(servico)
+      if (filtroAssinatura === "assinadas" && !osAssinada(servico)) return false
+      if (filtroAssinatura === "sem_assinatura" && osAssinada(servico)) return false
+      if (filtroStatus !== "todos" && servico.status !== filtroStatus) return false
+      if (filtroDataInicio || filtroDataFim) {
+        // data exibida em DD/MM/YYYY — converte para YYYY-MM-DD para comparar
+        const parts = servico.data.split("/")
+        const isoData = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : ""
+        if (isoData) {
+          if (filtroDataInicio && isoData < filtroDataInicio) return false
+          if (filtroDataFim && isoData > filtroDataFim) return false
+        }
+      }
       return true
     }),
-    [servicos, filtroAssinatura, osAssinada]
+    [servicos, filtroAssinatura, filtroStatus, filtroDataInicio, filtroDataFim, osAssinada]
   )
 
   return (
@@ -509,7 +522,53 @@ function ServicosAgendadosContent({
             <CardDescription>Todos os servicos agendados com suas ordens de servico</CardDescription>
           </div>
           <div className="flex flex-wrap items-end gap-3">
-            <div className="w-full md:w-[240px]">
+            <div className="w-full md:w-[180px]">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select value={filtroStatus} onValueChange={(value) => setFiltroStatus(value as "todos" | StatusAgendado)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="agendado">Agendado</SelectItem>
+                  <SelectItem value="em_execucao">Em execução</SelectItem>
+                  <SelectItem value="concluido">Concluído</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">Data início</Label>
+                <input
+                  type="date"
+                  value={filtroDataInicio}
+                  onChange={(e) => setFiltroDataInicio(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Data fim</Label>
+                <input
+                  type="date"
+                  value={filtroDataFim}
+                  onChange={(e) => setFiltroDataFim(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              {(filtroDataInicio || filtroDataFim) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={() => { setFiltroDataInicio(""); setFiltroDataFim("") }}
+                  title="Limpar período"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <div className="w-full md:w-[180px]">
               <Label className="text-xs text-muted-foreground">Assinatura da OS</Label>
               <Select value={filtroAssinatura} onValueChange={(value) => setFiltroAssinatura(value as "todos" | "assinadas" | "sem_assinatura")}>
                 <SelectTrigger>
