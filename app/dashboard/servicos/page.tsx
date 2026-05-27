@@ -1542,23 +1542,34 @@ export default function ServicosPage() {
       return next
     })
 
-    if (servico.registerRevenueInCashFlow && saved.cobrancaModo === "adicional" && saved.valorCobranca > 0) {
-      await upsertReceitaServicoSupabase({
-        servicoId: saved.id,
-        clienteId: saved.clienteId || undefined,
-        contratoId: saved.contratoId || undefined,
-        categoriaId: servico.revenueCategoryId,
-        categoria: categoriasFinanceirasReceita.find((item) => item.id === servico.revenueCategoryId)?.nome,
-        descricao: `${saved.servico} - ${saved.cliente}`,
-        valor: saved.valorCobranca,
-        dataCompetencia: saved.data,
-        dataVencimento: saved.data,
-        formaPagamento: saved.formaPagamento || undefined,
-        documentoTipo: saved.tipoDocumentoCobranca || undefined,
-        notificacaoEmail: servico.notifyEmail,
-        notificacaoWhatsapp: servico.notifyWhatsapp,
-        observacoes: saved.motivoAdicional || undefined,
-      })
+    if (servico.registerRevenueInCashFlow && saved.cobrancaModo === "adicional") {
+      if (saved.valorCobranca <= 0) {
+        setToastMessage("Serviço salvo. Atenção: receita não registrada no financeiro pois o valor é R$ 0,00.")
+        setShowToast(true)
+        setTimeout(() => setShowToast(false), 4000)
+        return
+      }
+      try {
+        await upsertReceitaServicoSupabase({
+          servicoId: saved.id,
+          clienteId: saved.clienteId || undefined,
+          contratoId: saved.contratoId || undefined,
+          categoriaId: servico.revenueCategoryId,
+          categoria: categoriasFinanceirasReceita.find((item) => item.id === servico.revenueCategoryId)?.nome,
+          descricao: `${saved.servico} - ${saved.cliente}`,
+          valor: saved.valorCobranca,
+          dataCompetencia: saved.data,
+          dataVencimento: saved.data,
+          formaPagamento: saved.formaPagamento || undefined,
+          documentoTipo: saved.tipoDocumentoCobranca || undefined,
+          observacoes: saved.motivoAdicional || undefined,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erro desconhecido"
+        setToastMessage(`Serviço salvo, mas falha ao registrar no financeiro: ${msg}`)
+        setShowToast(true)
+        setTimeout(() => setShowToast(false), 6000)
+      }
     }
   }
 

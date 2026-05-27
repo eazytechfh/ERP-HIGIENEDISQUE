@@ -199,7 +199,7 @@ function mapLancamentoToDb(input: FinanceiroLancamentoInput) {
     status: input.status,
     origem: input.origem || "manual",
     descricao: input.descricao,
-    // categoria_id adicionado na migration 009 — omitido enquanto nao aplicada
+    categoria_id: input.categoriaId || null,
     categoria: input.categoria || null,
     valor: input.valor,
     data_competencia: input.dataCompetencia,
@@ -212,8 +212,8 @@ function mapLancamentoToDb(input: FinanceiroLancamentoInput) {
     forma_pagamento: input.formaPagamento || null,
     documento_tipo: input.documentoTipo || null,
     documento_numero: input.documentoNumero || null,
-    // notificacao_email, notificacao_whatsapp, api_integracao_status, api_integracao_referencia
-    // adicionados na migration 009 — omitidos enquanto nao aplicada
+    notificacao_email: Boolean(input.notificacaoEmail),
+    notificacao_whatsapp: Boolean(input.notificacaoWhatsapp),
     observacoes: input.observacoes || null,
     deleted_at: null,
   }
