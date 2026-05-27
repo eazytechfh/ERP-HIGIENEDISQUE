@@ -2373,15 +2373,32 @@ const handleConfirmarAgendamentoFinal = async () => {
                             {errors["billing.additionalReason"] && <p className="text-sm text-destructive">{errors["billing.additionalReason"]}</p>}
                           </div>
 
-                          <div className="rounded-lg border p-4 space-y-4">
+                          <button
+                            type="button"
+                            onClick={() => handleBillingChange("registerRevenueInCashFlow", !serviceRequest.billing.registerRevenueInCashFlow)}
+                            className={`w-full rounded-lg border-2 p-4 space-y-4 text-left transition-colors ${
+                              serviceRequest.billing.registerRevenueInCashFlow
+                                ? "border-green-500 bg-green-50"
+                                : "border-dashed border-muted-foreground/30 hover:border-muted-foreground/60 hover:bg-muted/30"
+                            }`}
+                          >
                             <div className="flex items-center justify-between gap-4">
-                              <div>
-                                <p className="font-medium">Cadastrar receita no fluxo de caixa?</p>
-                                <p className="text-sm text-muted-foreground">Se marcado, o servico adicional entra automaticamente no financeiro.</p>
+                              <div className="flex items-center gap-3">
+                                <div className={`rounded-lg p-2 ${serviceRequest.billing.registerRevenueInCashFlow ? "bg-green-100" : "bg-muted"}`}>
+                                  <DollarSign className={`h-5 w-5 ${serviceRequest.billing.registerRevenueInCashFlow ? "text-green-600" : "text-muted-foreground"}`} />
+                                </div>
+                                <div>
+                                  <p className={`font-semibold ${serviceRequest.billing.registerRevenueInCashFlow ? "text-green-700" : ""}`}>
+                                    Cadastrar receita no fluxo de caixa?
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">Se marcado, o servico adicional entra automaticamente no financeiro.</p>
+                                </div>
                               </div>
                               <Checkbox
                                 checked={serviceRequest.billing.registerRevenueInCashFlow || false}
                                 onCheckedChange={(checked) => handleBillingChange("registerRevenueInCashFlow", checked === true)}
+                                onClick={(e) => e.stopPropagation()}
+                                className={serviceRequest.billing.registerRevenueInCashFlow ? "border-green-500 data-[state=checked]:bg-green-500" : ""}
                               />
                             </div>
 
@@ -2425,7 +2442,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                                 </div>
                               </>
                             ) : null}
-                          </div>
+                          </button>
 
                           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                             <Label htmlFor="approved" className="font-normal cursor-pointer">
