@@ -363,7 +363,7 @@ export async function upsertFinanceiroLancamentoSupabase(input: FinanceiroLancam
     .select("id")
     .single()
 
-  if (saveError) throw saveError
+  if (saveError) throw new Error((saveError as any).message || (saveError as any).code || JSON.stringify(saveError))
 
   const { data, error } = await supabase
     .from("financeiro_lancamentos")
@@ -507,7 +507,7 @@ export async function upsertReceitaServicoSupabase(input: {
     .is("deleted_at", null)
     .maybeSingle()
 
-  if (existenteError) throw existenteError
+  if (existenteError) throw new Error((existenteError as any).message || (existenteError as any).code || JSON.stringify(existenteError))
 
   return upsertFinanceiroLancamentoSupabase({
     id: existente?.id ? String(existente.id) : undefined,

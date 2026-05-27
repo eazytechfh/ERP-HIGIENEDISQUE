@@ -1542,11 +1542,14 @@ export default function ServicosPage() {
       return next
     })
 
+    console.log("[fin] registerRevenueInCashFlow:", servico.registerRevenueInCashFlow, "| cobrancaModo:", saved.cobrancaModo, "| valor:", saved.valorCobranca)
+
     if (servico.registerRevenueInCashFlow && saved.cobrancaModo === "adicional") {
       if (saved.valorCobranca <= 0) {
         return { financeiroErro: "valor informado é R$ 0,00 — informe o valor do serviço para registrar no financeiro" }
       }
       try {
+        console.log("[fin] criando lancamento para servico", saved.id)
         await upsertReceitaServicoSupabase({
           servicoId: saved.id,
           clienteId: saved.clienteId || undefined,
@@ -1561,8 +1564,11 @@ export default function ServicosPage() {
           documentoTipo: saved.tipoDocumentoCobranca || undefined,
           observacoes: saved.motivoAdicional || undefined,
         })
+        console.log("[fin] lancamento criado com sucesso")
       } catch (err) {
-        return { financeiroErro: err instanceof Error ? err.message : "erro desconhecido ao registrar no financeiro" }
+        console.error("[fin] ERRO ao criar lancamento:", err)
+        const msg = (err as any)?.message || (err as any)?.code || JSON.stringify(err) || "erro desconhecido ao registrar no financeiro"
+        return { financeiroErro: msg }
       }
     }
 
@@ -3018,12 +3024,20 @@ const handleConfirmarAgendamentoFinal = async () => {
                     </>
                   )}
                   {serviceRequest.billing.mode === "adicional" && (
-                    <div className="p-4 bg-muted/50 rounded-lg md:col-span-3">
-                      <p className="text-sm text-muted-foreground mb-1">Aprovado?</p>
-                      <Badge variant={serviceRequest.billing.approved ? "default" : "secondary"}>
-                        {serviceRequest.billing.approved ? "Sim, aprovado" : "Pendente de aprovação"}
-                      </Badge>
-                    </div>
+                    <>
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-1">Aprovado?</p>
+                        <Badge variant={serviceRequest.billing.approved ? "default" : "secondary"}>
+                          {serviceRequest.billing.approved ? "Sim, aprovado" : "Pendente de aprovação"}
+                        </Badge>
+                      </div>
+                      <div className={`p-4 rounded-lg ${serviceRequest.billing.registerRevenueInCashFlow ? "bg-green-50 border border-green-200" : "bg-muted/50"}`}>
+                        <p className="text-sm text-muted-foreground mb-1">Registrar no financeiro?</p>
+                        <Badge variant={serviceRequest.billing.registerRevenueInCashFlow ? "default" : "secondary"} className={serviceRequest.billing.registerRevenueInCashFlow ? "bg-green-600" : ""}>
+                          {serviceRequest.billing.registerRevenueInCashFlow ? "Sim — será lançado" : "Não"}
+                        </Badge>
+                      </div>
+                    </>
                   )}
                 </div>
               </CardContent>
