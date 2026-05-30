@@ -13,10 +13,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { 
-  Search, Plus, Edit, UserPlus, Users, Trash2, MapPin, Phone, 
+import {
+  Search, Plus, Edit, UserPlus, Users, Trash2, MapPin, Phone,
   Building2, FileText, Upload, ChevronRight, Home, Save, X, Download, Eye
 } from 'lucide-react'
+import { ConfirmActionDialog, type ConfirmDetailItem } from "@/components/ui/confirm-action-dialog"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ensureFlowStoreInitialized, loadFlowContratos, saveFlowContratos, setFlowClientes } from "@/lib/flow-store"
@@ -167,6 +168,12 @@ export default function ClientesPage() {
   const [clientesLoaded, setClientesLoaded] = useState(false)
   const [loadError, setLoadError] = useState("")
   const [isSavingCliente, setIsSavingCliente] = useState(false)
+  const [confirmCliente, setConfirmCliente] = useState<{
+    open: boolean
+    action: "salvar" | "contrato" | "servico" | null
+    details: ConfirmDetailItem[]
+    warningMessage?: string
+  }>({ open: false, action: null, details: [] })
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [isLoadingPage, setIsLoadingPage] = useState(false)
@@ -294,6 +301,49 @@ const isFormValid = () => {
   if (formData.tipoCliente === "pj" && !formData.cnpj.trim()) return false
   
   return true
+}
+
+const handleOpenConfirmCliente = (action: "salvar" | "contrato" | "servico") => {
+  if (!isFormValid()) {
+    alert("Por favor, preencha todos os campos obrigatorios: Nome, Telefone, E-mail e CNPJ (para Pessoa Juridica)")
+    return
+  }
+
+  const docValue = formData.tipoCliente === "pj"
+    ? (formData.cnpj?.trim() || "")
+    : (formData.cpf?.trim() || "")
+
+  // Verificar duplicidade por CNPJ/CPF (apenas para novos registros)
+  let warningMessage: string | undefined
+  if (!editingClient && docValue) {
+    const jaExiste = clientes.some((c) => {
+      const docExistente = (c as any).cnpj?.trim() || (c as any).cpf?.trim() || ""
+      return docExistente && docExistente === docValue
+    })
+    if (jaExiste) {
+      warningMessage = `Já existe um cliente cadastrado com o documento "${docValue}". Verifique se não é um cadastro duplicado.`
+    }
+  }
+
+  const actionLabels = {
+    salvar: "Salvar cliente",
+    contrato: "Salvar e criar contrato",
+    servico: "Salvar e criar serviço",
+  }
+
+  setConfirmCliente({
+    open: true,
+    action,
+    warningMessage,
+    details: [
+      { label: "Nome", value: formData.nome || "" },
+      { label: "Tipo", value: formData.tipoCliente === "pj" ? "Pessoa Jurídica" : "Pessoa Física" },
+      ...(docValue ? [{ label: formData.tipoCliente === "pj" ? "CNPJ" : "CPF", value: docValue }] : []),
+      { label: "Telefone", value: formData.telefone || "" },
+      { label: "E-mail", value: formData.email || "" },
+      { label: "Ação", value: actionLabels[action] },
+    ],
+  })
 }
 
 const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
@@ -1449,6 +1499,28 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
               </CardContent>
             </Card>
 
+            {/* Diálogo de confirmação de cadastro de cliente */}
+            <ConfirmActionDialog
+              open={confirmCliente.open}
+              title={editingClient ? "Confirmar edição do cliente" : "Confirmar cadastro do cliente"}
+              description={editingClient
+                ? "Revise os dados abaixo antes de salvar as alterações."
+                : "Revise os dados antes de cadastrar. Verifique se o cliente já não existe no sistema."
+              }
+              details={confirmCliente.details}
+              warningMessage={confirmCliente.warningMessage}
+              confirmLabel={isSavingCliente ? "Salvando..." : "Confirmar"}
+              isLoading={isSavingCliente}
+              onConfirm={() => {
+                if (confirmCliente.action) {
+                  void handleSubmit(confirmCliente.action).then(() => {
+                    setConfirmCliente({ open: false, action: null, details: [] })
+                  })
+                }
+              }}
+              onCancel={() => setConfirmCliente({ open: false, action: null, details: [] })}
+            />
+
             {/* BLOCO 9 - Ações (Fixo no rodapé) */}
             <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 shadow-lg z-50">
               <div className="container mx-auto flex flex-wrap gap-3 justify-end">
@@ -1456,26 +1528,26 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                   <X className="h-4 w-4" />
                   Cancelar
                 </Button>
-<Button 
-    variant="secondary" 
-    onClick={() => handleSubmit("contrato")} 
+<Button
+    variant="secondary"
+    onClick={() => handleOpenConfirmCliente("contrato")}
     className="gap-2"
     disabled={!isFormValid() || isSavingCliente}
   >
     <FileText className="h-4 w-4" />
     Salvar e cadastrar contrato
   </Button>
-  <Button 
-    variant="secondary" 
-    onClick={() => handleSubmit("servico")} 
+  <Button
+    variant="secondary"
+    onClick={() => handleOpenConfirmCliente("servico")}
     className="gap-2"
     disabled={!isFormValid() || isSavingCliente}
   >
     <Plus className="h-4 w-4" />
     Salvar e cadastrar serviço
   </Button>
-  <Button 
-    onClick={() => handleSubmit("salvar")} 
+  <Button
+    onClick={() => handleOpenConfirmCliente("salvar")}
     className="gap-2"
     disabled={!isFormValid() || isSavingCliente}
   >

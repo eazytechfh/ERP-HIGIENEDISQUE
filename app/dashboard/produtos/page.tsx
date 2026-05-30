@@ -50,6 +50,7 @@ import {
   upsertProdutoSupabase,
 } from "@/lib/supabase/estoque-repo"
 import { listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertDespesaNotaFiscalSupabase } from "@/lib/supabase/financeiro-repo"
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog"
 
 // Tipos
 type Categoria = "Item Quimico" | "Diluente" | "Consumivel" | "Equipamentos" | "EPIs"
@@ -467,6 +468,12 @@ export default function EstoquePage() {
   const [editingProduct, setEditingProduct] = useState<Produto | null>(null)
   const [editingFornecedor, setEditingFornecedor] = useState<Fornecedor | null>(null)
   const [isNFModalOpen, setIsNFModalOpen] = useState(false)
+  const [confirmProduto, setConfirmProduto] = useState<{
+    open: boolean
+    tipo: "cadastrar" | "editar" | null
+    warningMessage?: string
+  }>({ open: false, tipo: null })
+  const [isSavingProduto, setIsSavingProduto] = useState(false)
   
   // Formulário Cadastro
   const [formData, setFormData] = useState({
@@ -509,35 +516,51 @@ export default function EstoquePage() {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleCadastrar = async (e: React.FormEvent) => {
+  const handleOpenConfirmProduto = (e: React.FormEvent, tipo: "cadastrar" | "editar") => {
     e.preventDefault()
     if (!formData.categoria || !formData.unidade || !formData.fornecedorId) return
-    const categoria = formData.categoria
-    const unidade = formData.unidade
-    
-    const fornecedorSelecionado = fornecedores.find((f) => f.id === formData.fornecedorId)
-    const novoProduto = await upsertProdutoSupabase({
-      nome: formData.nome,
-      marca: formData.marca,
-      fornecedorId: formData.fornecedorId,
-      estoqueAtual: 0, // Estoque começa zerado
-      estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
-      unidade,
-      categoria,
-      custoUnitario: 0, // Será definido na entrada de NF
-      ativo: formData.ativo,
-    })
-    setProdutos([...produtos, { ...novoProduto, fornecedor: fornecedorSelecionado?.razaoSocial || novoProduto.fornecedor }])
-    setFormData({
-      nome: "",
-      marca: "",
-      fornecedorId: "",
-      categoria: "",
-      unidade: "",
-      estoqueMinimo: "",
-      ativo: true,
-    })
+
+    // Verificar duplicidade de nome para novos cadastros
+    let warningMessage: string | undefined
+    if (tipo === "cadastrar") {
+      const nomeNovo = formData.nome.trim().toLowerCase()
+      const jaExiste = produtos.some((p) => p.nome.trim().toLowerCase() === nomeNovo)
+      if (jaExiste) {
+        warningMessage = `Já existe um item com o nome "${formData.nome}" no estoque. Verifique se não é um cadastro duplicado.`
+      }
+    }
+
+    setConfirmProduto({ open: true, tipo, warningMessage })
   }
+
+  const executeCadastrarProduto = async () => {
+    if (!formData.categoria || !formData.unidade || !formData.fornecedorId) return
+    setIsSavingProduto(true)
+    try {
+      const categoria = formData.categoria
+      const unidade = formData.unidade
+      const fornecedorSelecionado = fornecedores.find((f) => f.id === formData.fornecedorId)
+      const novoProduto = await upsertProdutoSupabase({
+        nome: formData.nome,
+        marca: formData.marca,
+        fornecedorId: formData.fornecedorId,
+        estoqueAtual: 0,
+        estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
+        unidade,
+        categoria,
+        custoUnitario: 0,
+        ativo: formData.ativo,
+      })
+      setProdutos([...produtos, { ...novoProduto, fornecedor: fornecedorSelecionado?.razaoSocial || novoProduto.fornecedor }])
+      setFormData({ nome: "", marca: "", fornecedorId: "", categoria: "", unidade: "", estoqueMinimo: "", ativo: true })
+      setConfirmProduto({ open: false, tipo: null })
+    } finally {
+      setIsSavingProduto(false)
+    }
+  }
+
+  // kept for form onSubmit compatibility — actual save goes through confirm dialog
+  const handleCadastrar = (e: React.FormEvent) => handleOpenConfirmProduto(e, "cadastrar")
 
   const handleEditar = (produto: Produto) => {
     setActiveTab("cadastrar")
@@ -553,36 +576,35 @@ export default function EstoquePage() {
     })
   }
 
-  const handleSalvarEdicao = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const executeEditarProduto = async () => {
     if (!editingProduct || !formData.categoria || !formData.unidade || !formData.fornecedorId) return
-    const categoria = formData.categoria
-    const unidade = formData.unidade
-    
-    const produtoSalvo = await upsertProdutoSupabase({
-      id: editingProduct.id,
-      nome: formData.nome,
-      marca: formData.marca,
-      fornecedorId: formData.fornecedorId,
-      estoqueAtual: editingProduct.estoqueAtual,
-      estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
-      unidade,
-      categoria,
-      custoUnitario: editingProduct.custoUnitario,
-      ativo: formData.ativo,
-    })
-    setProdutos(produtos.map((p) => (p.id === editingProduct.id ? produtoSalvo : p)))
-    setEditingProduct(null)
-    setFormData({
-      nome: "",
-      marca: "",
-      fornecedorId: "",
-      categoria: "",
-      unidade: "",
-      estoqueMinimo: "",
-      ativo: true,
-    })
+    setIsSavingProduto(true)
+    try {
+      const categoria = formData.categoria
+      const unidade = formData.unidade
+      const produtoSalvo = await upsertProdutoSupabase({
+        id: editingProduct.id,
+        nome: formData.nome,
+        marca: formData.marca,
+        fornecedorId: formData.fornecedorId,
+        estoqueAtual: editingProduct.estoqueAtual,
+        estoqueMinimo: parseInt(formData.estoqueMinimo) || 0,
+        unidade,
+        categoria,
+        custoUnitario: editingProduct.custoUnitario,
+        ativo: formData.ativo,
+      })
+      setProdutos(produtos.map((p) => (p.id === editingProduct.id ? produtoSalvo : p)))
+      setEditingProduct(null)
+      setFormData({ nome: "", marca: "", fornecedorId: "", categoria: "", unidade: "", estoqueMinimo: "", ativo: true })
+      setConfirmProduto({ open: false, tipo: null })
+    } finally {
+      setIsSavingProduto(false)
+    }
   }
+
+  // kept for form onSubmit compatibility — actual save goes through confirm dialog
+  const handleSalvarEdicao = (e: React.FormEvent) => handleOpenConfirmProduto(e, "editar")
 
   const handleExcluir = async (id: string) => {
     await deleteProdutoSupabase(id)
@@ -1168,7 +1190,7 @@ export default function EstoquePage() {
                   </div>
 
                   <div className="flex gap-2 pt-4">
-                    <Button type="submit" className="flex-1">
+                    <Button type="submit" className="flex-1" disabled={isSavingProduto}>
                       <Plus className="h-4 w-4 mr-2" />
                       {editingProduct ? "Salvar Alteracoes" : "Cadastrar Item"}
                     </Button>
@@ -1854,6 +1876,35 @@ export default function EstoquePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo de confirmação de produto/fornecedor */}
+      <ConfirmActionDialog
+        open={confirmProduto.open}
+        title={
+          confirmProduto.tipo === "editar"
+            ? "Confirmar edição do item"
+            : "Confirmar cadastro do item"
+        }
+        description="Revise os dados antes de salvar."
+        details={[
+          { label: "Nome", value: formData.nome || "" },
+          { label: "Categoria", value: formData.categoria || "" },
+          { label: "Unidade", value: formData.unidade || "" },
+          { label: "Estoque mínimo", value: formData.estoqueMinimo ? `${formData.estoqueMinimo} unid.` : "0 unid." },
+          { label: "Fornecedor", value: fornecedores.find((f) => f.id === formData.fornecedorId)?.razaoSocial || "" },
+        ]}
+        warningMessage={confirmProduto.warningMessage}
+        confirmLabel={isSavingProduto ? "Salvando..." : "Confirmar"}
+        isLoading={isSavingProduto}
+        onConfirm={() => {
+          if (confirmProduto.tipo === "editar") {
+            void executeEditarProduto()
+          } else {
+            void executeCadastrarProduto()
+          }
+        }}
+        onCancel={() => setConfirmProduto({ open: false, tipo: null })}
+      />
     </div>
   )
 }

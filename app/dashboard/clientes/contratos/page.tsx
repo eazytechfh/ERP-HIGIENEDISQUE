@@ -13,12 +13,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
-import { 
-  ChevronRight, 
-  FileText, 
-  User, 
-  Calendar, 
-  DollarSign, 
+import {
+  ChevronRight,
+  FileText,
+  User,
+  Calendar,
+  DollarSign,
   ClipboardList,
   Plus,
   Trash2,
@@ -27,9 +27,10 @@ import {
   X,
   Building2,
   Search,
-  Printer
+  Printer,
 } from "lucide-react"
 import Link from "next/link"
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog"
 import { listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { mapClienteToResumoView } from "@/lib/supabase/clientes-view"
 import { upsertFlowContrato, type FlowContrato } from "@/lib/flow-store"
@@ -91,6 +92,11 @@ export default function NovoContratoPage() {
   const [clientesCompletos, setClientesCompletos] = useState<ClienteInput[]>([])
   const [showClienteList, setShowClienteList] = useState(false)
   const [pageError, setPageError] = useState("")
+  const [isSavingContrato, setIsSavingContrato] = useState(false)
+  const [confirmContrato, setConfirmContrato] = useState<{
+    open: boolean
+    afterSave: "listar" | "servico" | null
+  }>({ open: false, afterSave: null })
 
   useEffect(() => {
     let mounted = true
@@ -596,31 +602,40 @@ export default function NovoContratoPage() {
     upsertFlowContrato(contratoFlow)
     return contratoFlow
   }
-  const handleSalvar = async () => {
+  const handleOpenConfirmContrato = (afterSave: "listar" | "servico") => {
+    if (!clienteSelecionado) {
+      setPageError("Selecione um cliente antes de salvar o contrato.")
+      return
+    }
+    setConfirmContrato({ open: true, afterSave })
+  }
+
+  const handleExecuteSalvarContrato = async () => {
+    if (!confirmContrato.afterSave || isSavingContrato) return
+    setIsSavingContrato(true)
     try {
       setPageError("")
       const contrato = await persistirContrato()
       if (!contrato) return
-      alert("Contrato salvo com sucesso e anexado ao cliente.")
-      router.push(`/dashboard/clientes`)
+      setConfirmContrato({ open: false, afterSave: null })
+      if (confirmContrato.afterSave === "servico") {
+        alert("Contrato salvo e anexado ao cliente. Redirecionando para cadastro de servico...")
+        router.push(`/dashboard/servicos?clienteId=${contrato.clienteId}`)
+      } else {
+        alert("Contrato salvo com sucesso e anexado ao cliente.")
+        router.push(`/dashboard/clientes`)
+      }
     } catch (error) {
       console.error("Falha ao salvar contrato", error)
       setPageError(getErrorMessage(error))
+    } finally {
+      setIsSavingContrato(false)
     }
   }
 
-  const handleSalvarECadastrarServico = async () => {
-    try {
-      setPageError("")
-      const contrato = await persistirContrato()
-      if (!contrato) return
-      alert("Contrato salvo e anexado ao cliente. Redirecionando para cadastro de servico...")
-      router.push(`/dashboard/servicos?clienteId=${contrato.clienteId}`)
-    } catch (error) {
-      console.error("Falha ao salvar contrato e redirecionar", error)
-      setPageError(getErrorMessage(error))
-    }
-  }
+  // mantido para compatibilidade de chamadas legadas
+  const handleSalvar = () => handleOpenConfirmContrato("listar")
+  const handleSalvarECadastrarServico = () => handleOpenConfirmContrato("servico")
   const clienteData = clienteSelecionado || { nome: "", cpfCnpj: "", tipo: "", status: "" }
 
   return (
@@ -1078,17 +1093,19 @@ export default function NovoContratoPage() {
               <Printer className="h-4 w-4 mr-2" />
               Imprimir / PDF
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={handleSalvarECadastrarServico}
               className="sm:order-3 bg-transparent"
+              disabled={isSavingContrato}
             >
               <ClipboardList className="h-4 w-4 mr-2" />
               Salvar e Cadastrar Serviço
             </Button>
-            <Button 
+            <Button
               onClick={handleSalvar}
               className="sm:order-4"
+              disabled={isSavingContrato}
             >
               <Save className="h-4 w-4 mr-2" />
               Salvar Contrato
@@ -1096,6 +1113,27 @@ export default function NovoContratoPage() {
           </div>
         </div>
       </main>
+
+      {/* Diálogo de confirmação de contrato */}
+      <ConfirmActionDialog
+        open={confirmContrato.open}
+        title="Confirmar cadastro do contrato"
+        description="Revise os dados abaixo antes de salvar o contrato."
+        details={[
+          { label: "Cliente", value: clienteSelecionado?.nome || "" },
+          { label: "Documento", value: clienteSelecionado?.cpfCnpj || "" },
+          { label: "Tipo de contrato", value: tipoContrato || "" },
+          { label: "Status", value: statusContrato || "" },
+          { label: "Vigência", value: dataInicio && dataTermino ? `${dataInicio} a ${dataTermino}` : dataInicio || "" },
+          { label: "Valor mensal", value: valorMensal ? `R$ ${valorMensal}` : "" },
+          { label: "Serviços inclusos", value: `${servicosContrato.filter(s => s.tipoServico).length} serviço(s)` },
+          { label: "Ação", value: confirmContrato.afterSave === "servico" ? "Salvar e cadastrar serviço" : "Salvar contrato" },
+        ]}
+        confirmLabel={isSavingContrato ? "Salvando..." : "Confirmar"}
+        isLoading={isSavingContrato}
+        onConfirm={() => void handleExecuteSalvarContrato()}
+        onCancel={() => setConfirmContrato({ open: false, afterSave: null })}
+      />
     </div>
   )
 }

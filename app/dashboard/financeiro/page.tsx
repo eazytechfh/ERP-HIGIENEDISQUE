@@ -80,6 +80,7 @@ import {
   upsertFinanceiroLancamentoSupabase,
 } from "@/lib/supabase/financeiro-repo"
 import { listFornecedoresSupabase, type FornecedorSupabaseItem } from "@/lib/supabase/estoque-repo"
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog"
 
 type AbaFinanceira = "dashboard" | "boleto" | "nf" | "relatorios" | "fluxo" | "categorias"
 
@@ -1572,6 +1573,8 @@ export default function FinanceiroPage() {
   const [nfForm, setNfForm] = useState<DocumentoEmitirForm>(buildDocumentoInitialForm)
   const [fluxoForm, setFluxoForm] = useState<FluxoForm>(buildFluxoInitialForm)
   const [categoriaForm, setCategoriaForm] = useState<FinanceiroCategoriaInput>({ nome: "", tipo: "despesa", descricao: "", ativo: true })
+  const [confirmFluxo, setConfirmFluxo] = useState(false)
+  const [isSavingFluxo, setIsSavingFluxo] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -1727,12 +1730,23 @@ export default function FinanceiroPage() {
     }
   }
 
+  const handleOpenConfirmFluxo = () => {
+    const valor = toNumber(fluxoForm.valor)
+    if (!fluxoForm.descricao.trim() || !valor || !fluxoForm.dataCompetencia || !fluxoForm.dataVencimento) {
+      setPageError("Preencha descricao, valor, competencia e vencimento.")
+      return
+    }
+    setPageError("")
+    setConfirmFluxo(true)
+  }
+
   const handleSalvarFluxo = async () => {
     const valor = toNumber(fluxoForm.valor)
     if (!fluxoForm.descricao.trim() || !valor || !fluxoForm.dataCompetencia || !fluxoForm.dataVencimento) {
       setPageError("Preencha descricao, valor, competencia e vencimento.")
       return
     }
+    setIsSavingFluxo(true)
     try {
       const categoriaSelecionada = categorias.find((item) => item.id === fluxoForm.categoriaId)
       const saved = await upsertFinanceiroLancamentoSupabase({
@@ -1789,9 +1803,12 @@ export default function FinanceiroPage() {
       }
 
       setFluxoForm(buildFluxoInitialForm())
+      setConfirmFluxo(false)
       setPageError("")
     } catch (error) {
       setPageError(getErrorMessage(error))
+    } finally {
+      setIsSavingFluxo(false)
     }
   }
 
@@ -2200,7 +2217,7 @@ export default function FinanceiroPage() {
               fluxoForm={fluxoForm}
               setFluxoForm={setFluxoForm}
               categoriasFluxo={categoriasFluxo}
-              onSalvar={() => void handleSalvarFluxo()}
+              onSalvar={handleOpenConfirmFluxo}
               onExcluir={handleExcluirLancamento}
               onDarBaixa={handleDarBaixa}
               onCancelar={handleCancelarLancamento}
@@ -2324,6 +2341,26 @@ export default function FinanceiroPage() {
           ) : null}
         </main>
       </div>
+
+      {/* Diálogo de confirmação de lançamento financeiro */}
+      <ConfirmActionDialog
+        open={confirmFluxo}
+        title="Confirmar lançamento financeiro"
+        description="Revise os dados abaixo antes de registrar o lançamento."
+        details={[
+          { label: "Tipo", value: fluxoForm.tipo === "receita" ? "Receita" : fluxoForm.tipo === "despesa" ? "Despesa" : "Investimento" },
+          { label: "Descrição", value: fluxoForm.descricao || "" },
+          { label: "Valor", value: fluxoForm.valor ? `R$ ${fluxoForm.valor}` : "" },
+          { label: "Status", value: fluxoForm.status === "realizado" ? "Realizado" : "Programado" },
+          { label: "Competência", value: fluxoForm.dataCompetencia || "" },
+          { label: "Vencimento", value: fluxoForm.dataVencimento || "" },
+          ...(fluxoForm.formaPagamento ? [{ label: "Forma pgto", value: fluxoForm.formaPagamento }] : []),
+        ]}
+        confirmLabel={isSavingFluxo ? "Salvando..." : "Confirmar lançamento"}
+        isLoading={isSavingFluxo}
+        onConfirm={() => void handleSalvarFluxo()}
+        onCancel={() => setConfirmFluxo(false)}
+      />
     </div>
   )
 }
