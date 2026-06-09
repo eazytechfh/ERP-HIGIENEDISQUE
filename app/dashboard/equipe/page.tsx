@@ -43,6 +43,7 @@ const INITIAL_FORM_DATA: FormData = {
   nr33Validade: "",
   nr35Validade: "",
   asoValidade: "",
+  feriasVencimento: "",
   situacao: "Ativo",
   emailAcesso: "",
   perfilAcesso: "",
@@ -362,6 +363,7 @@ export default function EquipePage() {
                           <th className="px-4 py-3 text-left text-sm font-medium">Telefone</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Cargo</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Endereco</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Férias</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Acesso</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Situacao</th>
                           <th className="px-4 py-3 text-center text-sm font-medium">Acoes</th>
@@ -383,6 +385,11 @@ export default function EquipePage() {
                               <td className="px-4 py-3">{membro.telefone}</td>
                               <td className="px-4 py-3">{membro.cargo}</td>
                               <td className="px-4 py-3 text-sm">{membro.endereco}</td>
+                              <td className="px-4 py-3 text-sm">
+                                {membro.feriasVencimento
+                                  ? new Date(`${membro.feriasVencimento}T00:00:00`).toLocaleDateString("pt-BR")
+                                  : "-"}
+                              </td>
                               <td className="px-4 py-3 text-sm">
                                 {membro.emailAcesso ? (
                                   <div className="space-y-1">
@@ -509,6 +516,10 @@ export default function EquipePage() {
                       <div className="space-y-2">
                         <Label htmlFor="aso">ASO - Validade</Label>
                         <Input id="aso" type="date" value={formData.asoValidade} onChange={(e) => handleInputChange("asoValidade", e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="feriasVencimento">Vencimento das Férias</Label>
+                        <Input id="feriasVencimento" type="date" value={formData.feriasVencimento || ""} onChange={(e) => handleInputChange("feriasVencimento", e.target.value)} />
                       </div>
                     </div>
                   </div>

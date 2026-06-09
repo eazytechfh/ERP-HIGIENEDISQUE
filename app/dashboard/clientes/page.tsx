@@ -190,21 +190,45 @@ export default function ClientesPage() {
         listContratosSupabase(),
       ])
 
+      let clientesList: Cliente[] = []
+      let clientesCount = 0
+
       if (clientesResult.status === "fulfilled") {
-        setClientes(clientesResult.value.data as Cliente[])
-        setTotalCount(clientesResult.value.count)
+        clientesList = clientesResult.value.data as Cliente[]
+        clientesCount = clientesResult.value.count
       } else {
         console.error("Falha ao carregar clientes no Supabase", clientesResult.reason)
-        setClientes([])
-        setTotalCount(0)
         setLoadError("Nao foi possivel carregar os clientes do Supabase para este usuario.")
       }
 
+      let contratos: ContratoSupabaseItem[] = []
       if (contratosResult.status === "fulfilled") {
-        setContratosSupabase(contratosResult.value)
+        contratos = contratosResult.value
+        setContratosSupabase(contratos)
       } else {
         setContratosSupabase([])
       }
+
+      // Se há busca e nenhum cliente foi encontrado pelo servidor, tenta por número de contrato
+      if (search && clientesList.length === 0 && contratos.length > 0) {
+        const term = search.toLowerCase()
+        const clienteIdsComContrato = contratos
+          .filter((c) => c.numero.toLowerCase().includes(term))
+          .map((c) => c.clienteId)
+          .filter(Boolean)
+
+        if (clienteIdsComContrato.length > 0) {
+          const porContratoResult = await listClientesSupabase({ pageSize: 9999, status })
+          const clientesPorContrato = (porContratoResult.data as Cliente[]).filter((c) =>
+            clienteIdsComContrato.includes(String(c.id))
+          )
+          clientesList = clientesPorContrato
+          clientesCount = clientesPorContrato.length
+        }
+      }
+
+      setClientes(clientesList)
+      setTotalCount(clientesCount)
     } finally {
       setIsLoadingPage(false)
       setClientesLoaded(true)
@@ -684,6 +708,14 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
   }
 
   const filteredClientes = clientes.filter((cliente) => {
+    // Filtro por número de contrato (client-side, sobre contratos já carregados)
+    if (searchTerm) {
+      const contratoResumo = getContratoResumoCliente(cliente)
+      const term = searchTerm.toLowerCase()
+      const matchesContrato = contratoResumo.numero?.toLowerCase().includes(term)
+      if (matchesContrato) return true
+    }
+
     if (contractFilter === "todos") return true
     const contratoResumo = getContratoResumoCliente(cliente)
     const situacaoCliente = contratoResumo.situacao
@@ -781,7 +813,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                 <div className="relative md:col-span-2">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Pesquisar por nome, telefone, CPF ou CNPJ..."
+                    placeholder="Pesquisar por nome, telefone, CPF, CNPJ ou nº contrato..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"

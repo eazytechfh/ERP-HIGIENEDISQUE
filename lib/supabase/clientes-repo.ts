@@ -253,6 +253,38 @@ export async function getClientesMetricasSupabase(): Promise<ClientesMetricas> {
   }
 }
 
+export type ClienteContratoAVencer = {
+  id: string
+  nome: string
+  dataFimContrato: string
+}
+
+export async function listClientesContratoAVencerSupabase(): Promise<ClienteContratoAVencer[]> {
+  const supabase = getSupabaseBrowserClient()
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  const em30Dias = new Date(hoje)
+  em30Dias.setDate(hoje.getDate() + 30)
+
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("id, nome, data_fim_contrato")
+    .is("deleted_at", null)
+    .eq("status", "Ativo")
+    .eq("possui_contrato", true)
+    .gte("data_fim_contrato", hoje.toISOString().split("T")[0])
+    .lte("data_fim_contrato", em30Dias.toISOString().split("T")[0])
+    .order("data_fim_contrato", { ascending: true })
+    .limit(50)
+
+  if (error) throw new Error((error as any).message || JSON.stringify(error))
+  return (data || []).map((row: any) => ({
+    id: String(row.id),
+    nome: row.nome || "",
+    dataFimContrato: row.data_fim_contrato || "",
+  }))
+}
+
 export async function getClienteSupabase(clienteId: string): Promise<ClienteInput> {
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase

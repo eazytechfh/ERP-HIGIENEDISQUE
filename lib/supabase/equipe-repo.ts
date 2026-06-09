@@ -20,6 +20,7 @@ export type EquipeMembroInput = {
   nr33Validade: string
   nr35Validade: string
   asoValidade: string
+  feriasVencimento?: string
   situacao: "Ativo" | "Inativo"
   emailAcesso: string
   perfilAcesso: EquipeRole | ""
@@ -40,6 +41,7 @@ function mapDbToEquipe(row: any): EquipeMembroInput {
     nr33Validade: row.nr33_validade || "",
     nr35Validade: row.nr35_validade || "",
     asoValidade: row.aso_validade || "",
+    feriasVencimento: row.ferias_vencimento || "",
     situacao: (row.situacao || "Ativo") as EquipeMembroInput["situacao"],
     emailAcesso: row.email_acesso || "",
     perfilAcesso: (row.perfil_acesso || "") as EquipeMembroInput["perfilAcesso"],
@@ -61,6 +63,7 @@ function mapEquipeToDb(input: EquipeMembroInput) {
     nr33_validade: input.nr33Validade || null,
     nr35_validade: input.nr35Validade || null,
     aso_validade: input.asoValidade || null,
+    ferias_vencimento: input.feriasVencimento || null,
     situacao: input.situacao,
     email_acesso: input.emailAcesso || null,
     perfil_acesso: input.perfilAcesso || null,

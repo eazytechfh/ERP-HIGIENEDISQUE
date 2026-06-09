@@ -916,8 +916,9 @@ export default function EstoquePage() {
         ) : null}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="flex h-auto flex-wrap gap-1 bg-muted p-1">
             <TabsTrigger value="visualizar">Visualizar Estoque</TabsTrigger>
+            <TabsTrigger value="quimicos">Produtos Químicos</TabsTrigger>
             <TabsTrigger value="cadastrar">Cadastrar Item</TabsTrigger>
             <TabsTrigger value="nf">Entrada de Nota Fiscal</TabsTrigger>
             <TabsTrigger value="fornecedor">Cadastro de Fornecedor</TabsTrigger>
@@ -1062,6 +1063,111 @@ export default function EstoquePage() {
                     <span className="inline-block w-3 h-3 rounded-full bg-red-500"></span>
                     <span className="text-muted-foreground">Critico - Estoque abaixo do minimo</span>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Produtos Químicos */}
+          <TabsContent value="quimicos" className="space-y-4">
+            <Card>
+              <CardHeader className="flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Produtos Químicos</CardTitle>
+                  <CardDescription>
+                    Visualize e gerencie todos os produtos químicos (inseticidas, raticidas, diluentes e similares)
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 bg-transparent whitespace-nowrap shrink-0"
+                  onClick={() => {
+                    setFormData((f) => ({ ...f, categoria: "Item Quimico" }))
+                    setActiveTab("cadastrar")
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Cadastrar Químico
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Pesquisar por nome ou marca..."
+                      className="pl-10"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Marca</TableHead>
+                        <TableHead>Fornecedor</TableHead>
+                        <TableHead className="text-center">Estoque Atual</TableHead>
+                        <TableHead className="text-center">Unidade</TableHead>
+                        <TableHead className="text-center">Estoque Min.</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="text-right">Custo Unitario</TableHead>
+                        <TableHead className="text-center">Acoes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {produtos.filter(
+                        (p) => p.categoria === "Item Quimico" &&
+                          (p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           p.marca.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           p.fornecedor.toLowerCase().includes(searchTerm.toLowerCase()))
+                      ).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                            Nenhum produto químico cadastrado
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        produtos.filter(
+                          (p) => p.categoria === "Item Quimico" &&
+                            (p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             p.marca.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             p.fornecedor.toLowerCase().includes(searchTerm.toLowerCase()))
+                        ).map((produto) => {
+                          const status = calcularStatus(produto.estoqueAtual, produto.estoqueMinimo)
+                          return (
+                            <TableRow key={produto.id} className={!produto.ativo ? "opacity-50" : ""}>
+                              <TableCell className="font-medium">{produto.nome}</TableCell>
+                              <TableCell>{produto.marca}</TableCell>
+                              <TableCell>{produto.fornecedor}</TableCell>
+                              <TableCell className="text-center">
+                                <EstoqueBadge quantidade={produto.estoqueAtual} status={status} />
+                              </TableCell>
+                              <TableCell className="text-center text-muted-foreground">{produto.unidade}</TableCell>
+                              <TableCell className="text-center text-muted-foreground">{produto.estoqueMinimo}</TableCell>
+                              <TableCell className="text-center">
+                                <StatusBadge status={status} />
+                              </TableCell>
+                              <TableCell className="text-right">R$ {produto.custoUnitario.toFixed(2)}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-center gap-2">
+                                  <Button variant="ghost" size="icon" onClick={() => handleEditar(produto)}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => handleExcluir(produto.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Users, UserCheck, Calendar, CheckCircle2, Clock, AlertTriangle, AlertCircle, TrendingUp, Package, Wrench, FileSignature, RefreshCw } from "lucide-react"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts"
-import { getClientesMetricasSupabase, type ClientesMetricas } from "@/lib/supabase/clientes-repo"
+import { getClientesMetricasSupabase, listClientesContratoAVencerSupabase, type ClientesMetricas, type ClienteContratoAVencer } from "@/lib/supabase/clientes-repo"
 import { listServicosSupabase, type ServicoSupabaseItem } from "@/lib/supabase/servicos-repo"
 import { listProdutosSupabase, type ProdutoSupabaseItem } from "@/lib/supabase/estoque-repo"
 import { listManutencoesPreventivasSupabase, listVeiculosSupabase, type ManutencaoPreventivaSupabaseItem, type VeiculoSupabaseItem } from "@/lib/supabase/veiculos-repo"
@@ -73,6 +73,7 @@ function computeMetrics(
   veiculos: VeiculoSupabaseItem[],
   produtos: ProdutoSupabaseItem[],
   equipe: EquipeMembroInput[],
+  clientesAVencer: ClienteContratoAVencer[] = [],
   now = new Date(),
 ): DashboardMetrics {
   const today = new Date(now)
@@ -174,6 +175,7 @@ function computeMetrics(
 
 export default function DashboardPage() {
   const [clientesMetricas, setClientesMetricas] = useState<ClientesMetricas>({ totalAtivos: 0, totalAVencer: 0, totalVencidos: 0, total: 0 })
+  const [clientesAVencer, setClientesAVencer] = useState<ClienteContratoAVencer[]>([])
   const [servicos, setServicos] = useState<ServicoSupabaseItem[]>([])
   const [manutencoes, setManutencoes] = useState<ManutencaoPreventivaSupabaseItem[]>([])
   const [veiculos, setVeiculos] = useState<VeiculoSupabaseItem[]>([])
@@ -186,8 +188,9 @@ export default function DashboardPage() {
 
     const loadData = async () => {
       try {
-        const [clientesResult, servicosResult, manutencoesResult, veiculosResult, produtosResult, equipeResult] = await Promise.allSettled([
+        const [clientesResult, clientesAVencerResult, servicosResult, manutencoesResult, veiculosResult, produtosResult, equipeResult] = await Promise.allSettled([
           getClientesMetricasSupabase(),
+          listClientesContratoAVencerSupabase(),
           listServicosSupabase(),
           listManutencoesPreventivasSupabase(),
           listVeiculosSupabase(),
@@ -201,6 +204,12 @@ export default function DashboardPage() {
         } else {
           console.error("Falha ao carregar clientes no dashboard", clientesResult.reason)
           setClientesMetricas({ totalAtivos: 0, totalAVencer: 0, totalVencidos: 0, total: 0 })
+        }
+
+        if (clientesAVencerResult.status === "fulfilled") {
+          setClientesAVencer(clientesAVencerResult.value)
+        } else {
+          setClientesAVencer([])
         }
 
         if (servicosResult.status === "fulfilled") {
@@ -242,6 +251,7 @@ export default function DashboardPage() {
         console.error("Falha inesperada ao carregar dashboard do Supabase", error)
         if (!mounted) return
         setClientesMetricas({ totalAtivos: 0, totalAVencer: 0, totalVencidos: 0, total: 0 })
+        setClientesAVencer([])
         setServicos([])
         setManutencoes([])
         setVeiculos([])
@@ -257,13 +267,14 @@ export default function DashboardPage() {
   }, [])
 
   const metrics = useMemo(
-    () => computeMetrics(clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe, new Date()),
-    [clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe],
+    () => computeMetrics(clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe, clientesAVencer, new Date()),
+    [clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe, clientesAVencer],
   )
 
   const alertas = [
     { tipo: "OS sem assinatura", quantidade: metrics.alertas.osSemAssinatura, icon: FileSignature, cor: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
     { tipo: "Serviços Vencidos", quantidade: metrics.alertas.servicosVencidos, icon: AlertCircle, cor: "text-red-600", bg: "bg-red-50 border-red-200" },
+    { tipo: "Contratos a Vencer (30d)", quantidade: clientesAVencer.length, icon: AlertTriangle, cor: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200" },
     { tipo: "Manutenção de Veículo", quantidade: metrics.alertas.manutencaoVeiculo, icon: Wrench, cor: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
     { tipo: "Estoque crítico", quantidade: metrics.alertas.equipamentoDefeito, icon: Package, cor: "text-orange-600", bg: "bg-orange-50 border-orange-200" },
   ]
@@ -397,6 +408,36 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {clientesAVencer.length > 0 && (
+          <Card className="mb-6 border-yellow-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                Contratos a Vencer nos Próximos 30 Dias
+                <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-700">{clientesAVencer.length}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Data de Vencimento</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientesAVencer.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{c.nome}</TableCell>
+                      <TableCell>{new Date(`${c.dataFimContrato}T00:00:00`).toLocaleDateString("pt-BR")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="pb-2">

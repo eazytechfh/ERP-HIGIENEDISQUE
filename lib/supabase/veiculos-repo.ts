@@ -9,6 +9,7 @@ export type VeiculoSupabaseItem = {
   modelo: string
   marca: string
   placa: string
+  renavan?: string
   responsavel: string
   ativo: boolean
 }
@@ -18,6 +19,7 @@ export type VeiculoSupabaseInput = {
   modelo: string
   marca: string
   placa: string
+  renavan?: string
   responsavel: string
   ativo: boolean
 }
@@ -48,6 +50,7 @@ function mapDbToVeiculo(row: any): VeiculoSupabaseItem {
     modelo: row.modelo || "",
     marca: row.marca || "",
     placa: row.placa || "",
+    renavan: row.renavan || "",
     responsavel: row.responsavel || "",
     ativo: Boolean(row.ativo ?? true),
   }
@@ -59,6 +62,7 @@ function mapVeiculoToDb(input: VeiculoSupabaseInput) {
     modelo: input.modelo,
     marca: input.marca,
     placa: input.placa,
+    renavan: input.renavan || null,
     responsavel: input.responsavel,
     ativo: Boolean(input.ativo),
     deleted_at: null,
