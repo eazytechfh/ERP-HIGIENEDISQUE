@@ -203,6 +203,13 @@ Se o usuário compartilhar link, credencial de ambiente, decisão arquitetural o
 
 ## 📋 Histórico de Alterações
 
+### 2026-06-15 — Fix: lista de clientes não mostrava resultados antigos durante digitação
+
+- **Problema**: No seletor de clientes da página de Serviços, ao digitar um nome, a lista OLD (todos os clientes, sem filtro) continuava visível durante os 600ms do debounce. O usuário via resultados sem relação com o que tinha digitado.
+- **Causa**: O debounce atrasa o disparo da busca no servidor, mas o estado `clientesSupabase` permanecia inalterado nesse intervalo.
+- **Solução**: Ao detectar mudança no `searchTerm`, ativa `isLoadingClientes = true` imediatamente (antes do timer disparar). A UI já exibia o spinner quando `isLoadingClientes` é `true`, então a lista antiga some na hora e o usuário vê "carregando" enquanto aguarda.
+- **Arquivos modificados**: `app/dashboard/servicos/page.tsx`
+
 ### 2026-06-15 — Refinamento do Gerenciador de Duplicatas + Debounce de Busca
 
 - **O que foi feito**:

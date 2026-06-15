@@ -755,8 +755,12 @@ export default function ServicosPage() {
     }
   }, [])
 
-  // Busca com debounce
+  // Busca com debounce — limpa a lista imediatamente ao digitar para não mostrar resultados antigos
   useEffect(() => {
+    if (searchTerm) {
+      setIsLoadingClientes(true)
+      setClientesBuscaErro(null)
+    }
     const timer = setTimeout(() => {
       setClientesPage(1)
       loadClientesPaginados(1, searchTerm)
