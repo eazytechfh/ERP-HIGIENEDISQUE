@@ -47,7 +47,7 @@ import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-prev
 import { ConsumoEstoqueCard, type ConsumoItem, type ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { getClienteSupabase, listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
+import { CLIENTE_COLUMNS_SELETOR, getClienteSupabase, listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { buildLocaisPorCliente, mapClienteToServicoView } from "@/lib/supabase/clientes-view"
 import { setFlowServicos, toIsoDate, type FlowServico } from "@/lib/flow-store"
 import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
@@ -739,7 +739,7 @@ export default function ServicosPage() {
     setIsLoadingClientes(true)
     setClientesBuscaErro(null)
     try {
-      const result = await listClientesSupabase({ page, pageSize: CLIENT_PAGE_SIZE, search: search || undefined })
+      const result = await listClientesSupabase({ page, pageSize: CLIENT_PAGE_SIZE, search: search || undefined, columns: CLIENTE_COLUMNS_SELETOR })
       if (requestId !== clientesRequestIdRef.current) return
       setClientesSupabase(result.data)
       setClientesTotalCount(result.count)

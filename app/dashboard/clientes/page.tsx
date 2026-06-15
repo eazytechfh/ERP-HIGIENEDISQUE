@@ -22,7 +22,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ensureFlowStoreInitialized, loadFlowContratos, saveFlowContratos, setFlowClientes } from "@/lib/flow-store"
 import { isApiMode } from "@/lib/runtime-config"
-import { deleteClienteSupabase, getClienteSupabase, listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
+import { CLIENTE_COLUMNS_DUPLICATAS, deleteClienteSupabase, getClienteSupabase, listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { listContratosSupabase, type ContratoSupabaseItem } from "@/lib/supabase/contratos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
@@ -508,7 +508,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
     setIsLoadingDuplicatas(true)
     setDuplicatasVerificadas(false)
     try {
-      const result = await listClientesSupabase({ pageSize: 9999 })
+      const result = await listClientesSupabase({ pageSize: 9999, columns: CLIENTE_COLUMNS_DUPLICATAS })
       const todos = result.data as Cliente[]
 
       const grupos: GrupoDuplicata[] = []

@@ -176,12 +176,19 @@ function mapClienteToDb(cliente: ClienteInput) {
   }
 }
 
+// Colunas mínimas para seletores (Serviços, Histórico) — não inclui campos longos desnecessários
+export const CLIENTE_COLUMNS_SELETOR = "id,nome,nome_fantasia,telefone,email,cpf,cnpj,tipo_cliente"
+
+// Colunas mínimas para verificação de duplicatas — só o que é comparado
+export const CLIENTE_COLUMNS_DUPLICATAS = "id,nome,telefone,email,cpf,cnpj"
+
 export type ListClientesParams = {
   page?: number
   pageSize?: number
   search?: string
   status?: string
   nomeOnly?: boolean
+  columns?: string
 }
 
 export type ListClientesResult = {
@@ -196,9 +203,10 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
   const to = from + pageSize - 1
 
   const supabase = getSupabaseBrowserClient()
+  const selectColumns = params?.columns ?? "*"
   let query = supabase
     .from("clientes")
-    .select("*", { count: "estimated" })
+    .select(selectColumns, { count: "estimated" })
     .is("deleted_at", null)
     .order("nome", { ascending: true })
     .range(from, to)

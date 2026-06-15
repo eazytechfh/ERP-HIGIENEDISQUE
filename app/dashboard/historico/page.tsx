@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, CheckCircle2, Clock, XCircle, Bell, Calendar, FileText, Eye, Paperclip, ChevronLeft, ChevronRight } from "lucide-react"
 import { toIsoDate } from "@/lib/flow-store"
-import { listClientesSupabase } from "@/lib/supabase/clientes-repo"
+import { CLIENTE_COLUMNS_SELETOR, listClientesSupabase } from "@/lib/supabase/clientes-repo"
 import { mapClienteToServicoView } from "@/lib/supabase/clientes-view"
 import { getOSAssinadaArquivoUrl, listServicosSupabase } from "@/lib/supabase/servicos-repo"
 
@@ -70,7 +70,7 @@ export default function HistoricoPage() {
     const requestId = ++clientesRequestIdRef.current
     setIsLoadingClientes(true)
     try {
-      const result = await listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined })
+      const result = await listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined, columns: CLIENTE_COLUMNS_SELETOR })
       if (requestId !== clientesRequestIdRef.current) return
       setClientes(
         result.data.map((c) => {

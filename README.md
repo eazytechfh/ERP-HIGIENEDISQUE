@@ -208,6 +208,12 @@ Se o usuário compartilhar link, credencial de ambiente, decisão arquitetural o
 - **O que foi feito**: Soft delete de 340 clientes duplicados diretamente no banco via SQL Editor do Supabase. Critério: mesmo nome + pelo menos um de (telefone, CPF, CNPJ ou e-mail) igual. O registro mais antigo (menor ID) de cada grupo foi mantido. Os removidos têm `deleted_at` preenchido — não foram apagados permanentemente e podem ser recuperados se necessário.
 - **Arquivos modificados**: nenhum (operação direta no banco)
 
+### 2026-06-15 — Performance: select() com colunas específicas por contexto
+
+- **O que foi feito**: Adicionado parâmetro `columns` em `listClientesSupabase` para restringir as colunas retornadas conforme o contexto de uso. Exportadas duas constantes: `CLIENTE_COLUMNS_SELETOR` (8 campos) e `CLIENTE_COLUMNS_DUPLICATAS` (6 campos). A lista principal de clientes mantém `"*"` para preservar a exportação CSV. A `clientes/page.tsx` (verificarDuplicatas com 9999 registros) e os seletores de clientes em `servicos/page.tsx` e `historico/page.tsx` agora baixam apenas os campos necessários, reduzindo dados transferidos em ~75-89% nesses contextos.
+- **Arquivos modificados**: `lib/supabase/clientes-repo.ts`, `app/dashboard/clientes/page.tsx`, `app/dashboard/servicos/page.tsx`, `app/dashboard/historico/page.tsx`, `README.md`
+- **Status**: aguardando validação em localhost antes de subir para GitHub/Vercel
+
 ### 2026-06-15 — Performance: otimizações na busca de clientes
 
 - **O que foi feito**:
