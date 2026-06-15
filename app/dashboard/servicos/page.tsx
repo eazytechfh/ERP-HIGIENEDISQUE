@@ -731,14 +731,23 @@ export default function ServicosPage() {
   const [tipoFormError, setTipoFormError] = useState("")
   const [pageError, setPageError] = useState("")
 
+  const [clientesBuscaErro, setClientesBuscaErro] = useState<string | null>(null)
+
   const loadClientesPaginados = useCallback(async (page: number, search: string) => {
     setIsLoadingClientes(true)
+    setClientesBuscaErro(null)
     try {
       const result = await listClientesSupabase({ page, pageSize: CLIENT_PAGE_SIZE, search: search || undefined })
       setClientesSupabase(result.data)
       setClientesTotalCount(result.count)
-    } catch (err) {
+    } catch (err: any) {
       console.error("Falha ao carregar clientes paginados", err)
+      const msg = err?.message || ""
+      if (msg.includes("timeout") || msg.includes("canceling")) {
+        setClientesBuscaErro("Busca demorou demais. Digite mais letras para refinar ou aguarde.")
+      } else {
+        setClientesBuscaErro("Erro ao buscar clientes. Tente novamente.")
+      }
       setClientesSupabase([])
       setClientesTotalCount(0)
     } finally {
@@ -2038,8 +2047,12 @@ const handleConfirmarAgendamentoFinal = async () => {
                   <div className="space-y-2 max-h-[350px] overflow-y-auto">
                     {isLoadingClientes ? (
                       <p className="py-4 text-center text-sm text-muted-foreground">Carregando...</p>
+                    ) : clientesBuscaErro ? (
+                      <p className="py-4 text-center text-sm text-destructive">{clientesBuscaErro}</p>
                     ) : filteredClientes.length === 0 ? (
-                      <p className="py-4 text-center text-sm text-muted-foreground">Nenhum cliente encontrado</p>
+                      <p className="py-4 text-center text-sm text-muted-foreground">
+                        {searchTerm ? "Nenhum cliente encontrado para essa busca." : "Digite o nome do cliente para buscar."}
+                      </p>
                     ) : (
                       filteredClientes.map((cliente) => (
                         <div
