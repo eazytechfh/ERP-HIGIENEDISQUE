@@ -213,12 +213,13 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
 
   if (params?.search) {
     const term = params.search.replace(/[%_]/g, "\\$&")
-    if (params.nomeOnly) {
-      // Busca só por nome — usa o índice trigram (idx_clientes_nome_trgm) e é muito mais rápido.
-      // Usar quando o campo de busca é para selecionar cliente por nome (ex: seletor em Serviços).
-      query = query.ilike("nome", `%${term}%`)
+    // Detecta se o termo é numérico (telefone/cpf/cnpj) ou textual (nome).
+    // OR em 4 colunas simultaneamente impede o uso eficiente dos índices trigram.
+    const isNumeric = /^[\d\s\-\.\(\)\/]+$/.test(params.search)
+    if (isNumeric) {
+      query = query.or(`telefone.ilike.%${term}%,cpf.ilike.%${term}%,cnpj.ilike.%${term}%`)
     } else {
-      query = query.or(`nome.ilike.%${term}%,telefone.ilike.%${term}%,cpf.ilike.%${term}%,cnpj.ilike.%${term}%`)
+      query = query.ilike("nome", `%${term}%`)
     }
   }
 
