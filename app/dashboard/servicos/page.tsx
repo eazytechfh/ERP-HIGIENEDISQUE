@@ -737,7 +737,7 @@ export default function ServicosPage() {
     setIsLoadingClientes(true)
     setClientesBuscaErro(null)
     try {
-      const result = await listClientesSupabase({ page, pageSize: CLIENT_PAGE_SIZE, search: search || undefined })
+      const result = await listClientesSupabase({ page, pageSize: CLIENT_PAGE_SIZE, search: search || undefined, nomeOnly: true })
       setClientesSupabase(result.data)
       setClientesTotalCount(result.count)
     } catch (err: any) {
