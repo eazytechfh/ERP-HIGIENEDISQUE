@@ -155,9 +155,15 @@ const contatoInicial: Omit<Contato, 'id'> = {
   principal: false
 }
 
+type GrupoDuplicata = {
+  chave: string
+  tipo: "cpf" | "cnpj" | "nome"
+  clientes: Cliente[]
+}
+
 export default function ClientesPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"consultar" | "cadastrar">("consultar")
+  const [activeTab, setActiveTab] = useState<"consultar" | "cadastrar" | "duplicatas">("consultar")
   const [searchTerm, setSearchTerm] = useState("")
   const [contractFilter, setContractFilter] = useState<FiltroContrato>("todos")
   const [statusFilter, setStatusFilter] = useState<StatusCliente | "todos">("todos")
@@ -179,6 +185,12 @@ export default function ClientesPage() {
   const [isLoadingPage, setIsLoadingPage] = useState(false)
   const PAGE_SIZE = 20
   const apiMode = isApiMode()
+
+  // Estados da aba de duplicatas
+  const [duplicatasGrupos, setDuplicatasGrupos] = useState<GrupoDuplicata[]>([])
+  const [isLoadingDuplicatas, setIsLoadingDuplicatas] = useState(false)
+  const [isDeletingDuplicata, setIsDeletingDuplicata] = useState<string | null>(null)
+  const [duplicatasVerificadas, setDuplicatasVerificadas] = useState(false)
 
   const loadClientes = useCallback(async (page: number, search: string, status: string) => {
     if (!apiMode) return
@@ -484,6 +496,98 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
     setActiveTab("consultar")
   }
 
+  const verificarDuplicatas = async () => {
+    if (!apiMode) return
+    setIsLoadingDuplicatas(true)
+    setDuplicatasVerificadas(false)
+    try {
+      // Carrega todos os clientes (sem paginação) só com campos necessários para detectar duplicatas
+      const result = await listClientesSupabase({ pageSize: 9999 })
+      const todos = result.data as Cliente[]
+
+      const grupos: GrupoDuplicata[] = []
+
+      // Agrupa por CNPJ
+      const porCnpj = new Map<string, Cliente[]>()
+      todos.forEach((c) => {
+        const doc = (c as any).cnpj?.trim().replace(/\D/g, "")
+        if (doc && doc.length >= 11) {
+          const lista = porCnpj.get(doc) || []
+          lista.push(c)
+          porCnpj.set(doc, lista)
+        }
+      })
+      porCnpj.forEach((lista, chave) => {
+        if (lista.length > 1) grupos.push({ chave, tipo: "cnpj", clientes: lista })
+      })
+
+      // Agrupa por CPF
+      const porCpf = new Map<string, Cliente[]>()
+      todos.forEach((c) => {
+        const doc = (c as any).cpf?.trim().replace(/\D/g, "")
+        if (doc && doc.length >= 11) {
+          const lista = porCpf.get(doc) || []
+          lista.push(c)
+          porCpf.set(doc, lista)
+        }
+      })
+      porCpf.forEach((lista, chave) => {
+        if (lista.length > 1) grupos.push({ chave, tipo: "cpf", clientes: lista })
+      })
+
+      // Agrupa por nome normalizado (como fallback — nomes idênticos sem doc)
+      const porNome = new Map<string, Cliente[]>()
+      todos.forEach((c) => {
+        const doc = ((c as any).cnpj?.trim() || (c as any).cpf?.trim() || "").replace(/\D/g, "")
+        if (doc && doc.length >= 11) return // já detectado por doc — não duplicar o grupo
+        const nome = c.nome.trim().toLowerCase().replace(/\s+/g, " ")
+        if (!nome) return
+        const lista = porNome.get(nome) || []
+        lista.push(c)
+        porNome.set(nome, lista)
+      })
+      porNome.forEach((lista, chave) => {
+        if (lista.length > 1) grupos.push({ chave, tipo: "nome", clientes: lista })
+      })
+
+      setDuplicatasGrupos(grupos)
+    } catch (error) {
+      console.error("Falha ao buscar duplicatas", error)
+    } finally {
+      setIsLoadingDuplicatas(false)
+      setDuplicatasVerificadas(true)
+    }
+  }
+
+  const handleExcluirDuplicata = async (cliente: Cliente, grupoIndex: number) => {
+    const confirmed = window.confirm(
+      `Excluir "${cliente.nome}" (ID: ${cliente.id})?\n\nEsta ação é segura — o registro vai para a lixeira e pode ser recuperado via banco de dados se necessário.`
+    )
+    if (!confirmed) return
+
+    setIsDeletingDuplicata(cliente.id)
+    try {
+      await deleteClienteSupabase(cliente.id)
+      // Remove o cliente do grupo na UI
+      setDuplicatasGrupos((prev) => {
+        const novo = [...prev]
+        novo[grupoIndex] = {
+          ...novo[grupoIndex],
+          clientes: novo[grupoIndex].clientes.filter((c) => c.id !== cliente.id),
+        }
+        // Remove o grupo se sobrou só 1 cliente (não é mais duplicata)
+        return novo.filter((g) => g.clientes.length > 1)
+      })
+      // Também remove da lista principal
+      setClientes((prev) => prev.filter((c) => c.id !== cliente.id))
+    } catch (error) {
+      console.error("Falha ao excluir duplicata", error)
+      alert("Falha ao excluir. Verifique permissões e tente novamente.")
+    } finally {
+      setIsDeletingDuplicata(null)
+    }
+  }
+
 
   const baixarArquivoCliente = async (arquivo: ClienteArquivo) => {
     if (arquivo?.storageBucket && arquivo?.storagePath) {
@@ -764,7 +868,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-6">
           <Button
             variant={activeTab === "consultar" ? "default" : "outline"}
             onClick={() => {
@@ -792,6 +896,18 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
           >
             <FileText className="h-4 w-4" />
             Cadastrar Contrato
+          </Button>
+          <Button
+            variant={activeTab === "duplicatas" ? "default" : "outline"}
+            onClick={() => {
+              setActiveTab("duplicatas")
+              setEditingClient(null)
+              setFormData(clienteInicial)
+            }}
+            className="gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Gerenciar Duplicatas
           </Button>
         </div>
 
@@ -968,6 +1084,113 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                   </TableBody>
                 </Table>
               </div>
+            </CardContent>
+          </Card>
+        ) : activeTab === "duplicatas" ? (
+          /* Duplicatas */
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5 text-destructive" />
+                Gerenciar Clientes Duplicados
+              </CardTitle>
+              <CardDescription>
+                Detecta clientes com o mesmo CPF, CNPJ ou nome idêntico. O cliente excluído vai para a lixeira (soft delete) e pode ser recuperado via banco de dados se necessário.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!apiMode ? (
+                <Alert variant="destructive">
+                  <AlertDescription>Disponível apenas no modo API (Supabase).</AlertDescription>
+                </Alert>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <Button onClick={() => void verificarDuplicatas()} disabled={isLoadingDuplicatas} className="gap-2">
+                      <Search className="h-4 w-4" />
+                      {isLoadingDuplicatas ? "Verificando..." : "Verificar Duplicatas"}
+                    </Button>
+                    {duplicatasVerificadas && (
+                      <p className="text-sm text-muted-foreground">
+                        {duplicatasGrupos.length === 0
+                          ? "Nenhuma duplicata encontrada."
+                          : `${duplicatasGrupos.length} grupo(s) com duplicatas encontrado(s).`}
+                      </p>
+                    )}
+                  </div>
+
+                  {duplicatasGrupos.length > 0 && (
+                    <div className="space-y-6">
+                      {duplicatasGrupos.map((grupo, grupoIndex) => (
+                        <div key={`${grupo.tipo}-${grupo.chave}`} className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="destructive" className="text-xs uppercase">{grupo.tipo}</Badge>
+                            <span className="text-sm font-medium text-muted-foreground">
+                              {grupo.tipo === "nome" ? `Nome: "${grupo.chave}"` : `Documento: ${grupo.chave}`}
+                            </span>
+                            <span className="text-xs text-muted-foreground">— {grupo.clientes.length} registros</span>
+                          </div>
+                          <div className="rounded-md border overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>ID</TableHead>
+                                  <TableHead>Nome</TableHead>
+                                  <TableHead>Telefone</TableHead>
+                                  <TableHead>E-mail</TableHead>
+                                  <TableHead>CPF/CNPJ</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead className="text-right">Ação</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {grupo.clientes.map((cliente, clienteIndex) => (
+                                  <TableRow key={cliente.id} className={clienteIndex === 0 ? "bg-green-50 dark:bg-green-950/20" : ""}>
+                                    <TableCell className="text-xs text-muted-foreground font-mono">{cliente.id}</TableCell>
+                                    <TableCell className="font-medium">
+                                      {cliente.nome}
+                                      {clienteIndex === 0 && (
+                                        <Badge variant="outline" className="ml-2 text-xs text-green-700 border-green-300">original</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell>{cliente.telefone || "-"}</TableCell>
+                                    <TableCell>{cliente.email || "-"}</TableCell>
+                                    <TableCell className="font-mono text-xs">
+                                      {cliente.tipoCliente === "pj" ? (cliente as any).cnpj : (cliente as any).cpf || "-"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={cliente.status === "Ativo" ? "default" : "secondary"}>
+                                        {cliente.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {clienteIndex === 0 ? (
+                                        <span className="text-xs text-muted-foreground">Manter</span>
+                                      ) : (
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          disabled={isDeletingDuplicata === cliente.id}
+                                          onClick={() => void handleExcluirDuplicata(cliente, grupoIndex)}
+                                        >
+                                          {isDeletingDuplicata === cliente.id ? "Excluindo..." : "Excluir duplicata"}
+                                        </Button>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            A linha em verde é sugerida como original (primeiro cadastrado por ID). Revise antes de excluir.
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         ) : (

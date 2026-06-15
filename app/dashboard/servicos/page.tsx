@@ -452,19 +452,20 @@ function ServicosAgendadosContent({
   const [filtroStatus, setFiltroStatus] = useState<"todos" | StatusAgendado>("todos")
   const [filtroDataInicio, setFiltroDataInicio] = useState("")
   const [filtroDataFim, setFiltroDataFim] = useState("")
+  const [filtroTexto, setFiltroTexto] = useState("")
 
   const osAssinada = useCallback((servico: ServicoAgendado) =>
     typeof servico.osFoiAssinada === "boolean" ? servico.osFoiAssinada : servico.osStatus === "assinada_digitalizada",
     []
   )
 
-  const servicosFiltrados = useMemo(() =>
-    servicos.filter((servico) => {
+  const servicosFiltrados = useMemo(() => {
+    const termo = filtroTexto.trim().toLowerCase()
+    return servicos.filter((servico) => {
       if (filtroAssinatura === "assinadas" && !osAssinada(servico)) return false
       if (filtroAssinatura === "sem_assinatura" && osAssinada(servico)) return false
       if (filtroStatus !== "todos" && servico.status !== filtroStatus) return false
       if (filtroDataInicio || filtroDataFim) {
-        // data exibida em DD/MM/YYYY — converte para YYYY-MM-DD para comparar
         const parts = servico.data.split("/")
         const isoData = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : ""
         if (isoData) {
@@ -472,9 +473,19 @@ function ServicosAgendadosContent({
           if (filtroDataFim && isoData > filtroDataFim) return false
         }
       }
+      if (termo) {
+        const matches =
+          servico.cliente.toLowerCase().includes(termo) ||
+          servico.osNumber.toLowerCase().includes(termo) ||
+          servico.servico.toLowerCase().includes(termo) ||
+          servico.tecnico.toLowerCase().includes(termo) ||
+          servico.local.toLowerCase().includes(termo)
+        if (!matches) return false
+      }
       return true
-    }),
-    [servicos, filtroAssinatura, filtroStatus, filtroDataInicio, filtroDataFim, osAssinada]
+    })
+  },
+    [servicos, filtroAssinatura, filtroStatus, filtroDataInicio, filtroDataFim, filtroTexto, osAssinada]
   )
 
   return (
@@ -522,6 +533,18 @@ function ServicosAgendadosContent({
             <CardDescription>Todos os servicos agendados com suas ordens de servico</CardDescription>
           </div>
           <div className="flex flex-wrap items-end gap-3">
+            <div className="relative w-full md:w-[240px]">
+              <Label className="text-xs text-muted-foreground">Buscar</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cliente, OS, técnico, local..."
+                  value={filtroTexto}
+                  onChange={(e) => setFiltroTexto(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
             <div className="w-full md:w-[180px]">
               <Label className="text-xs text-muted-foreground">Status</Label>
               <Select value={filtroStatus} onValueChange={(value) => setFiltroStatus(value as "todos" | StatusAgendado)}>

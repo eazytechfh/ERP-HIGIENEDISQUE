@@ -145,6 +145,33 @@ function sanitizeFileName(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]/g, "_")
 }
 
+// Colunas leves: exclui os_documento_html (pode ter vários KB por registro).
+// Usar APENAS onde o documento HTML da OS não é necessário (ex: dashboard, agendados).
+// Páginas que precisam imprimir/visualizar OS devem usar listServicosSupabase().
+const SERVICO_COLUMNS_SEM_HTML = [
+  "id", "os_number", "cliente_id", "cliente", "servico", "tipo", "local", "data", "horario",
+  "tecnico", "status", "os_status", "os_assinada", "baixa_observacao", "os_fingerprint",
+  "responsavel_baixa", "os_assinada_nome", "os_assinada_mime_type", "os_assinada_storage_bucket",
+  "os_assinada_storage_path", "os_assinada_tamanho", "cobranca_modo", "contrato_id",
+  "contrato_item_id", "valor_cobranca", "forma_pagamento", "tipo_documento_cobranca",
+  "motivo_adicional", "cobranca_aprovada",
+].join(",")
+
+// Para dashboard e métricas: não carrega os_documento_html (campo pesado).
+export async function listServicosSupabaseDashboard(): Promise<ServicoSupabaseItem[]> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("servicos")
+    .select(SERVICO_COLUMNS_SEM_HTML)
+    .is("deleted_at", null)
+    .order("data", { ascending: false })
+    .limit(300)
+
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
+  return (data || []).map(mapDbToServico)
+}
+
+// Para histórico e página de serviços: carrega tudo incluindo os_documento_html.
 export async function listServicosSupabase(): Promise<ServicoSupabaseItem[]> {
   const supabase = getSupabaseBrowserClient()
   const { data, error } = await supabase

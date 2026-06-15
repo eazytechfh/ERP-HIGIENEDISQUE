@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Car, Wrench, Plus, Pencil, Trash2 } from "lucide-react"
+import { Car, Wrench, Plus, Pencil, Trash2, Search } from "lucide-react"
 import { ensureFlowStoreInitialized, setFlowManutencoes, setFlowVeiculos } from "@/lib/flow-store"
 import {
   deleteManutencaoPreventivaSupabase,
@@ -122,7 +122,20 @@ export default function VeiculosPage() {
     setFlowManutencoes(manutencoes as any[])
   }, [manutencoes, loaded])
 
+  const [searchVeiculo, setSearchVeiculo] = useState("")
+
   const veiculosAtivos = useMemo(() => veiculos.filter((v) => v.ativo), [veiculos])
+
+  const veiculosFiltrados = useMemo(() => {
+    const termo = searchVeiculo.trim().toLowerCase()
+    if (!termo) return veiculos
+    return veiculos.filter((v) =>
+      v.modelo.toLowerCase().includes(termo) ||
+      v.marca.toLowerCase().includes(termo) ||
+      v.placa.toLowerCase().includes(termo) ||
+      v.responsavel.toLowerCase().includes(termo)
+    )
+  }, [veiculos, searchVeiculo])
 
   const resetVeiculoForm = () => {
     setVeiculoForm({ modelo: "", marca: "", placa: "", renavan: "", responsavel: "", ativo: true })
@@ -275,8 +288,21 @@ export default function VeiculosPage() {
           <TabsContent value="lista" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Car className="h-5 w-5" />Frota</CardTitle>
-                <CardDescription>{veiculos.length} veiculo(s) cadastrado(s)</CardDescription>
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2"><Car className="h-5 w-5" />Frota</CardTitle>
+                    <CardDescription>{veiculos.length} veiculo(s) cadastrado(s)</CardDescription>
+                  </div>
+                  <div className="relative w-full md:w-[260px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Placa, modelo, marca, responsável..."
+                      value={searchVeiculo}
+                      onChange={(e) => setSearchVeiculo(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border overflow-x-auto">
@@ -293,14 +319,14 @@ export default function VeiculosPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {veiculos.length === 0 ? (
+                      {veiculosFiltrados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                            Nenhum veiculo cadastrado.
+                            {searchVeiculo ? "Nenhum veículo encontrado para a busca." : "Nenhum veiculo cadastrado."}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        veiculos.map((v) => (
+                        veiculosFiltrados.map((v) => (
                           <TableRow key={v.id} className={!v.ativo ? "opacity-60" : ""}>
                             <TableCell>{v.modelo}</TableCell>
                             <TableCell>{v.marca}</TableCell>

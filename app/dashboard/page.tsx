@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Users, UserCheck, Calendar, CheckCircle2, Clock, AlertTriangle, AlertCircle, TrendingUp, Package, Wrench, FileSignature, RefreshCw } from "lucide-react"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts"
 import { getClientesMetricasSupabase, listClientesContratoAVencerSupabase, type ClientesMetricas, type ClienteContratoAVencer } from "@/lib/supabase/clientes-repo"
-import { listServicosSupabase, type ServicoSupabaseItem } from "@/lib/supabase/servicos-repo"
+import { listServicosSupabaseDashboard, type ServicoSupabaseItem } from "@/lib/supabase/servicos-repo"
 import { listProdutosSupabase, type ProdutoSupabaseItem } from "@/lib/supabase/estoque-repo"
 import { listManutencoesPreventivasSupabase, listVeiculosSupabase, type ManutencaoPreventivaSupabaseItem, type VeiculoSupabaseItem } from "@/lib/supabase/veiculos-repo"
 import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabase/equipe-repo"
@@ -191,7 +191,7 @@ export default function DashboardPage() {
         const [clientesResult, clientesAVencerResult, servicosResult, manutencoesResult, veiculosResult, produtosResult, equipeResult] = await Promise.allSettled([
           getClientesMetricasSupabase(),
           listClientesContratoAVencerSupabase(),
-          listServicosSupabase(),
+          listServicosSupabaseDashboard(),
           listManutencoesPreventivasSupabase(),
           listVeiculosSupabase(),
           listProdutosSupabase(),
