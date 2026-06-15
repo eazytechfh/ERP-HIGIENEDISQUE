@@ -68,7 +68,7 @@ export default function HistoricoPage() {
   const loadClientes = useCallback(async (page: number, search: string) => {
     setIsLoadingClientes(true)
     try {
-      const result = await listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined, nomeOnly: true })
+      const result = await listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined })
       setClientes(
         result.data.map((c) => {
           const view = mapClienteToServicoView(c)
