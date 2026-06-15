@@ -203,6 +203,11 @@ Se o usuário compartilhar link, credencial de ambiente, decisão arquitetural o
 
 ## 📋 Histórico de Alterações
 
+### 2026-06-15 — Limpeza de duplicatas via SQL (Supabase)
+
+- **O que foi feito**: Soft delete de 340 clientes duplicados diretamente no banco via SQL Editor do Supabase. Critério: mesmo nome + pelo menos um de (telefone, CPF, CNPJ ou e-mail) igual. O registro mais antigo (menor ID) de cada grupo foi mantido. Os removidos têm `deleted_at` preenchido — não foram apagados permanentemente e podem ser recuperados se necessário.
+- **Arquivos modificados**: nenhum (operação direta no banco)
+
 ### 2026-06-15 — Fix: lista de clientes não mostrava resultados antigos durante digitação
 
 - **Problema**: No seletor de clientes da página de Serviços, ao digitar um nome, a lista OLD (todos os clientes, sem filtro) continuava visível durante os 600ms do debounce. O usuário via resultados sem relação com o que tinha digitado.
