@@ -751,7 +751,7 @@ export default function ServicosPage() {
     const timer = setTimeout(() => {
       setClientesPage(1)
       loadClientesPaginados(1, searchTerm)
-    }, searchTerm ? 400 : 0)
+    }, searchTerm ? 600 : 0)
     return () => clearTimeout(timer)
   }, [searchTerm])
 

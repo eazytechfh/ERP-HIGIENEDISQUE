@@ -203,6 +203,15 @@ Se o usuário compartilhar link, credencial de ambiente, decisão arquitetural o
 
 ## 📋 Histórico de Alterações
 
+### 2026-06-15 — Refinamento do Gerenciador de Duplicatas + Debounce de Busca
+
+- **O que foi feito**:
+  1. **Duplicatas — novo critério**: Detecção mudada para sempre exigir **nome idêntico + pelo menos um de (telefone, CPF, CNPJ ou e-mail) igual**. Antes agrupava só por documento. Agora qualquer campo em comum já classifica como duplicata.
+  2. **Duplicatas — sem restrição de exclusão**: Removida a lógica de "original" que impedia excluir o primeiro registro. Agora qualquer cliente do grupo pode ser excluído.
+  3. **Debounce de busca**: Aumentado de 400ms para 600ms em Clientes, Serviços e Histórico para reduzir disparos desnecessários durante digitação. O fix definitivo para a lentidão é o índice abaixo.
+- **Arquivos modificados**: `app/dashboard/clientes/page.tsx`, `app/dashboard/servicos/page.tsx`, `app/dashboard/historico/page.tsx`, `README.md`
+- **Cuidados futuros**: Ver nota sobre índice do Supabase abaixo.
+
 ### 2026-06-15 — Performance, Busca e Gerenciador de Duplicatas
 
 - **O que foi feito**:
@@ -249,3 +258,12 @@ Se o usuário compartilhar link, credencial de ambiente, decisão arquitetural o
 - **Observabilidade em produção**: `@vercel/analytics` e `@vercel/speed-insights` já estão instalados e ativos. Monitorar via painel da Vercel.
 - **`clientes-view.ts`** é uma camada de view separada de `clientes-repo.ts` — representa a visão agregada (joins). Ao alterar o schema de clientes, verificar ambos os arquivos.
 - **`confirm-action-dialog.tsx`**: Componente de confirmação antes de salvar registros novos. Deve ser usado em todos os formulários de criação para evitar duplicatas. Não remover ou bypassar.
+- **Índice Supabase para busca rápida de clientes**: A busca por nome com `ilike` em 12k+ registros é lenta sem índice. Executar no SQL Editor do Supabase para resolver definitivamente:
+  ```sql
+  CREATE EXTENSION IF NOT EXISTS pg_trgm;
+  CREATE INDEX IF NOT EXISTS idx_clientes_nome_trgm ON clientes USING GIN (nome gin_trgm_ops);
+  CREATE INDEX IF NOT EXISTS idx_clientes_telefone ON clientes (telefone) WHERE deleted_at IS NULL;
+  CREATE INDEX IF NOT EXISTS idx_clientes_cpf ON clientes (cpf) WHERE deleted_at IS NULL;
+  CREATE INDEX IF NOT EXISTS idx_clientes_cnpj ON clientes (cnpj) WHERE deleted_at IS NULL;
+  ```
+  Após criar, as buscas `ilike '%termo%'` passam a usar o índice trigram e ficam muito mais rápidas.

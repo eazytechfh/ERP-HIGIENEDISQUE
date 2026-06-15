@@ -262,7 +262,7 @@ export default function ClientesPage() {
     const timer = setTimeout(() => {
       setCurrentPage(1)
       loadClientes(1, searchTerm, statusFilter)
-    }, searchTerm ? 400 : 0)
+    }, searchTerm ? 600 : 0)
     return () => clearTimeout(timer)
   }, [searchTerm, statusFilter, apiMode])
 
@@ -501,53 +501,48 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
     setIsLoadingDuplicatas(true)
     setDuplicatasVerificadas(false)
     try {
-      // Carrega todos os clientes (sem paginação) só com campos necessários para detectar duplicatas
       const result = await listClientesSupabase({ pageSize: 9999 })
       const todos = result.data as Cliente[]
 
       const grupos: GrupoDuplicata[] = []
 
-      // Agrupa por CNPJ
-      const porCnpj = new Map<string, Cliente[]>()
-      todos.forEach((c) => {
-        const doc = (c as any).cnpj?.trim().replace(/\D/g, "")
-        if (doc && doc.length >= 11) {
-          const lista = porCnpj.get(doc) || []
-          lista.push(c)
-          porCnpj.set(doc, lista)
-        }
-      })
-      porCnpj.forEach((lista, chave) => {
-        if (lista.length > 1) grupos.push({ chave, tipo: "cnpj", clientes: lista })
-      })
-
-      // Agrupa por CPF
-      const porCpf = new Map<string, Cliente[]>()
-      todos.forEach((c) => {
-        const doc = (c as any).cpf?.trim().replace(/\D/g, "")
-        if (doc && doc.length >= 11) {
-          const lista = porCpf.get(doc) || []
-          lista.push(c)
-          porCpf.set(doc, lista)
-        }
-      })
-      porCpf.forEach((lista, chave) => {
-        if (lista.length > 1) grupos.push({ chave, tipo: "cpf", clientes: lista })
-      })
-
-      // Agrupa por nome normalizado (como fallback — nomes idênticos sem doc)
+      // Agrupa por nome normalizado
       const porNome = new Map<string, Cliente[]>()
       todos.forEach((c) => {
-        const doc = ((c as any).cnpj?.trim() || (c as any).cpf?.trim() || "").replace(/\D/g, "")
-        if (doc && doc.length >= 11) return // já detectado por doc — não duplicar o grupo
         const nome = c.nome.trim().toLowerCase().replace(/\s+/g, " ")
         if (!nome) return
         const lista = porNome.get(nome) || []
         lista.push(c)
         porNome.set(nome, lista)
       })
+
+      // Dentro de cada grupo de mesmo nome, verifica se algum par compartilha
+      // telefone, CPF, CNPJ ou e-mail — critério: nome + pelo menos 1 campo igual
       porNome.forEach((lista, chave) => {
-        if (lista.length > 1) grupos.push({ chave, tipo: "nome", clientes: lista })
+        if (lista.length < 2) return
+
+        const normaliza = (v?: string) => (v || "").trim().replace(/\D/g, "")
+        const normalizaEmail = (v?: string) => (v || "").trim().toLowerCase()
+
+        // Marca quais clientes têm match com pelo menos outro do grupo
+        const temMatch = lista.map((c, i) =>
+          lista.some((outro, j) => {
+            if (i === j) return false
+            const tel1 = normaliza(c.telefone); const tel2 = normaliza(outro.telefone)
+            const cpf1 = normaliza((c as any).cpf); const cpf2 = normaliza((outro as any).cpf)
+            const cnpj1 = normaliza((c as any).cnpj); const cnpj2 = normaliza((outro as any).cnpj)
+            const email1 = normalizaEmail(c.email); const email2 = normalizaEmail(outro.email)
+            return (tel1.length >= 8 && tel1 === tel2) ||
+                   (cpf1.length >= 11 && cpf1 === cpf2) ||
+                   (cnpj1.length >= 14 && cnpj1 === cnpj2) ||
+                   (email1.length > 3 && email1 === email2)
+          })
+        )
+
+        const duplicados = lista.filter((_, i) => temMatch[i])
+        if (duplicados.length >= 2) {
+          grupos.push({ chave, tipo: "nome", clientes: duplicados })
+        }
       })
 
       setDuplicatasGrupos(grupos)
@@ -1124,9 +1119,9 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                       {duplicatasGrupos.map((grupo, grupoIndex) => (
                         <div key={`${grupo.tipo}-${grupo.chave}`} className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
                           <div className="flex items-center gap-2">
-                            <Badge variant="destructive" className="text-xs uppercase">{grupo.tipo}</Badge>
+                            <Badge variant="destructive" className="text-xs">DUPLICATA</Badge>
                             <span className="text-sm font-medium text-muted-foreground">
-                              {grupo.tipo === "nome" ? `Nome: "${grupo.chave}"` : `Documento: ${grupo.chave}`}
+                              Nome: &quot;{grupo.chave}&quot;
                             </span>
                             <span className="text-xs text-muted-foreground">— {grupo.clientes.length} registros</span>
                           </div>
@@ -1144,19 +1139,14 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {grupo.clientes.map((cliente, clienteIndex) => (
-                                  <TableRow key={cliente.id} className={clienteIndex === 0 ? "bg-green-50 dark:bg-green-950/20" : ""}>
+                                {grupo.clientes.map((cliente) => (
+                                  <TableRow key={cliente.id}>
                                     <TableCell className="text-xs text-muted-foreground font-mono">{cliente.id}</TableCell>
-                                    <TableCell className="font-medium">
-                                      {cliente.nome}
-                                      {clienteIndex === 0 && (
-                                        <Badge variant="outline" className="ml-2 text-xs text-green-700 border-green-300">original</Badge>
-                                      )}
-                                    </TableCell>
+                                    <TableCell className="font-medium">{cliente.nome}</TableCell>
                                     <TableCell>{cliente.telefone || "-"}</TableCell>
                                     <TableCell>{cliente.email || "-"}</TableCell>
                                     <TableCell className="font-mono text-xs">
-                                      {cliente.tipoCliente === "pj" ? (cliente as any).cnpj : (cliente as any).cpf || "-"}
+                                      {cliente.tipoCliente === "pj" ? (cliente as any).cnpj || "-" : (cliente as any).cpf || "-"}
                                     </TableCell>
                                     <TableCell>
                                       <Badge variant={cliente.status === "Ativo" ? "default" : "secondary"}>
@@ -1164,18 +1154,14 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                                       </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                      {clienteIndex === 0 ? (
-                                        <span className="text-xs text-muted-foreground">Manter</span>
-                                      ) : (
-                                        <Button
-                                          variant="destructive"
-                                          size="sm"
-                                          disabled={isDeletingDuplicata === cliente.id}
-                                          onClick={() => void handleExcluirDuplicata(cliente, grupoIndex)}
-                                        >
-                                          {isDeletingDuplicata === cliente.id ? "Excluindo..." : "Excluir duplicata"}
-                                        </Button>
-                                      )}
+                                      <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        disabled={isDeletingDuplicata === cliente.id}
+                                        onClick={() => void handleExcluirDuplicata(cliente, grupoIndex)}
+                                      >
+                                        {isDeletingDuplicata === cliente.id ? "Excluindo..." : "Excluir"}
+                                      </Button>
                                     </TableCell>
                                   </TableRow>
                                 ))}
@@ -1183,7 +1169,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                             </Table>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            A linha em verde é sugerida como original (primeiro cadastrado por ID). Revise antes de excluir.
+                            Revise os registros acima e exclua o(s) que forem duplicata. O excluído vai para a lixeira (pode ser recuperado pelo banco se necessário).
                           </p>
                         </div>
                       ))}

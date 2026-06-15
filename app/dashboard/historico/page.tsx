@@ -90,7 +90,7 @@ export default function HistoricoPage() {
     const timer = setTimeout(() => {
       setCurrentPage(1)
       loadClientes(1, searchTerm)
-    }, searchTerm ? 400 : 0)
+    }, searchTerm ? 600 : 0)
     return () => clearTimeout(timer)
   }, [searchTerm])
 
