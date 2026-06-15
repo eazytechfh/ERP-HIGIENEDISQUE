@@ -719,6 +719,7 @@ export default function ServicosPage() {
   const CLIENT_PAGE_SIZE = 20
   const searchTermRef = useRef(searchTerm)
   useEffect(() => { searchTermRef.current = searchTerm }, [searchTerm])
+  const clientesRequestIdRef = useRef(0)
   const [contratosSupabase, setContratosSupabase] = useState<Contrato[]>([])
   const [equipesData, setEquipesData] = useState<Equipe[]>([])
   const [veiculosData, setVeiculosData] = useState<Veiculo[]>([])
@@ -734,13 +735,16 @@ export default function ServicosPage() {
   const [clientesBuscaErro, setClientesBuscaErro] = useState<string | null>(null)
 
   const loadClientesPaginados = useCallback(async (page: number, search: string) => {
+    const requestId = ++clientesRequestIdRef.current
     setIsLoadingClientes(true)
     setClientesBuscaErro(null)
     try {
       const result = await listClientesSupabase({ page, pageSize: CLIENT_PAGE_SIZE, search: search || undefined })
+      if (requestId !== clientesRequestIdRef.current) return
       setClientesSupabase(result.data)
       setClientesTotalCount(result.count)
     } catch (err: any) {
+      if (requestId !== clientesRequestIdRef.current) return
       console.error("Falha ao carregar clientes paginados", err)
       const msg = err?.message || ""
       if (msg.includes("timeout") || msg.includes("canceling")) {
@@ -751,7 +755,7 @@ export default function ServicosPage() {
       setClientesSupabase([])
       setClientesTotalCount(0)
     } finally {
-      setIsLoadingClientes(false)
+      if (requestId === clientesRequestIdRef.current) setIsLoadingClientes(false)
     }
   }, [])
 

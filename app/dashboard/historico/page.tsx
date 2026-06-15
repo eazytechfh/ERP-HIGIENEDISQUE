@@ -64,11 +64,14 @@ export default function HistoricoPage() {
 
   const searchTermRef = useRef(searchTerm)
   useEffect(() => { searchTermRef.current = searchTerm }, [searchTerm])
+  const clientesRequestIdRef = useRef(0)
 
   const loadClientes = useCallback(async (page: number, search: string) => {
+    const requestId = ++clientesRequestIdRef.current
     setIsLoadingClientes(true)
     try {
       const result = await listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined })
+      if (requestId !== clientesRequestIdRef.current) return
       setClientes(
         result.data.map((c) => {
           const view = mapClienteToServicoView(c)
@@ -77,11 +80,12 @@ export default function HistoricoPage() {
       )
       setTotalCount(result.count)
     } catch (error) {
+      if (requestId !== clientesRequestIdRef.current) return
       console.error("Falha ao carregar clientes no historico", error)
       setClientes([])
       setTotalCount(0)
     } finally {
-      setIsLoadingClientes(false)
+      if (requestId === clientesRequestIdRef.current) setIsLoadingClientes(false)
     }
   }, [])
 

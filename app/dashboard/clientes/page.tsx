@@ -173,6 +173,7 @@ export default function ClientesPage() {
   const [contratosSupabase, setContratosSupabase] = useState<ContratoSupabaseItem[]>([])
   const [clientesLoaded, setClientesLoaded] = useState(false)
   const [loadError, setLoadError] = useState("")
+  const clientesRequestIdRef = useRef(0)
   const [isSavingCliente, setIsSavingCliente] = useState(false)
   const [confirmCliente, setConfirmCliente] = useState<{
     open: boolean
@@ -194,6 +195,7 @@ export default function ClientesPage() {
 
   const loadClientes = useCallback(async (page: number, search: string, status: string) => {
     if (!apiMode) return
+    const requestId = ++clientesRequestIdRef.current
     setIsLoadingPage(true)
     setLoadError("")
     try {
@@ -201,6 +203,8 @@ export default function ClientesPage() {
         listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined, status }),
         listContratosSupabase(),
       ])
+
+      if (requestId !== clientesRequestIdRef.current) return
 
       let clientesList: Cliente[] = []
       let clientesCount = 0
@@ -231,6 +235,7 @@ export default function ClientesPage() {
 
         if (clienteIdsComContrato.length > 0) {
           const porContratoResult = await listClientesSupabase({ pageSize: 9999, status })
+          if (requestId !== clientesRequestIdRef.current) return
           const clientesPorContrato = (porContratoResult.data as Cliente[]).filter((c) =>
             clienteIdsComContrato.includes(String(c.id))
           )
@@ -242,8 +247,10 @@ export default function ClientesPage() {
       setClientes(clientesList)
       setTotalCount(clientesCount)
     } finally {
-      setIsLoadingPage(false)
-      setClientesLoaded(true)
+      if (requestId === clientesRequestIdRef.current) {
+        setIsLoadingPage(false)
+        setClientesLoaded(true)
+      }
     }
   }, [apiMode])
 
@@ -806,7 +813,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
     URL.revokeObjectURL(url)
   }
 
-  const filteredClientes = clientes.filter((cliente) => {
+  const filteredClientes = useMemo(() => clientes.filter((cliente) => {
     // Filtro por número de contrato (client-side, sobre contratos já carregados)
     if (searchTerm) {
       const contratoResumo = getContratoResumoCliente(cliente)
@@ -826,7 +833,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
       case "vencido": return contratoResumo.possuiContrato && situacaoCliente === "Vencido"
       default: return true
     }
-  })
+  }), [clientes, searchTerm, contractFilter])
 
   return (
     <div className="min-h-screen bg-muted/30">

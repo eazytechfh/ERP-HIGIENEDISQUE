@@ -198,7 +198,7 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
   const supabase = getSupabaseBrowserClient()
   let query = supabase
     .from("clientes")
-    .select("*", { count: "exact" })
+    .select("*", { count: "estimated" })
     .is("deleted_at", null)
     .order("nome", { ascending: true })
     .range(from, to)

@@ -208,6 +208,14 @@ Se o usuário compartilhar link, credencial de ambiente, decisão arquitetural o
 - **O que foi feito**: Soft delete de 340 clientes duplicados diretamente no banco via SQL Editor do Supabase. Critério: mesmo nome + pelo menos um de (telefone, CPF, CNPJ ou e-mail) igual. O registro mais antigo (menor ID) de cada grupo foi mantido. Os removidos têm `deleted_at` preenchido — não foram apagados permanentemente e podem ser recuperados se necessário.
 - **Arquivos modificados**: nenhum (operação direta no banco)
 
+### 2026-06-15 — Performance: otimizações na busca de clientes
+
+- **O que foi feito**:
+  1. **`count: "estimated"`**: Substituído `count: "exact"` por `count: "estimated"` em `listClientesSupabase`. O modo `exact` forçava o Postgres a contar todos os registros antes de retornar — operação cara. O modo `estimated` usa estatísticas internas do banco, muito mais rápido e suficientemente preciso para paginação.
+  2. **Race condition — padrão `requestId`**: Adicionado `clientesRequestIdRef` nos três fluxos de busca (clientes, serviços, histórico). Quando o usuário digita rápido e múltiplas requests são disparadas, apenas a resposta da última request atualiza o estado. Respostas de requests antigas são descartadas silenciosamente.
+  3. **`useMemo` em `filteredClientes`**: O filtro client-side de clientes em `clientes/page.tsx` era recalculado a cada re-render. Agora só recalcula quando `clientes`, `searchTerm` ou `contractFilter` mudam.
+- **Arquivos modificados**: `lib/supabase/clientes-repo.ts`, `app/dashboard/clientes/page.tsx`, `app/dashboard/servicos/page.tsx`, `app/dashboard/historico/page.tsx`, `README.md`
+
 ### 2026-06-15 — Fix: lista de clientes não mostrava resultados antigos durante digitação
 
 - **Problema**: No seletor de clientes da página de Serviços, ao digitar um nome, a lista OLD (todos os clientes, sem filtro) continuava visível durante os 600ms do debounce. O usuário via resultados sem relação com o que tinha digitado.
