@@ -7,10 +7,9 @@ Sistema de gestão empresarial para controle de serviços, clientes, agendamento
 | Recurso | URL |
 |---|---|
 | Repositório GitHub | https://github.com/eazytechfh/ERP-HIGIENEDISQUE |
+| Vercel (deploy/produção) | https://vercel.com/eazytechfh-gmailcoms-projects/erp-higienedisque |
 | Supabase (banco de dados) | https://supabase.com (projeto vinculado ao e-mail eazytech.ia@gmail.com) |
 | Dev local | http://localhost:3000 |
-
-> Se a URL da Vercel for configurada futuramente, adicionar aqui.
 
 ---
 
