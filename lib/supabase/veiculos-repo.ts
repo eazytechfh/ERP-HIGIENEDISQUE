@@ -155,11 +155,14 @@ export async function deleteVeiculoSupabase(id: string): Promise<void> {
 
 export async function listManutencoesPreventivasSupabase(): Promise<ManutencaoPreventivaSupabaseItem[]> {
   const supabase = getSupabaseBrowserClient()
+  const hoje = new Date().toISOString().split("T")[0]
   const { data, error } = await supabase
     .from("manutencoes_preventivas")
-    .select("*")
+    .select("id, veiculo_id, descricao, data_prevista, quilometragem, status")
     .is("deleted_at", null)
+    .gte("data_prevista", hoje)
     .order("data_prevista", { ascending: true })
+    .limit(30)
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToManutencao)

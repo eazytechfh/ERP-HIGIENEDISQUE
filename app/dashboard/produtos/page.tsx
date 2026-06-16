@@ -405,6 +405,9 @@ export default function EstoquePage() {
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscalHistorico[]>([])
+  const [notasFiscaisCount, setNotasFiscaisCount] = useState(0)
+  const [notasFiscaisPage, setNotasFiscaisPage] = useState(1)
+  const [loadingMaisNotas, setLoadingMaisNotas] = useState(false)
   const [categoriasDespesa, setCategoriasDespesa] = useState<FinanceiroCategoriaItem[]>([])
   const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -419,17 +422,19 @@ export default function EstoquePage() {
 
     async function loadEstoque() {
       try {
-        const [produtosDb, fornecedoresDb, notasDb, categoriasDb] = await Promise.all([
+        const [produtosDb, fornecedoresDb, notasResult, categoriasDb] = await Promise.all([
           listProdutosSupabase(),
           listFornecedoresSupabase(),
-          listNotasFiscaisSupabase(),
+          listNotasFiscaisSupabase(1, 50),
           listFinanceiroCategoriasSupabase("despesa"),
         ])
 
         if (!active) return
         setProdutos(produtosDb)
         setFornecedores(fornecedoresDb)
-        setNotasFiscais(notasDb)
+        setNotasFiscais(notasResult.data)
+        setNotasFiscaisCount(notasResult.count)
+        setNotasFiscaisPage(1)
         setCategoriasDespesa(categoriasDb.filter((item) => item.ativo))
         setLoadError(null)
       } catch (error) {
@@ -775,8 +780,14 @@ export default function EstoquePage() {
         }
       }
 
-      setProdutos(await listProdutosSupabase())
-      setNotasFiscais(await listNotasFiscaisSupabase())
+      const [produtosAtualizadosSalvar, notasSalvarResult] = await Promise.all([
+        listProdutosSupabase(),
+        listNotasFiscaisSupabase(1, 50),
+      ])
+      setProdutos(produtosAtualizadosSalvar)
+      setNotasFiscais(notasSalvarResult.data)
+      setNotasFiscaisCount(notasSalvarResult.count)
+      setNotasFiscaisPage(1)
       setNfData({
         fornecedorId: null,
         numeroNF: "",
@@ -848,13 +859,15 @@ export default function EstoquePage() {
           : null,
       )
 
-      const [produtosAtualizados, notasAtualizadas] = await Promise.all([
+      const [produtosAtualizados, notasExcluirResult] = await Promise.all([
         listProdutosSupabase(),
-        listNotasFiscaisSupabase(),
+        listNotasFiscaisSupabase(1, 50),
       ])
 
       setProdutos(produtosAtualizados)
-      setNotasFiscais(notasAtualizadas)
+      setNotasFiscais(notasExcluirResult.data)
+      setNotasFiscaisCount(notasExcluirResult.count)
+      setNotasFiscaisPage(1)
 
       if (notaFiscalSelecionada?.id === nota.id) {
         setNotaFiscalSelecionada(null)
@@ -875,6 +888,19 @@ export default function EstoquePage() {
   )
 
   const fornecedoresAtivos = fornecedores.filter(f => f.ativo)
+
+  async function handleCarregarMaisNotas() {
+    setLoadingMaisNotas(true)
+    try {
+      const proximaPagina = notasFiscaisPage + 1
+      const result = await listNotasFiscaisSupabase(proximaPagina, 50)
+      setNotasFiscais((prev) => [...prev, ...result.data])
+      setNotasFiscaisCount(result.count)
+      setNotasFiscaisPage(proximaPagina)
+    } finally {
+      setLoadingMaisNotas(false)
+    }
+  }
 
   const filteredNotasFiscais = notasFiscais.filter((nota) => {
     const term = searchNotaFiscal.trim().toLowerCase()
@@ -1638,6 +1664,18 @@ export default function EstoquePage() {
                       )}
                     </TableBody>
                   </Table>
+                  {notasFiscais.length < notasFiscaisCount && (
+                    <div className="mt-4 flex justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void handleCarregarMaisNotas()}
+                        disabled={loadingMaisNotas}
+                      >
+                        {loadingMaisNotas ? "Carregando..." : `Carregar mais (${notasFiscais.length} de ${notasFiscaisCount})`}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

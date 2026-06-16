@@ -73,17 +73,19 @@ function mapEquipeToDb(input: EquipeMembroInput) {
 
 export async function listEquipeMembrosSupabase(): Promise<EquipeMembroInput[]> {
   const supabase = getSupabaseBrowserClient()
-  const { data, error } = await supabase
-    .from("equipe_membros")
-    .select("*")
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(100)
+  const [{ data, error }, currentProfile] = await Promise.all([
+    supabase
+      .from("equipe_membros")
+      .select("*")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    getCurrentUserAccessProfileSupabase(),
+  ])
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
 
   const membros = (data || []).map(mapDbToEquipe)
-  const currentProfile = await getCurrentUserAccessProfileSupabase()
   const canManageAccess = hasPermission(currentProfile?.permissions, "equipe.manage_access")
   if (!canManageAccess) {
     return membros

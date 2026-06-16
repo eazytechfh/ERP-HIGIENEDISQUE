@@ -244,29 +244,9 @@ export type ClientesMetricas = {
 
 export async function getClientesMetricasSupabase(): Promise<ClientesMetricas> {
   const supabase = getSupabaseBrowserClient()
-  const hoje = new Date()
-  hoje.setHours(0, 0, 0, 0)
-  const em30Dias = new Date(hoje)
-  em30Dias.setDate(hoje.getDate() + 30)
-
-  const [totalRes, ativosRes, aVencerRes, vencidosRes] = await Promise.all([
-    supabase.from("clientes").select("*", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("clientes").select("*", { count: "exact", head: true }).is("deleted_at", null).eq("status", "Ativo"),
-    supabase.from("clientes").select("*", { count: "exact", head: true })
-      .is("deleted_at", null).eq("status", "Ativo").eq("possui_contrato", true)
-      .gte("data_fim_contrato", hoje.toISOString().split("T")[0])
-      .lte("data_fim_contrato", em30Dias.toISOString().split("T")[0]),
-    supabase.from("clientes").select("*", { count: "exact", head: true })
-      .is("deleted_at", null).eq("status", "Ativo").eq("possui_contrato", true)
-      .lt("data_fim_contrato", hoje.toISOString().split("T")[0]),
-  ])
-
-  return {
-    total: totalRes.count ?? 0,
-    totalAtivos: ativosRes.count ?? 0,
-    totalAVencer: aVencerRes.count ?? 0,
-    totalVencidos: vencidosRes.count ?? 0,
-  }
+  const { data, error } = await supabase.rpc("get_clientes_metricas")
+  if (error) throw new Error(error.message)
+  return data as ClientesMetricas
 }
 
 export type ClienteContratoAVencer = {

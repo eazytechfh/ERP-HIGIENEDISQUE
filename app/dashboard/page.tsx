@@ -266,9 +266,15 @@ export default function DashboardPage() {
     }
   }, [])
 
+  const hoje = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [])
+
   const metrics = useMemo(
-    () => computeMetrics(clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe, clientesAVencer, new Date()),
-    [clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe, clientesAVencer],
+    () => computeMetrics(clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe, clientesAVencer, hoje),
+    [clientesMetricas, servicos, manutencoes, veiculos, produtos, equipe, clientesAVencer, hoje],
   )
 
   const alertas = [

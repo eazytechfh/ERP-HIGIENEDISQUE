@@ -421,9 +421,17 @@ export async function registrarEntradaNotaFiscalSupabase(input: NotaFiscalEntrad
   return String(notaSalva.id)
 }
 
-export async function listNotasFiscaisSupabase(): Promise<NotaFiscalHistorico[]> {
+export interface ListNotasFiscaisResult {
+  data: NotaFiscalHistorico[]
+  count: number
+}
+
+export async function listNotasFiscaisSupabase(page = 1, pageSize = 50): Promise<ListNotasFiscaisResult> {
   const supabase = getSupabaseBrowserClient()
-  const { data, error } = await supabase
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const { data, error, count } = await supabase
     .from("notas_fiscais_entrada")
     .select(`
       *,
@@ -432,13 +440,14 @@ export async function listNotasFiscaisSupabase(): Promise<NotaFiscalHistorico[]>
         *,
         produtos(id, nome)
       )
-    `)
+    `, { count: "exact" })
     .is("deleted_at", null)
     .order("data_nf", { ascending: false })
     .order("created_at", { ascending: false })
+    .range(from, to)
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
-  return (data || []).map(mapDbToNotaFiscal)
+  return { data: (data || []).map(mapDbToNotaFiscal), count: count ?? 0 }
 }
 
 export async function getNotaFiscalArquivoUrl(
