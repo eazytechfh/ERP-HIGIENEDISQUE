@@ -206,7 +206,7 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
   const selectColumns = params?.columns ?? "*"
   let query = supabase
     .from("clientes")
-    .select(selectColumns, { count: "exact" })
+    .select(selectColumns, { count: "estimated" })
     .is("deleted_at", null)
     .order("nome", { ascending: true })
     .range(from, to)
