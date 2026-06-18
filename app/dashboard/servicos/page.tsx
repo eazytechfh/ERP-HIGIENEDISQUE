@@ -55,6 +55,7 @@ import { listEquipeMembrosSupabase } from "@/lib/supabase/equipe-repo"
 import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
 import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
 import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 
 // Tipos
@@ -442,11 +443,86 @@ function parseDateBR(dataBR: string): Date | null {
   return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]))
 }
 
+type GoogleEvent = {
+  id: string
+  summary: string
+  description?: string
+  start: { dateTime?: string; date?: string }
+  end: { dateTime?: string; date?: string }
+}
+
 function AgendaCalendarContent({ servicos }: { servicos: ServicoAgendado[] }) {
   const hoje = new Date()
   const [mes, setMes] = useState(hoje.getMonth())
   const [ano, setAno] = useState(hoje.getFullYear())
   const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null)
+  const [gcalConnected, setGcalConnected] = useState<boolean | null>(null)
+  const [gcalEvents, setGcalEvents] = useState<GoogleEvent[]>([])
+  const [gcalLoading, setGcalLoading] = useState(false)
+  const [gcalError, setGcalError] = useState("")
+
+  // Detecta retorno do callback do Google
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const gcal = params.get("gcal")
+    if (gcal === "conectado") {
+      setGcalConnected(true)
+      // Limpa o query param sem recarregar
+      window.history.replaceState({}, "", window.location.pathname + "?tab=agenda")
+    } else if (gcal === "erro") {
+      setGcalError("Erro ao conectar com o Google Calendar. Tente novamente.")
+      window.history.replaceState({}, "", window.location.pathname + "?tab=agenda")
+    }
+  }, [])
+
+  async function getToken(): Promise<string | null> {
+    const supabase = getSupabaseBrowserClient()
+    const { data } = await supabase.auth.getSession()
+    return data.session?.access_token ?? null
+  }
+
+  async function fetchGcalEvents() {
+    const token = await getToken()
+    if (!token) return
+    setGcalLoading(true)
+    try {
+      const timeMin = new Date(ano, mes, 1).toISOString()
+      const timeMax = new Date(ano, mes + 1, 0, 23, 59, 59).toISOString()
+      const res = await fetch(`/api/google-calendar/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      setGcalConnected(data.connected)
+      setGcalEvents(data.events ?? [])
+    } catch {
+      setGcalError("Falha ao carregar eventos do Google Calendar.")
+    } finally {
+      setGcalLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchGcalEvents()
+  }, [mes, ano])
+
+  async function handleConnect() {
+    const supabase = getSupabaseBrowserClient()
+    const { data } = await supabase.auth.getUser()
+    if (!data.user) return
+    window.location.href = `/api/google-calendar/auth?userId=${data.user.id}`
+  }
+
+  async function handleDisconnect() {
+    const token = await getToken()
+    if (!token) return
+    await fetch("/api/google-calendar/disconnect", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    setGcalConnected(false)
+    setGcalEvents([])
+  }
 
   function prevMes() {
     if (mes === 0) { setMes(11); setAno(a => a - 1) }
@@ -472,6 +548,21 @@ function AgendaCalendarContent({ servicos }: { servicos: ServicoAgendado[] }) {
     return mapa
   }, [servicos, mes, ano])
 
+  // Agrupa eventos do Google por dia
+  const gcalPorDia = useMemo(() => {
+    const mapa: Record<number, GoogleEvent[]> = {}
+    for (const e of gcalEvents) {
+      const raw = e.start.dateTime || e.start.date
+      if (!raw) continue
+      const d = new Date(raw)
+      if (d.getMonth() !== mes || d.getFullYear() !== ano) continue
+      const dia = d.getDate()
+      if (!mapa[dia]) mapa[dia] = []
+      mapa[dia].push(e)
+    }
+    return mapa
+  }, [gcalEvents, mes, ano])
+
   // Dias do mês
   const primeiroDia = new Date(ano, mes, 1).getDay()
   const totalDias = new Date(ano, mes + 1, 0).getDate()
@@ -485,17 +576,54 @@ function AgendaCalendarContent({ servicos }: { servicos: ServicoAgendado[] }) {
   }
 
   const servicosDiaSelecionado = diaSelecionado ? (servicosPorDia[diaSelecionado] ?? []) : []
+  const gcalDiaSelecionado = diaSelecionado ? (gcalPorDia[diaSelecionado] ?? []) : []
 
   return (
     <div className="space-y-4">
-      {/* Legenda */}
-      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-        {Object.entries(agendadosStatusConfig).map(([k, v]) => (
-          <div key={k} className="flex items-center gap-1.5">
-            <span className={`inline-block w-2.5 h-2.5 rounded-full ${statusDot[k]}`} />
-            {v.label}
-          </div>
-        ))}
+      {/* Barra de status Google Calendar */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+          {Object.entries(agendadosStatusConfig).map(([k, v]) => (
+            <div key={k} className="flex items-center gap-1.5">
+              <span className={`inline-block w-2.5 h-2.5 rounded-full ${statusDot[k]}`} />
+              {v.label}
+            </div>
+          ))}
+          {gcalConnected && (
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-purple-500" />
+              Google Calendar
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {gcalError && <span className="text-xs text-red-500">{gcalError}</span>}
+          {gcalConnected === false && (
+            <button
+              onClick={handleConnect}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted transition-colors text-xs font-medium"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Conectar Google Calendar
+            </button>
+          )}
+          {gcalConnected === true && (
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Google Calendar conectado
+              </span>
+              <button
+                onClick={handleDisconnect}
+                className="text-xs text-muted-foreground hover:text-red-500 underline transition-colors"
+              >
+                Desconectar
+              </button>
+            </div>
+          )}
+          {gcalLoading && <span className="text-xs text-muted-foreground">Carregando...</span>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -526,6 +654,7 @@ function AgendaCalendarContent({ servicos }: { servicos: ServicoAgendado[] }) {
                 const dia = i - primeiroDia + 1
                 const valido = dia >= 1 && dia <= totalDias
                 const eventos = valido ? (servicosPorDia[dia] ?? []) : []
+                const gcalEvts = valido ? (gcalPorDia[dia] ?? []) : []
                 const isHoje = valido && dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
                 const isSelecionado = valido && dia === diaSelecionado
                 return (
@@ -556,7 +685,16 @@ function AgendaCalendarContent({ servicos }: { servicos: ServicoAgendado[] }) {
                               <span className="truncate">{s.cliente}</span>
                             </div>
                           ))}
-                          {eventos.length > 3 && (
+                          {gcalEvts.slice(0, 2).map(e => (
+                            <div key={e.id} className="flex items-center gap-1 px-1 py-0.5 rounded text-[10px] truncate bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200">
+                              <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-purple-500" />
+                              <span className="truncate">{e.summary}</span>
+                            </div>
+                          ))}
+                          {eventos.length + gcalEvts.length > 5 && (
+                            <div className="text-[10px] text-muted-foreground pl-1">+{eventos.length + gcalEvts.length - 5} mais</div>
+                          )}
+                          {eventos.length > 3 && gcalEvts.length === 0 && (
                             <div className="text-[10px] text-muted-foreground pl-1">+{eventos.length - 3} mais</div>
                           )}
                         </div>
@@ -575,12 +713,37 @@ function AgendaCalendarContent({ servicos }: { servicos: ServicoAgendado[] }) {
             <div className="border rounded-xl bg-card overflow-hidden">
               <div className="px-4 py-3 border-b bg-muted/30">
                 <p className="font-semibold text-sm">{diaSelecionado} de {MESES[mes]} de {ano}</p>
-                <p className="text-xs text-muted-foreground">{servicosDiaSelecionado.length} serviço(s)</p>
+                <p className="text-xs text-muted-foreground">{servicosDiaSelecionado.length + gcalDiaSelecionado.length} evento(s)</p>
               </div>
               <div className="p-3 space-y-3 max-h-[500px] overflow-y-auto">
-                {servicosDiaSelecionado.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum serviço neste dia.</p>
-                ) : servicosDiaSelecionado.map(s => (
+                {servicosDiaSelecionado.length === 0 && gcalDiaSelecionado.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum evento neste dia.</p>
+                ) : null}
+
+                {/* Eventos do Google Calendar */}
+                {gcalDiaSelecionado.map(e => {
+                  const start = e.start.dateTime ? new Date(e.start.dateTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
+                  const end = e.end.dateTime ? new Date(e.end.dateTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""
+                  return (
+                    <div key={e.id} className="border border-purple-200 dark:border-purple-800 rounded-lg p-3 space-y-1.5 text-xs bg-purple-50 dark:bg-purple-950/30">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
+                        <span className="text-[10px] font-medium text-purple-600 dark:text-purple-400">Google Calendar</span>
+                      </div>
+                      <p className="font-medium text-sm leading-tight">{e.summary}</p>
+                      {(start || end) && (
+                        <p className="text-muted-foreground flex items-center gap-1">
+                          <svg className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          {start}{end ? ` - ${end}` : ""}
+                        </p>
+                      )}
+                      {e.description && <p className="text-muted-foreground truncate">{e.description}</p>}
+                    </div>
+                  )
+                })}
+
+                {/* Serviços do sistema */}
+                {servicosDiaSelecionado.map(s => (
                   <div key={s.id} className="border rounded-lg p-3 space-y-1.5 text-xs">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-primary text-[11px]">{s.osNumber}</span>
@@ -1770,6 +1933,38 @@ export default function ServicosPage() {
       const next = prev.some((item) => item.id === saved.id) ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]
       return next
     })
+
+    // Sync Google Calendar (fire-and-forget, não bloqueia o fluxo)
+    ;(async () => {
+      try {
+        const supabase = getSupabaseBrowserClient()
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData.session?.access_token
+        if (!token) return
+
+        const isUpdate = !!servico.id
+        const gcalRow = isUpdate
+          ? await supabase.from("servicos").select("google_event_id").eq("id", saved.id).maybeSingle()
+          : { data: null }
+        const existingGcalId = (gcalRow as any)?.data?.google_event_id
+
+        await fetch("/api/google-calendar/sync", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: isUpdate && existingGcalId ? "update" : "create",
+            servicoId: saved.id,
+            googleEventId: existingGcalId,
+            summary: `OS: ${saved.servico} — ${saved.cliente}`,
+            description: `Técnico: ${saved.tecnico}\nLocal: ${saved.local}\nHorário: ${saved.horario}`,
+            data: saved.data,
+            horario: saved.horario,
+          }),
+        })
+      } catch {
+        // Silencioso — falha no sync não impede o salvamento do serviço
+      }
+    })()
 
     if (servico.registerRevenueInCashFlow && saved.cobrancaModo === "adicional") {
       if (saved.valorCobranca <= 0) {
