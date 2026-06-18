@@ -182,6 +182,8 @@ export default function DashboardPage() {
   const [produtos, setProdutos] = useState<ProdutoSupabaseItem[]>([])
   const [equipe, setEquipe] = useState<EquipeMembroInput[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [pendenciasPage, setPendenciasPage] = useState(0)
+  const PENDENCIAS_PER_PAGE = 20
 
   useEffect(() => {
     let mounted = true
@@ -471,35 +473,65 @@ export default function DashboardPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  metrics.pendenciasCriticas.map((p, idx) => {
-                    const isManutencao = p.texto.toLowerCase().includes("manutencao")
-                    const isContrato = p.texto.toLowerCase().includes("contrato")
-                    const isEstoque = p.texto.toLowerCase().includes("estoque") || p.texto.toLowerCase().includes("critico")
-                    const isDoc = p.texto.toLowerCase().includes("nr") || p.texto.toLowerCase().includes("aso") || p.texto.toLowerCase().includes("vencido")
-                    const badge = isManutencao
-                      ? { label: "Veículo", cls: "bg-amber-100 text-amber-700" }
-                      : isContrato
-                      ? { label: "Contrato", cls: "bg-red-100 text-red-700" }
-                      : isEstoque
-                      ? { label: "Estoque", cls: "bg-orange-100 text-orange-700" }
-                      : isDoc
-                      ? { label: "Equipe", cls: "bg-purple-100 text-purple-700" }
-                      : { label: "Geral", cls: "bg-gray-100 text-gray-700" }
-                    return (
-                      <TableRow key={`${p.origem}-${idx}`}>
-                        <TableCell className="font-medium">{p.origem}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
-                            <span>{p.texto}</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
+                  metrics.pendenciasCriticas
+                    .slice(pendenciasPage * PENDENCIAS_PER_PAGE, (pendenciasPage + 1) * PENDENCIAS_PER_PAGE)
+                    .map((p, idx) => {
+                      const isManutencao = p.texto.toLowerCase().includes("manutencao")
+                      const isContrato = p.texto.toLowerCase().includes("contrato")
+                      const isEstoque = p.texto.toLowerCase().includes("estoque") || p.texto.toLowerCase().includes("critico")
+                      const isDoc = p.texto.toLowerCase().includes("nr") || p.texto.toLowerCase().includes("aso") || p.texto.toLowerCase().includes("vencido")
+                      const badge = isManutencao
+                        ? { label: "Veículo", cls: "bg-amber-100 text-amber-700" }
+                        : isContrato
+                        ? { label: "Contrato", cls: "bg-red-100 text-red-700" }
+                        : isEstoque
+                        ? { label: "Estoque", cls: "bg-orange-100 text-orange-700" }
+                        : isDoc
+                        ? { label: "Equipe", cls: "bg-purple-100 text-purple-700" }
+                        : { label: "Geral", cls: "bg-gray-100 text-gray-700" }
+                      return (
+                        <TableRow key={`${p.origem}-${idx}`}>
+                          <TableCell className="font-medium">{p.origem}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>
+                              <span>{p.texto}</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                 )}
               </TableBody>
             </Table>
+
+            {/* Paginação */}
+            {metrics.pendenciasCriticas.length > PENDENCIAS_PER_PAGE && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t text-sm text-muted-foreground">
+                <span>
+                  {pendenciasPage * PENDENCIAS_PER_PAGE + 1}–{Math.min((pendenciasPage + 1) * PENDENCIAS_PER_PAGE, metrics.pendenciasCriticas.length)} de {metrics.pendenciasCriticas.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPendenciasPage(p => Math.max(0, p - 1))}
+                    disabled={pendenciasPage === 0}
+                    className="px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ‹ Anterior
+                  </button>
+                  <span className="text-xs">
+                    Pág. {pendenciasPage + 1} / {Math.ceil(metrics.pendenciasCriticas.length / PENDENCIAS_PER_PAGE)}
+                  </span>
+                  <button
+                    onClick={() => setPendenciasPage(p => Math.min(Math.ceil(metrics.pendenciasCriticas.length / PENDENCIAS_PER_PAGE) - 1, p + 1))}
+                    disabled={(pendenciasPage + 1) * PENDENCIAS_PER_PAGE >= metrics.pendenciasCriticas.length}
+                    className="px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Próxima ›
+                  </button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
