@@ -204,9 +204,10 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
 
   const supabase = getSupabaseBrowserClient()
   const selectColumns = params?.columns ?? "*"
-  let query = supabase
+    const countMode = params?.search ? "planned" : "estimated"
+      let query = supabase
     .from("clientes")
-    .select(selectColumns, { count: "estimated" })
+        .select(selectColumns, { count: countMode })
     .is("deleted_at", null)
     .order("nome", { ascending: true })
     .range(from, to)
