@@ -431,6 +431,195 @@ function mapAgendadoToFlowServico(servico: ServicoAgendado): FlowServico {
     osDocumentoHtml: servico.osDocumentoHtml,
   }
 }
+// ─── Agenda Calendar ────────────────────────────────────────────────────────
+
+const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
+
+function parseDateBR(dataBR: string): Date | null {
+  const parts = dataBR.split("/")
+  if (parts.length !== 3) return null
+  return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]))
+}
+
+function AgendaCalendarContent({ servicos }: { servicos: ServicoAgendado[] }) {
+  const hoje = new Date()
+  const [mes, setMes] = useState(hoje.getMonth())
+  const [ano, setAno] = useState(hoje.getFullYear())
+  const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null)
+
+  function prevMes() {
+    if (mes === 0) { setMes(11); setAno(a => a - 1) }
+    else setMes(m => m - 1)
+    setDiaSelecionado(null)
+  }
+  function nextMes() {
+    if (mes === 11) { setMes(0); setAno(a => a + 1) }
+    else setMes(m => m + 1)
+    setDiaSelecionado(null)
+  }
+
+  // Agrupa serviços por dia do mês/ano atual
+  const servicosPorDia = useMemo(() => {
+    const mapa: Record<number, ServicoAgendado[]> = {}
+    for (const s of servicos) {
+      const d = parseDateBR(s.data)
+      if (!d || d.getMonth() !== mes || d.getFullYear() !== ano) continue
+      const dia = d.getDate()
+      if (!mapa[dia]) mapa[dia] = []
+      mapa[dia].push(s)
+    }
+    return mapa
+  }, [servicos, mes, ano])
+
+  // Dias do mês
+  const primeiroDia = new Date(ano, mes, 1).getDay()
+  const totalDias = new Date(ano, mes + 1, 0).getDate()
+  const celulas = primeiroDia + totalDias
+
+  const statusDot: Record<string, string> = {
+    agendado: "bg-blue-500",
+    em_execucao: "bg-amber-500",
+    concluido: "bg-green-500",
+    cancelado: "bg-red-500",
+  }
+
+  const servicosDiaSelecionado = diaSelecionado ? (servicosPorDia[diaSelecionado] ?? []) : []
+
+  return (
+    <div className="space-y-4">
+      {/* Legenda */}
+      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+        {Object.entries(agendadosStatusConfig).map(([k, v]) => (
+          <div key={k} className="flex items-center gap-1.5">
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${statusDot[k]}`} />
+            {v.label}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Calendário */}
+        <div className="lg:col-span-2">
+          <div className="border rounded-xl overflow-hidden bg-card">
+            {/* Header navegação */}
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+              <button onClick={prevMes} className="p-1.5 rounded hover:bg-muted transition-colors">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <span className="font-semibold text-sm">{MESES[mes]} {ano}</span>
+              <button onClick={nextMes} className="p-1.5 rounded hover:bg-muted transition-colors">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+
+            {/* Dias da semana */}
+            <div className="grid grid-cols-7 border-b">
+              {DIAS_SEMANA.map(d => (
+                <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground">{d}</div>
+              ))}
+            </div>
+
+            {/* Células */}
+            <div className="grid grid-cols-7">
+              {Array.from({ length: Math.ceil(celulas / 7) * 7 }).map((_, i) => {
+                const dia = i - primeiroDia + 1
+                const valido = dia >= 1 && dia <= totalDias
+                const eventos = valido ? (servicosPorDia[dia] ?? []) : []
+                const isHoje = valido && dia === hoje.getDate() && mes === hoje.getMonth() && ano === hoje.getFullYear()
+                const isSelecionado = valido && dia === diaSelecionado
+                return (
+                  <div
+                    key={i}
+                    onClick={() => valido && setDiaSelecionado(isSelecionado ? null : dia)}
+                    className={`min-h-[72px] p-1.5 border-b border-r text-xs transition-colors
+                      ${valido ? "cursor-pointer hover:bg-muted/50" : "bg-muted/10"}
+                      ${isSelecionado ? "bg-primary/10 ring-1 ring-inset ring-primary" : ""}
+                    `}
+                  >
+                    {valido && (
+                      <>
+                        <div className={`w-6 h-6 flex items-center justify-center rounded-full font-medium mb-1
+                          ${isHoje ? "bg-primary text-primary-foreground" : "text-foreground"}
+                        `}>
+                          {dia}
+                        </div>
+                        <div className="space-y-0.5">
+                          {eventos.slice(0, 3).map(s => (
+                            <div key={s.id} className={`flex items-center gap-1 px-1 py-0.5 rounded text-[10px] truncate
+                              ${s.status === "agendado" ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200" : ""}
+                              ${s.status === "em_execucao" ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200" : ""}
+                              ${s.status === "concluido" ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200" : ""}
+                              ${s.status === "cancelado" ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200" : ""}
+                            `}>
+                              <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${statusDot[s.status]}`} />
+                              <span className="truncate">{s.cliente}</span>
+                            </div>
+                          ))}
+                          {eventos.length > 3 && (
+                            <div className="text-[10px] text-muted-foreground pl-1">+{eventos.length - 3} mais</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Painel lateral do dia */}
+        <div className="lg:col-span-1">
+          {diaSelecionado ? (
+            <div className="border rounded-xl bg-card overflow-hidden">
+              <div className="px-4 py-3 border-b bg-muted/30">
+                <p className="font-semibold text-sm">{diaSelecionado} de {MESES[mes]} de {ano}</p>
+                <p className="text-xs text-muted-foreground">{servicosDiaSelecionado.length} serviço(s)</p>
+              </div>
+              <div className="p-3 space-y-3 max-h-[500px] overflow-y-auto">
+                {servicosDiaSelecionado.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum serviço neste dia.</p>
+                ) : servicosDiaSelecionado.map(s => (
+                  <div key={s.id} className="border rounded-lg p-3 space-y-1.5 text-xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-primary text-[11px]">{s.osNumber}</span>
+                      <span className={`px-1.5 py-0.5 rounded-full font-medium ${agendadosStatusConfig[s.status].color}`}>
+                        {agendadosStatusConfig[s.status].label}
+                      </span>
+                    </div>
+                    <p className="font-medium text-sm leading-tight">{s.servico}</p>
+                    <p className="text-muted-foreground flex items-center gap-1">
+                      <svg className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      {s.cliente}
+                    </p>
+                    <p className="text-muted-foreground flex items-center gap-1">
+                      <svg className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      {s.horario}
+                    </p>
+                    <p className="text-muted-foreground flex items-center gap-1">
+                      <svg className="h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <span className="truncate">{s.local}</span>
+                    </p>
+                    <p className="text-muted-foreground">Técnico: <span className="text-foreground">{s.tecnico}</span></p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="border rounded-xl bg-card flex flex-col items-center justify-center py-16 text-center px-4">
+              <svg className="h-10 w-10 text-muted-foreground/40 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <p className="text-sm text-muted-foreground">Clique em um dia para ver os serviços agendados.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function ServicosAgendadosContent({
   servicos,
   onVerOS,
@@ -1995,6 +2184,7 @@ const handleConfirmarAgendamentoFinal = async () => {
           <TabsList className="mb-6">
             <TabsTrigger value="nova-solicitacao">Nova Solicitacao</TabsTrigger>
             <TabsTrigger value="agendados">Servicos Agendados</TabsTrigger>
+            <TabsTrigger value="agenda">Agenda</TabsTrigger>
           </TabsList>
 
           <TabsContent value="nova-solicitacao" className="mt-0">
@@ -3344,6 +3534,11 @@ const handleConfirmarAgendamentoFinal = async () => {
               onSolicitarCancelamento={handleSolicitarCancelamento}
               onExcluirOS={handleExcluirOSAgendada}
             />
+          </TabsContent>
+
+          {/* Aba Agenda */}
+          <TabsContent value="agenda" className="mt-0">
+            <AgendaCalendarContent servicos={servicosAgendados} />
           </TabsContent>
         </Tabs>
       </main>
