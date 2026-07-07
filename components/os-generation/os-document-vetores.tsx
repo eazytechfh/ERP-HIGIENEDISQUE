@@ -59,10 +59,42 @@ type OSDocumentVetoresProps = {
   showDeclaracaoCupim?: boolean
 }
 
+const osVetoresA4Styles = `
+  .os-a4-page {
+    font-size: 13px;
+    line-height: 1.24;
+  }
+  .os-a4-page .text-\\[8px\\] {
+    font-size: 10px !important;
+  }
+  .os-a4-page .text-\\[9px\\] {
+    font-size: 11px !important;
+  }
+  .os-a4-page .text-\\[10px\\],
+  .os-a4-page .text-xs {
+    font-size: 12px !important;
+  }
+  .os-a4-page .text-sm {
+    font-size: 13px !important;
+  }
+  .os-a4-page .text-lg {
+    font-size: 20px !important;
+  }
+  .os-a4-page table {
+    font-size: 11px;
+  }
+  .os-a4-page th,
+  .os-a4-page td {
+    line-height: 1.22;
+  }
+`
+
 export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresProps>(
   ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico, consumos = [], veiculo, showDeclaracaoCupim = false }, ref) => {
     return (
-      <div ref={ref} className="os-a4-page bg-white text-black p-6 mx-auto text-[11px] print:text-[11px]" style={{ fontFamily: 'Arial, sans-serif' }}>
+      <>
+      <style>{osVetoresA4Styles}</style>
+      <div ref={ref} className="os-a4-page bg-white text-black p-6 mx-auto text-[13px] print:text-[13px]" style={{ fontFamily: 'Arial, sans-serif' }}>
         {/* Header */}
         <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-4">
           <div className="flex items-center gap-4">
@@ -394,6 +426,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
           </div>
         </div>
       </div>
+      </>
     )
   }
 )
