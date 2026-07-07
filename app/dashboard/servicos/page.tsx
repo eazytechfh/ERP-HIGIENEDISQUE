@@ -1670,9 +1670,9 @@ export default function ServicosPage() {
   <base href="${typeof window !== "undefined" ? window.location.origin : ""}/" />
   <style>
     @page { size: A4; margin: 5mm; }
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 11px; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 13px; }
     * { box-sizing: border-box; }
-    .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
+    .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; font-size: 13px; line-height: 1.24; }
     .bg-green-600 { background-color: #16a34a; }
     .bg-gray-200 { background-color: #e5e7eb; }
     .bg-gray-100 { background-color: #f3f4f6; }
@@ -1682,9 +1682,14 @@ export default function ServicosPage() {
     .text-red-600 { color: #dc2626; }
     .text-gray-500 { color: #6b7280; }
     .font-bold { font-weight: bold; }
-    .text-xs { font-size: 10px; }
-    .text-lg { font-size: 1.1rem; }
-    .text-sm { font-size: 0.9rem; }
+    .text-xs { font-size: 12px; }
+    .text-lg { font-size: 20px; }
+    .text-sm { font-size: 13px; }
+    .text-\[8px\] { font-size: 10px; }
+    .text-\[9px\] { font-size: 11px; }
+    .text-\[10px\] { font-size: 12px; }
+    .text-\[11px\] { font-size: 13px; }
+    .text-\[13px\] { font-size: 13px; }
     .border { border: 1px solid #000; }
     .border-black { border-color: #000; }
     .border-t { border-top: 1px solid #000; }
@@ -1734,7 +1739,8 @@ export default function ServicosPage() {
     .align-top { vertical-align: top; }
     .space-y-1 > * + * { margin-top: 0.15rem; }
     p { margin: 0; }
-    table { border-collapse: collapse; width: 100%; }
+    table { border-collapse: collapse; width: 100%; font-size: 11px; }
+    th, td { line-height: 1.22; }
     @media print {
       body { margin: 0; padding: 0; }
       .no-print { display: none; }
