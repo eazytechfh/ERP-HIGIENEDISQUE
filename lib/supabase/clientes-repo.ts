@@ -231,7 +231,7 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
   const { data, error, count } = await query
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return {
-    data: (data || []).map((row) => mapDbToCliente({ ...row, cliente_locais: [], cliente_contatos: [], cliente_arquivos: [] })),
+    data: (data || []).map((row) => mapDbToCliente({ ...(row as unknown as Record<string, unknown>), cliente_locais: [], cliente_contatos: [], cliente_arquivos: [] })),
     count: count ?? 0,
   }
 }

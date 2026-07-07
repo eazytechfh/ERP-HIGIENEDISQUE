@@ -135,6 +135,7 @@ export default function EquipePage() {
       let perfilAcesso = formData.perfilAcesso
       let permissions = (formData.permissions || []) as AppPermissionKey[]
       let createdAuth = false
+      let updatedPassword = false
 
       if (accessEnabled && !userId) {
         if (!canManageAccess) {
@@ -195,6 +196,47 @@ export default function EquipePage() {
         createdAuth = true
       }
 
+      if (!createdAuth && accessEnabled && userId && (formData.senhaAcesso || formData.confirmarSenhaAcesso)) {
+        if (!canManageAccess) {
+          throw new Error("Somente administradores podem alterar senhas de usuarios.")
+        }
+
+        if (formData.senhaAcesso.length < 6) {
+          throw new Error("A nova senha deve ter ao menos 6 caracteres.")
+        }
+
+        if (formData.senhaAcesso !== formData.confirmarSenhaAcesso) {
+          throw new Error("A confirmacao da nova senha nao confere.")
+        }
+
+        const supabase = getSupabaseBrowserClient()
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError || !sessionData.session?.access_token) {
+          throw new Error("Sessao admin do Supabase indisponivel. Entre com um administrador real para alterar senhas.")
+        }
+
+        const response = await fetch("/api/admin/update-user-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            userId,
+            password: formData.senhaAcesso,
+          }),
+        })
+
+        const payload = (await response.json()) as { error?: string; ok?: boolean }
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "Falha ao alterar senha do usuario no Supabase Auth.")
+        }
+
+        updatedPassword = true
+      }
+
       if (userId && canManageAccess && perfilAcesso) {
         await upsertUserAccessProfileSupabase({
           userId,
@@ -237,11 +279,16 @@ export default function EquipePage() {
           entity: "user_access",
           entityId: userId,
           entityLabel: formData.nome.trim(),
-          description: createdAuth ? "Usuario criado com permissoes personalizadas." : "Permissoes de usuario atualizadas.",
+          description: createdAuth
+            ? "Usuario criado com permissoes personalizadas."
+            : updatedPassword
+              ? "Acesso de usuario atualizado com alteracao de senha."
+              : "Permissoes de usuario atualizadas.",
           metadata: {
             role: perfilAcesso,
             permissions,
             ativo: formData.situacao === "Ativo",
+            passwordUpdated: updatedPassword,
           },
         })
       }
@@ -254,7 +301,13 @@ export default function EquipePage() {
       })
 
       await refreshProfile()
-      setSubmitSuccess(createdAuth ? "Membro salvo e usuario criado no Supabase com sucesso." : "Membro salvo no Supabase com sucesso.")
+      setSubmitSuccess(
+        createdAuth
+          ? "Membro salvo e usuario criado no Supabase com sucesso."
+          : updatedPassword
+            ? "Membro salvo e senha alterada no Supabase com sucesso."
+            : "Membro salvo no Supabase com sucesso."
+      )
       setEditingId(null)
       setFormData(INITIAL_FORM_DATA)
       setActiveTab("visualizar")
@@ -528,7 +581,7 @@ export default function EquipePage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
                         <h3 className="text-sm font-semibold text-foreground">Acesso ao sistema</h3>
-                        <p className="text-sm text-muted-foreground">Se preencher email e perfil, o usuario tambem sera criado no Supabase Auth.</p>
+                        <p className="text-sm text-muted-foreground">Se preencher email e perfil, o usuario tambem sera criado no Supabase Auth. Ao editar um usuario existente, preencha a nova senha apenas quando quiser altera-la.</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <Label htmlFor="temAcesso" className="text-sm">Criar login</Label>
@@ -554,7 +607,7 @@ export default function EquipePage() {
 
                     {formData.userId ? (
                       <Alert>
-                        <AlertDescription>Este membro ja possui usuario vinculado no Supabase Auth.</AlertDescription>
+                        <AlertDescription>Este membro ja possui usuario vinculado no Supabase Auth. A senha pode ser alterada abaixo, se necessario.</AlertDescription>
                       </Alert>
                     ) : null}
 
@@ -580,18 +633,28 @@ export default function EquipePage() {
                             </SelectContent>
                           </Select>
                         </div>
-                        {!formData.userId ? (
-                          <>
-                            <div className="space-y-2">
-                              <Label htmlFor="senhaAcesso">Senha provisoria *</Label>
-                              <Input id="senhaAcesso" type="password" value={formData.senhaAcesso} onChange={(e) => handleInputChange("senhaAcesso", e.target.value)} required={accessEnabled && !Boolean(formData.userId)} />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="confirmarSenhaAcesso">Confirmar senha *</Label>
-                              <Input id="confirmarSenhaAcesso" type="password" value={formData.confirmarSenhaAcesso} onChange={(e) => handleInputChange("confirmarSenhaAcesso", e.target.value)} required={accessEnabled && !Boolean(formData.userId)} />
-                            </div>
-                          </>
-                        ) : null}
+                        <div className="space-y-2">
+                          <Label htmlFor="senhaAcesso">{formData.userId ? "Nova senha" : "Senha provisoria *"}</Label>
+                          <Input
+                            id="senhaAcesso"
+                            type="password"
+                            value={formData.senhaAcesso}
+                            onChange={(e) => handleInputChange("senhaAcesso", e.target.value)}
+                            required={accessEnabled && !Boolean(formData.userId)}
+                            placeholder={formData.userId ? "Deixe em branco para manter a senha atual" : undefined}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmarSenhaAcesso">{formData.userId ? "Confirmar nova senha" : "Confirmar senha *"}</Label>
+                          <Input
+                            id="confirmarSenhaAcesso"
+                            type="password"
+                            value={formData.confirmarSenhaAcesso}
+                            onChange={(e) => handleInputChange("confirmarSenhaAcesso", e.target.value)}
+                            required={accessEnabled && !Boolean(formData.userId)}
+                            placeholder={formData.userId ? "Repita a nova senha" : undefined}
+                          />
+                        </div>
                       </div>
                     ) : null}
 

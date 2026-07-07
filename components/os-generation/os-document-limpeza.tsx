@@ -73,7 +73,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
     const caixasPadded = [...caixasDagua, ...Array(Math.max(0, 10 - caixasDagua.length)).fill(null)]
 
     return (
-      <div ref={ref} className="bg-white text-black p-6 max-w-4xl mx-auto text-[10px] print:text-[9px]" style={{ fontFamily: 'Arial, sans-serif' }}>
+      <div ref={ref} className="os-a4-page bg-white text-black p-5 mx-auto text-[11px] print:text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
         {/* Header */}
         <div className="flex items-start justify-between border-b-2 border-black pb-3 mb-3">
           <div className="flex items-center gap-3">

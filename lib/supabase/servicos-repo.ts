@@ -27,7 +27,7 @@ export type ServicoSupabaseItem = {
   osAssinadaStorageBucket: string
   osAssinadaStoragePath: string
   osAssinadaTamanho: number
-  cobrancaModo: "contrato" | "adicional"
+  cobrancaModo: "contrato" | "adicional" | "avulso"
   contratoId: string
   contratoItemId: string
   valorCobranca: number
@@ -60,7 +60,7 @@ export type ServicoSupabaseInput = {
   osAssinadaStorageBucket?: string
   osAssinadaStoragePath?: string
   osAssinadaTamanho?: number
-  cobrancaModo?: "contrato" | "adicional"
+  cobrancaModo?: "contrato" | "adicional" | "avulso"
   contratoId?: string
   contratoItemId?: string
   valorCobranca?: number
@@ -94,7 +94,7 @@ function mapDbToServico(row: any): ServicoSupabaseItem {
     osAssinadaStorageBucket: row.os_assinada_storage_bucket || "",
     osAssinadaStoragePath: row.os_assinada_storage_path || "",
     osAssinadaTamanho: typeof row.os_assinada_tamanho === "number" ? row.os_assinada_tamanho : Number(row.os_assinada_tamanho) || 0,
-    cobrancaModo: row.cobranca_modo === "adicional" ? "adicional" : "contrato",
+    cobrancaModo: row.cobranca_modo === "adicional" || row.cobranca_modo === "avulso" ? row.cobranca_modo : "contrato",
     contratoId: row.contrato_id ? String(row.contrato_id) : "",
     contratoItemId: row.contrato_item_id ? String(row.contrato_item_id) : "",
     valorCobranca: typeof row.valor_cobranca === "number" ? row.valor_cobranca : Number(row.valor_cobranca) || 0,

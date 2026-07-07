@@ -62,13 +62,11 @@ type OSDocumentVetoresProps = {
 export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresProps>(
   ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico, consumos = [], veiculo, showDeclaracaoCupim = false }, ref) => {
     return (
-      <div ref={ref} className="bg-white text-black p-8 max-w-4xl mx-auto text-xs print:text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
+      <div ref={ref} className="os-a4-page bg-white text-black p-6 mx-auto text-[11px] print:text-[11px]" style={{ fontFamily: 'Arial, sans-serif' }}>
         {/* Header */}
         <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-4">
           <div className="flex items-center gap-4">
-            <div className="w-24 h-16 bg-green-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-lg">HD</span>
-            </div>
+            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="w-24 h-16 object-contain" />
             <div>
               <h1 className="font-bold text-sm">{empresaInfo.nome}</h1>
               <p className="text-[10px]">{empresaInfo.endereco}</p>

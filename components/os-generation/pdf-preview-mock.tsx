@@ -81,9 +81,12 @@ export function PdfPreviewMock({
       <html>
       <head>
         <title>OS ${osNumber}</title>
+        <base href="${window.location.origin}/" />
         <style>
-          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+          @page { size: A4; margin: 5mm; }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 11px; }
           * { box-sizing: border-box; }
+          .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
           .bg-green-600 { background-color: #16a34a; }
           .bg-gray-200 { background-color: #e5e7eb; }
           .bg-gray-100 { background-color: #f3f4f6; }
@@ -93,8 +96,9 @@ export function PdfPreviewMock({
           .text-red-600 { color: #dc2626; }
           .text-gray-500 { color: #6b7280; }
           .font-bold { font-weight: bold; }
-          .text-lg { font-size: 1.125rem; }
-          .text-sm { font-size: 0.875rem; }
+          .text-xs { font-size: 10px; }
+          .text-lg { font-size: 1.1rem; }
+          .text-sm { font-size: 0.9rem; }
           .border { border: 1px solid #000; }
           .border-black { border-color: #000; }
           .border-t { border-top: 1px solid #000; }
@@ -102,21 +106,25 @@ export function PdfPreviewMock({
           .border-b { border-bottom: 1px solid #000; }
           .border-2 { border-width: 2px; }
           .rounded { border-radius: 0.25rem; }
-          .p-1 { padding: 0.25rem; }
-          .p-2 { padding: 0.5rem; }
-          .p-8 { padding: 2rem; }
+          .p-1 { padding: 0.15rem; }
+          .p-2 { padding: 0.25rem; }
+          .p-5 { padding: 0.75rem; }
+          .p-6 { padding: 1rem; }
+          .p-8 { padding: 1rem; }
           .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-          .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-          .mb-4 { margin-bottom: 1rem; }
-          .mt-1 { margin-top: 0.25rem; }
-          .mt-2 { margin-top: 0.5rem; }
-          .mt-4 { margin-top: 1rem; }
-          .mb-2 { margin-bottom: 0.5rem; }
-          .mb-8 { margin-bottom: 2rem; }
+          .py-1 { padding-top: 0.1rem; padding-bottom: 0.1rem; }
+          .py-2 { padding-top: 0.15rem; padding-bottom: 0.15rem; }
+          .mb-4 { margin-bottom: 0.35rem; }
+          .mt-1 { margin-top: 0.15rem; }
+          .mt-2 { margin-top: 0.2rem; }
+          .mt-4 { margin-top: 0.3rem; }
+          .mb-2 { margin-bottom: 0.2rem; }
+          .mb-8 { margin-bottom: 0.4rem; }
           .gap-2 { gap: 0.5rem; }
           .gap-4 { gap: 1rem; }
           .gap-8 { gap: 2rem; }
           .flex { display: flex; }
+          .flex-wrap { flex-wrap: wrap; }
           .grid { display: grid; }
           .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
           .grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
@@ -129,18 +137,20 @@ export function PdfPreviewMock({
           .text-right { text-align: right; }
           .w-full { width: 100%; }
           .w-4 { width: 1rem; }
-          .w-24 { width: 6rem; }
+          .w-24 { width: 5rem; }
+          .w-1\/4 { width: 25%; }
           .h-4 { height: 1rem; }
-          .h-16 { height: 4rem; }
-          .min-h-\[40px\] { min-height: 40px; }
-          .min-h-\[60px\] { min-height: 60px; }
+          .h-16 { height: 3rem; }
+          .min-h-\[40px\] { min-height: 18px; }
+          .min-h-\[60px\] { min-height: 24px; }
           .inline-flex { display: inline-flex; }
-          .leading-tight { line-height: 1.25; }
+          .leading-tight { line-height: 1.15; }
           .align-top { vertical-align: top; }
-          .space-y-1 > * + * { margin-top: 0.25rem; }
+          .space-y-1 > * + * { margin-top: 0.15rem; }
+          p { margin: 0; }
           table { border-collapse: collapse; width: 100%; }
           @media print {
-            body { margin: 0; padding: 10px; }
+            body { margin: 0; padding: 0; }
             .no-print { display: none; }
           }
         </style>

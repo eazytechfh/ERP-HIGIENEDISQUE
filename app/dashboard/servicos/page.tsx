@@ -44,7 +44,7 @@ import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-heade
 import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
-import { ConsumoEstoqueCard, type ConsumoItem, type ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
+import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CLIENTE_COLUMNS_SELETOR, getClienteSupabase, listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
@@ -99,7 +99,7 @@ type Contrato = {
   itens: { id: string; nome: string }[]
 }
 
-type BillingMode = "contrato" | "adicional"
+type BillingMode = "contrato" | "adicional" | "avulso"
 
 type ServiceRequest = {
   clientId: string
@@ -129,6 +129,7 @@ type ServiceRequest = {
     notifyWhatsapp?: boolean
   }
   warrantyDays: string
+  warrantyUnit: "dias" | "meses" | "anos"
   attachments: File[]
 }
 
@@ -372,8 +373,18 @@ function mapServicoSupabaseToAgendado(servico: ServicoSupabaseItem): ServicoAgen
     billingDocument: servico.tipoDocumentoCobranca || undefined,
     additionalReason: servico.motivoAdicional || undefined,
     billingApproved: servico.cobrancaAprovada,
-    registerRevenueInCashFlow: servico.cobrancaModo === "adicional" && servico.valorCobranca > 0,
+    registerRevenueInCashFlow: servico.cobrancaModo !== "contrato" && servico.valorCobranca > 0,
   }
+}
+
+function isBillingDireto(mode: BillingMode) {
+  return mode === "adicional" || mode === "avulso"
+}
+
+function getBillingModeLabel(mode: BillingMode) {
+  if (mode === "contrato") return "Incluso em contrato"
+  if (mode === "avulso") return "Pagamento avulso"
+  return "Adicional"
 }
 
 function mapFlowStatusToAgendado(status: FlowServico["status"]): StatusAgendado {
@@ -1265,9 +1276,10 @@ export default function ServicosPage() {
       paymentMethod: "",
       registerRevenueInCashFlow: false,
       notifyEmail: false,
-      notifyWhatsapp: false,
+    notifyWhatsapp: false,
     },
     warrantyDays: "",
+    warrantyUnit: "dias",
     attachments: []
   })
 
@@ -1314,7 +1326,7 @@ export default function ServicosPage() {
   })
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
 
-  // Estados para consumo de estoque (OS Vetores)
+  // Estados derivados dos produtos utilizados na OS Vetores.
   const [estoqueSimulado, setEstoqueSimulado] = useState<ItemEstoque[]>([])
 
   const [consumos, setConsumos] = useState<ConsumoItem[]>([])
@@ -1345,7 +1357,7 @@ export default function ServicosPage() {
   }, [estoqueBase])
   
 
-  // Sincroniza automaticamente o consumo de estoque com os produtos utilizados na OS Vetores
+  // Sincroniza automaticamente a baixa prevista com os produtos utilizados na OS Vetores.
   const normalizarTextoProduto = (value: string) =>
     value
       .normalize("NFD")
@@ -1441,6 +1453,11 @@ export default function ServicosPage() {
     return "vetores"
   }
 
+  const getWarrantyLabel = () => {
+    if (!serviceRequest.warrantyDays) return ""
+    return `${serviceRequest.warrantyDays} ${serviceRequest.warrantyUnit}`
+  }
+
   const filteredClientes = clientesData // já paginado/filtrado pelo servidor
   const clientesTotalPages = Math.ceil(clientesTotalCount / CLIENT_PAGE_SIZE)
 
@@ -1502,10 +1519,33 @@ export default function ServicosPage() {
   }
 
   const handleBillingChange = (field: string, value: any) => {
-    setServiceRequest(prev => ({
-      ...prev,
-      billing: { ...prev.billing, [field]: value }
-    }))
+    setServiceRequest((prev) => {
+      if (field === "mode") {
+        const mode = value as BillingMode
+        return {
+          ...prev,
+          billing: {
+            ...prev.billing,
+            mode,
+            contractId: mode === "contrato" ? prev.billing.contractId : "",
+            contractItemId: mode === "contrato" ? prev.billing.contractItemId : "",
+            additionalReason: "",
+            approved: mode === "avulso" ? true : prev.billing.approved,
+            registerRevenueInCashFlow: mode === "contrato" ? false : prev.billing.registerRevenueInCashFlow,
+          },
+        }
+      }
+
+      return {
+        ...prev,
+        billing: { ...prev.billing, [field]: value },
+      }
+    })
+
+    const errorKey = `billing.${field}`
+    if (errors[errorKey]) {
+      setErrors((prev) => ({ ...prev, [errorKey]: "" }))
+    }
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1563,17 +1603,17 @@ export default function ServicosPage() {
     }
 
     // Validação de billing
-    if (serviceRequest.billing.mode === "adicional") {
+    if (isBillingDireto(serviceRequest.billing.mode)) {
       if (!serviceRequest.billing.price) newErrors["billing.price"] = "Informe o valor"
       if (!serviceRequest.billing.paymentMethod) newErrors["billing.paymentMethod"] = "Selecione a forma de pagamento"
       if (!serviceRequest.billing.billingDocument) newErrors["billing.billingDocument"] = "Selecione o documento de cobrança"
     }
-    if (serviceRequest.billing.mode === "adicional" && !serviceRequest.billing.additionalReason) {
-      newErrors["billing.additionalReason"] = "Informe o motivo do adicional"
-    }
     if (serviceRequest.billing.mode === "contrato") {
       if (!serviceRequest.billing.contractId) newErrors["billing.contractId"] = "Selecione o contrato"
       if (!serviceRequest.billing.contractItemId) newErrors["billing.contractItemId"] = "Selecione o item do contrato"
+    }
+    if (serviceRequest.billing.mode === "adicional" && !serviceRequest.billing.additionalReason) {
+      newErrors["billing.additionalReason"] = "Informe o motivo do adicional"
     }
 
     setErrors(newErrors)
@@ -1627,9 +1667,12 @@ export default function ServicosPage() {
 <head>
   <meta charset="UTF-8" />
   <title>OS ${osNumberValue}</title>
+  <base href="${typeof window !== "undefined" ? window.location.origin : ""}/" />
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+    @page { size: A4; margin: 5mm; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 11px; }
     * { box-sizing: border-box; }
+    .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
     .bg-green-600 { background-color: #16a34a; }
     .bg-gray-200 { background-color: #e5e7eb; }
     .bg-gray-100 { background-color: #f3f4f6; }
@@ -1639,8 +1682,9 @@ export default function ServicosPage() {
     .text-red-600 { color: #dc2626; }
     .text-gray-500 { color: #6b7280; }
     .font-bold { font-weight: bold; }
-    .text-lg { font-size: 1.125rem; }
-    .text-sm { font-size: 0.875rem; }
+    .text-xs { font-size: 10px; }
+    .text-lg { font-size: 1.1rem; }
+    .text-sm { font-size: 0.9rem; }
     .border { border: 1px solid #000; }
     .border-black { border-color: #000; }
     .border-t { border-top: 1px solid #000; }
@@ -1648,21 +1692,25 @@ export default function ServicosPage() {
     .border-b { border-bottom: 1px solid #000; }
     .border-2 { border-width: 2px; }
     .rounded { border-radius: 0.25rem; }
-    .p-1 { padding: 0.25rem; }
-    .p-2 { padding: 0.5rem; }
-    .p-8 { padding: 2rem; }
+    .p-1 { padding: 0.15rem; }
+    .p-2 { padding: 0.25rem; }
+    .p-5 { padding: 0.75rem; }
+    .p-6 { padding: 1rem; }
+    .p-8 { padding: 1rem; }
     .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-    .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-    .mb-4 { margin-bottom: 1rem; }
-    .mt-1 { margin-top: 0.25rem; }
-    .mt-2 { margin-top: 0.5rem; }
-    .mt-4 { margin-top: 1rem; }
-    .mb-2 { margin-bottom: 0.5rem; }
-    .mb-8 { margin-bottom: 2rem; }
+    .py-1 { padding-top: 0.1rem; padding-bottom: 0.1rem; }
+    .py-2 { padding-top: 0.15rem; padding-bottom: 0.15rem; }
+    .mb-4 { margin-bottom: 0.35rem; }
+    .mt-1 { margin-top: 0.15rem; }
+    .mt-2 { margin-top: 0.2rem; }
+    .mt-4 { margin-top: 0.3rem; }
+    .mb-2 { margin-bottom: 0.2rem; }
+    .mb-8 { margin-bottom: 0.4rem; }
     .gap-2 { gap: 0.5rem; }
     .gap-4 { gap: 1rem; }
     .gap-8 { gap: 2rem; }
     .flex { display: flex; }
+    .flex-wrap { flex-wrap: wrap; }
     .grid { display: grid; }
     .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1675,18 +1723,20 @@ export default function ServicosPage() {
     .text-right { text-align: right; }
     .w-full { width: 100%; }
     .w-4 { width: 1rem; }
-    .w-24 { width: 6rem; }
+    .w-24 { width: 5rem; }
+    .w-1\/4 { width: 25%; }
     .h-4 { height: 1rem; }
-    .h-16 { height: 4rem; }
-    .min-h-\[40px\] { min-height: 40px; }
-    .min-h-\[60px\] { min-height: 60px; }
+    .h-16 { height: 3rem; }
+    .min-h-\[40px\] { min-height: 18px; }
+    .min-h-\[60px\] { min-height: 24px; }
     .inline-flex { display: inline-flex; }
-    .leading-tight { line-height: 1.25; }
+    .leading-tight { line-height: 1.15; }
     .align-top { vertical-align: top; }
-    .space-y-1 > * + * { margin-top: 0.25rem; }
+    .space-y-1 > * + * { margin-top: 0.15rem; }
+    p { margin: 0; }
     table { border-collapse: collapse; width: 100%; }
     @media print {
-      body { margin: 0; padding: 10px; }
+      body { margin: 0; padding: 0; }
       .no-print { display: none; }
     }
   </style>
@@ -1791,7 +1841,7 @@ export default function ServicosPage() {
     const itemComSaldoInsuficiente = itensSelecionadosBaixa.find(({ item, quantidade }) => quantidade > item.estoqueAtual)
     if (itemComSaldoInsuficiente) {
       setBaixaError(
-        `Quantidade informada para ${itemComSaldoInsuficiente.item.nome} excede o estoque mock (${itemComSaldoInsuficiente.item.estoqueAtual} ${itemComSaldoInsuficiente.item.unidadePadrao}).`
+        `Quantidade informada para ${itemComSaldoInsuficiente.item.nome} excede o saldo disponivel (${itemComSaldoInsuficiente.item.estoqueAtual} ${itemComSaldoInsuficiente.item.unidadePadrao}).`
       )
       return
     }
@@ -1966,7 +2016,7 @@ export default function ServicosPage() {
       }
     })()
 
-    if (servico.registerRevenueInCashFlow && saved.cobrancaModo === "adicional") {
+    if (servico.registerRevenueInCashFlow && saved.cobrancaModo !== "contrato") {
       if (saved.valorCobranca <= 0) {
         return { financeiroErro: "valor informado é R$ 0,00 — informe o valor do serviço para registrar no financeiro" }
       }
@@ -1974,7 +2024,7 @@ export default function ServicosPage() {
         await upsertReceitaServicoSupabase({
           servicoId: saved.id,
           clienteId: saved.clienteId || undefined,
-          contratoId: saved.contratoId || undefined,
+          contratoId: undefined,
           categoriaId: servico.revenueCategoryId,
           categoria: categoriasFinanceirasReceita.find((item) => item.id === servico.revenueCategoryId)?.nome,
           descricao: `${saved.servico} - ${saved.cliente}`,
@@ -2251,19 +2301,19 @@ const handleConfirmarAgendamentoFinal = async () => {
       osFingerprint,
       osDocumentoHtml: osDocumentoHtmlSnapshot,
       billingMode: serviceRequest.billing.mode,
-      contractId: serviceRequest.billing.contractId,
-      contractItemId: serviceRequest.billing.contractItemId,
+      contractId: serviceRequest.billing.mode === "contrato" ? serviceRequest.billing.contractId : "",
+      contractItemId: serviceRequest.billing.mode === "contrato" ? serviceRequest.billing.contractItemId : "",
       billingValue: Number(String(serviceRequest.billing.price || "0").replace(/\./g, "").replace(",", ".")) || 0,
       paymentMethod: serviceRequest.billing.paymentMethod,
-      billingDocument: serviceRequest.billing.mode === "adicional"
+      billingDocument: isBillingDireto(serviceRequest.billing.mode)
         ? serviceRequest.billing.billingDocument === "nota_fiscal"
           ? "nota_fiscal"
           : serviceRequest.billing.paymentMethod === "boleto"
             ? "boleto"
             : "recibo"
         : "",
-      additionalReason: serviceRequest.billing.additionalReason,
-      billingApproved: Boolean(serviceRequest.billing.approved),
+      additionalReason: serviceRequest.billing.mode === "adicional" ? serviceRequest.billing.additionalReason : "",
+      billingApproved: serviceRequest.billing.mode === "avulso" ? true : Boolean(serviceRequest.billing.approved),
       registerRevenueInCashFlow: Boolean(serviceRequest.billing.registerRevenueInCashFlow),
       revenueCategoryId: serviceRequest.billing.revenueCategoryId,
       notifyEmail: Boolean(serviceRequest.billing.notifyEmail),
@@ -2279,7 +2329,7 @@ const handleConfirmarAgendamentoFinal = async () => {
         setShowToast(true)
         setTimeout(() => { setShowToast(false); setActiveTab("agendados") }, 4000)
       } else if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
-        setToastMessage("Aviso: Voce ainda nao registrou consumo de produtos. Isso pode ser preenchido apos a execucao.")
+        setToastMessage("Aviso: Voce ainda nao informou produtos utilizados. Isso pode ser preenchido apos a execucao.")
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
@@ -2799,6 +2849,10 @@ const handleConfirmarAgendamentoFinal = async () => {
                         <RadioGroupItem value="adicional" id="adicional" />
                         <Label htmlFor="adicional" className="font-normal cursor-pointer">Adicional (fora do contrato)</Label>
                       </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="avulso" id="avulso" />
+                        <Label htmlFor="avulso" className="font-normal cursor-pointer">Pagamento avulso</Label>
+                      </div>
                     </RadioGroup>
                   </div>
 
@@ -2859,7 +2913,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                     </div>
                   )}
 
-                  {(serviceRequest.billing.mode === "adicional") && (
+                  {isBillingDireto(serviceRequest.billing.mode) && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
@@ -2912,20 +2966,22 @@ const handleConfirmarAgendamentoFinal = async () => {
                       </div>
 
                       {serviceRequest.billing.mode === "adicional" && (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="additionalReason">Motivo do adicional *</Label>
-                            <Textarea
-                              id="additionalReason"
-                              value={serviceRequest.billing.additionalReason || ""}
-                              onChange={(e) => handleBillingChange("additionalReason", e.target.value)}
-                              placeholder="Descreva o motivo do serviço adicional..."
-                              rows={2}
-                              className={errors["billing.additionalReason"] ? "border-destructive" : ""}
-                            />
-                            {errors["billing.additionalReason"] && <p className="text-sm text-destructive">{errors["billing.additionalReason"]}</p>}
-                          </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="additionalReason">Motivo do adicional *</Label>
+                          <Textarea
+                            id="additionalReason"
+                            value={serviceRequest.billing.additionalReason || ""}
+                            onChange={(e) => handleBillingChange("additionalReason", e.target.value)}
+                            placeholder="Descreva o motivo do serviço adicional..."
+                            rows={2}
+                            className={errors["billing.additionalReason"] ? "border-destructive" : ""}
+                          />
+                          {errors["billing.additionalReason"] && <p className="text-sm text-destructive">{errors["billing.additionalReason"]}</p>}
+                        </div>
+                      )}
 
+                      {isBillingDireto(serviceRequest.billing.mode) && (
+                        <>
                           <button
                             type="button"
                             onClick={() => handleBillingChange("registerRevenueInCashFlow", !serviceRequest.billing.registerRevenueInCashFlow)}
@@ -2944,7 +3000,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                                   <p className={`font-semibold ${serviceRequest.billing.registerRevenueInCashFlow ? "text-green-700" : ""}`}>
                                     Cadastrar receita no fluxo de caixa?
                                   </p>
-                                  <p className="text-sm text-muted-foreground">Se marcado, o servico adicional entra automaticamente no financeiro.</p>
+                                  <p className="text-sm text-muted-foreground">Se marcado, esta cobranca entra automaticamente no financeiro.</p>
                                 </div>
                               </div>
                               <Checkbox
@@ -2981,6 +3037,8 @@ const handleConfirmarAgendamentoFinal = async () => {
                             ) : null}
                           </button>
 
+                          {serviceRequest.billing.mode === "adicional" && (
+                            <>
                           <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                             <Label htmlFor="approved" className="font-normal cursor-pointer">
                               Aprovado pelo cliente?
@@ -2997,6 +3055,8 @@ const handleConfirmarAgendamentoFinal = async () => {
                               <AlertTriangle className="h-4 w-4" />
                               <span className="text-sm">Serviço adicional pendente de aprovação</span>
                             </div>
+                          )}
+                            </>
                           )}
                         </>
                       )}
@@ -3016,13 +3076,31 @@ const handleConfirmarAgendamentoFinal = async () => {
                 <CardContent className="space-y-2">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="warranty">Garantia (dias)</Label>
+                      <Label htmlFor="warranty">Garantia</Label>
                       <Input
                         id="warranty"
+                        type="number"
+                        min="1"
                         value={serviceRequest.warrantyDays}
                         onChange={(e) => handleInputChange("warrantyDays", e.target.value)}
                         placeholder="Ex: 90"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="warrantyUnit">Unidade da garantia</Label>
+                      <Select
+                        value={serviceRequest.warrantyUnit}
+                        onValueChange={(value) => handleInputChange("warrantyUnit", value as ServiceRequest["warrantyUnit"])}
+                      >
+                        <SelectTrigger id="warrantyUnit">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="dias">Dias</SelectItem>
+                          <SelectItem value="meses">Meses</SelectItem>
+                          <SelectItem value="anos">Anos</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -3120,9 +3198,9 @@ const handleConfirmarAgendamentoFinal = async () => {
                     <div>
                       <p className="text-muted-foreground">Cobrança</p>
                       <p className="font-medium">
-                        {serviceRequest.billing.mode === "contrato" && "Incluso em contrato"}
-                        
-                        {serviceRequest.billing.mode === "adicional" && `Adicional - ${serviceRequest.billing.price || "-"}`}
+                        {isBillingDireto(serviceRequest.billing.mode)
+                          ? `${getBillingModeLabel(serviceRequest.billing.mode)} - ${serviceRequest.billing.price || "-"}`
+                          : getBillingModeLabel(serviceRequest.billing.mode)}
                       </p>
                     </div>
                   </div>
@@ -3163,7 +3241,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                     <p><span className="text-muted-foreground">Tipo:</span> {getTipoNome(serviceRequest.serviceType)}</p>
                     <p><span className="text-muted-foreground">Local:</span> {localSelecionado?.nome}</p>
                     {serviceRequest.warrantyDays && (
-                      <p><span className="text-muted-foreground">Garantia:</span> {serviceRequest.warrantyDays} dias</p>
+                      <p><span className="text-muted-foreground">Garantia:</span> {getWarrantyLabel()}</p>
                     )}
                   </div>
                 </div>
@@ -3190,8 +3268,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   </h3>
                   <div className="space-y-2 text-sm p-4 bg-muted/50 rounded-lg">
                     <p><span className="text-muted-foreground">Cobrança:</span> {
-                      serviceRequest.billing.mode === "contrato" ? "Incluso em contrato" :
-                      "Adicional"
+                      getBillingModeLabel(serviceRequest.billing.mode)
                     }</p>
                     {serviceRequest.billing.mode !== "contrato" && (
                       <>
@@ -3256,14 +3333,14 @@ const handleConfirmarAgendamentoFinal = async () => {
                   Execucao e Baixa do Servico
                 </CardTitle>
                 <CardDescription>
-                  Registre os itens consumidos no atendimento (mock local) antes de finalizar o ciclo da OS.
+                  Revise os produtos utilizados no atendimento antes de finalizar o ciclo da OS.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div className="text-sm text-muted-foreground">
                   {consumos.length > 0
-                    ? `${consumos.length} item(ns) de consumo registrado(s).`
-                    : "Nenhum consumo registrado ainda."}
+                    ? `${consumos.length} produto(s) utilizado(s) registrado(s).`
+                    : "Nenhum produto utilizado registrado ainda."}
                 </div>
                 <Button
                   type="button"
@@ -3363,7 +3440,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                     {serviceRequest.warrantyDays && (
                       <div className="flex justify-between py-2">
                         <span className="text-muted-foreground">Garantia</span>
-                        <span className="font-medium">{serviceRequest.warrantyDays} dias</span>
+                        <span className="font-medium">{getWarrantyLabel()}</span>
                       </div>
                     )}
                   </div>
@@ -3394,16 +3471,6 @@ const handleConfirmarAgendamentoFinal = async () => {
               </Card>
             )}
 
-            {/* CARD 4.5 - Consumo de Produtos (Estoque) - Somente para Vetores */}
-            {serviceRequest.serviceType === "pragas" && (
-              <ConsumoEstoqueCard
-                consumos={consumos}
-                onConsumosChange={setConsumos}
-                estoqueSimulado={estoqueSimulado}
-                onEstoqueSimuladoChange={setEstoqueSimulado}
-              />
-            )}
-
             {/* CARD 5 - Financeiro (somente leitura) */}
             <Card>
               <CardHeader className="pb-4">
@@ -3417,8 +3484,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm text-muted-foreground mb-1">Cobrança</p>
                     <p className="font-semibold">
-                      {serviceRequest.billing.mode === "contrato" ? "Incluso em contrato" :
-                       "Adicional"}
+                      {getBillingModeLabel(serviceRequest.billing.mode)}
                     </p>
                   </div>
                   {serviceRequest.billing.mode === "contrato" && contratoSelecionado && (
@@ -3435,7 +3501,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                       </div>
                     </>
                   )}
-                  {(serviceRequest.billing.mode === "adicional") && (
+                  {isBillingDireto(serviceRequest.billing.mode) && (
                     <>
                       <div className="p-4 bg-muted/50 rounded-lg">
                         <p className="text-sm text-muted-foreground mb-1">Valor</p>
@@ -3445,20 +3511,18 @@ const handleConfirmarAgendamentoFinal = async () => {
                         <p className="text-sm text-muted-foreground mb-1">Forma de Pagamento</p>
                         <p className="font-semibold capitalize">{serviceRequest.billing.paymentMethod || "-"}</p>
                       </div>
-                    </>
-                  )}
-                  {serviceRequest.billing.mode === "adicional" && (
-                    <>
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <p className="text-sm text-muted-foreground mb-1">Aprovado?</p>
-                        <Badge variant={serviceRequest.billing.approved ? "default" : "secondary"}>
-                          {serviceRequest.billing.approved ? "Sim, aprovado" : "Pendente de aprovação"}
-                        </Badge>
-                      </div>
+                      {serviceRequest.billing.mode === "adicional" && (
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground mb-1">Aprovado?</p>
+                          <Badge variant={serviceRequest.billing.approved ? "default" : "secondary"}>
+                            {serviceRequest.billing.approved ? "Sim, aprovado" : "Pendente de aprovacao"}
+                          </Badge>
+                        </div>
+                      )}
                       <div className={`p-4 rounded-lg ${serviceRequest.billing.registerRevenueInCashFlow ? "bg-green-50 border border-green-200" : "bg-muted/50"}`}>
                         <p className="text-sm text-muted-foreground mb-1">Registrar no financeiro?</p>
                         <Badge variant={serviceRequest.billing.registerRevenueInCashFlow ? "default" : "secondary"} className={serviceRequest.billing.registerRevenueInCashFlow ? "bg-green-600" : ""}>
-                          {serviceRequest.billing.registerRevenueInCashFlow ? "Sim — será lançado" : "Não"}
+                          {serviceRequest.billing.registerRevenueInCashFlow ? "Sim - sera lancado" : "Nao"}
                         </Badge>
                       </div>
                     </>
@@ -3541,7 +3605,7 @@ const handleConfirmarAgendamentoFinal = async () => {
             <DialogHeader>
               <DialogTitle>Dar baixa no servico</DialogTitle>
               <DialogDescription>
-                Passo {baixaStep} de 2: informe os itens consumidos (estoque mock) e confirme o lancamento local da OS.
+                Passo {baixaStep} de 2: informe os produtos utilizados e confirme o lancamento da OS.
               </DialogDescription>
             </DialogHeader>
 
