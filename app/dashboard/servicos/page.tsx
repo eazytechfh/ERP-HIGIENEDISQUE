@@ -42,7 +42,7 @@ import {
   Settings
 } from 'lucide-react'
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
-import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
+import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/components/os-generation/vetores-form"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
@@ -1349,6 +1349,9 @@ export default function ServicosPage() {
   const [dataGeracao, setDataGeracao] = useState<string | null>(null)
   const [dadosTecnicosVetores, setDadosTecnicosVetores] = useState<DadosTecnicosVetores>({
     pragasAlvo: ["baratas"],
+    garantiasPorPraga: {
+      baratas: { quantidade: "3", unidade: "meses" },
+    },
     tipoAtividade: "quimico",
     descricaoServico: "",
     produtos: [],
@@ -2468,12 +2471,23 @@ const handleConfirmarAgendamentoFinal = async () => {
       : new Date()
     const garantiaInformada = Number.parseInt(serviceRequest.warrantyDays || "0", 10)
     const temGarantiaInformada = Number.isFinite(garantiaInformada) && garantiaInformada > 0
-    const pragas = dadosTecnicosVetores.pragasAlvo.length > 0 ? dadosTecnicosVetores.pragasAlvo : ["outros"]
+    const pragas: PragaAlvo[] = dadosTecnicosVetores.pragasAlvo.length > 0 ? dadosTecnicosVetores.pragasAlvo : ["outros"]
 
     const vetores = pragas.map((praga) => {
       const fallbackMeses = praga === "cupins" ? 24 : 3
-      const amount = temGarantiaInformada ? garantiaInformada : fallbackMeses
-      const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
+      const garantiaPorPraga = dadosTecnicosVetores.garantiasPorPraga?.[praga]
+      const garantiaPorPragaQuantidade = Number.parseInt(garantiaPorPraga?.quantidade || "0", 10)
+      const temGarantiaPorPraga = Number.isFinite(garantiaPorPragaQuantidade) && garantiaPorPragaQuantidade > 0
+      const amount = temGarantiaPorPraga
+        ? garantiaPorPragaQuantidade
+        : temGarantiaInformada
+          ? garantiaInformada
+          : fallbackMeses
+      const unit = temGarantiaPorPraga
+        ? garantiaPorPraga?.unidade || "meses"
+        : temGarantiaInformada
+          ? serviceRequest.warrantyUnit
+          : "meses"
       const vencimento = addWarrantyToDate(dataBase, amount, unit)
       const unitLabel = unit === "anos" ? "Ano(s)" : unit === "meses" ? "Mes(es)" : "Dia(s)"
 
@@ -2519,6 +2533,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     serviceRequest.warrantyUnit,
     serviceRequest.notes,
     dadosTecnicosVetores.pragasAlvo,
+    dadosTecnicosVetores.garantiasPorPraga,
     dadosTecnicosVetores.descricaoServico,
     dadosTecnicosVetores.aplicador,
     localSelecionado,
