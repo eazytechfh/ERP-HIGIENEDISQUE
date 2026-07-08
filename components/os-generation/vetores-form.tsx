@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Bug, Plus, Trash2 } from "lucide-react"
 
-export type PragaAlvo = "baratas" | "formigas" | "ratos" | "mosquitos" | "cupins" | "pulgas_carrapatos" | "outros"
+export type PragaAlvo = "baratas" | "formigas" | "ratos" | "mosquitos" | "cupins" | "lacraias" | "pulgas_carrapatos" | "outros"
 export type TipoAtividade = "quimico" | "nao_quimico"
 
 export type ProdutoUtilizado = {
@@ -48,6 +48,7 @@ const pragasOptions: { value: PragaAlvo; label: string }[] = [
   { value: "ratos", label: "Ratos" },
   { value: "mosquitos", label: "Mosquitos" },
   { value: "cupins", label: "Cupins" },
+  { value: "lacraias", label: "Lacraias" },
   { value: "pulgas_carrapatos", label: "Pulgas/Carrapatos" },
   { value: "outros", label: "Outros" },
 ]

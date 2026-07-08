@@ -107,7 +107,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                   <LabeledValue label="Cliente" value={data.cliente} />
                   <div />
                   <div style={{ fontWeight: 700, textAlign: "right" }}>Nº Pedido :</div>
-                  <div>{data.pedido || "-"}</div>
+                  <div>{data.pedido || ""}</div>
 
                   <LabeledValue label="Endereço" value={data.endereco} wide />
                   <div />
@@ -116,11 +116,11 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                   <LabeledValue label="Bairro" value={data.bairro} />
                   <LabeledValue label="Cidade" value={data.cidade} />
                   <LabeledValue label="Estado" value={data.estado} />
-                  <LabeledValue label="C.E.P" value={data.cep || "-"} />
+                  <LabeledValue label="C.E.P" value={data.cep || ""} />
 
-                  <LabeledValue label="C.P.F" value={data.cpfCnpj || "-"} />
+                  <LabeledValue label="C.P.F" value={data.cpfCnpj || ""} />
                   <div />
-                  <LabeledValue label="Identidade" value={data.identidade || "-"} wide />
+                  <LabeledValue label="Identidade" value={data.identidade || ""} wide />
                 </div>
               </td>
             </tr>

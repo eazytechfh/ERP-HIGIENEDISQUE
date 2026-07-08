@@ -395,6 +395,7 @@ const certificadoPragaLabels: Record<string, string> = {
   ratos: "Rato",
   mosquitos: "Mosquito",
   cupins: "Cupim",
+  lacraias: "Lacraia",
   pulgas_carrapatos: "Pulgas/Carrapatos",
   outros: "Outros",
 }
@@ -2496,7 +2497,7 @@ const handleConfirmarAgendamentoFinal = async () => {
       dataServico: formatDateBR(dataBase),
       validadeCrv: "09/08/2027",
       cliente: clienteSelecionado.nome,
-      pedido: "",
+      pedido: contratoSelecionado?.numero || "",
       endereco: enderecoCompleto,
       bairro: localSelecionado?.bairro || "",
       cidade: localSelecionado?.cidade || "",
@@ -2512,6 +2513,7 @@ const handleConfirmarAgendamentoFinal = async () => {
   }, [
     podeGerarCertificado,
     clienteSelecionado,
+    contratoSelecionado,
     serviceRequest.schedule.date,
     serviceRequest.warrantyDays,
     serviceRequest.warrantyUnit,

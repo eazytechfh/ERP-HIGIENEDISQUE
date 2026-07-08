@@ -25,6 +25,7 @@ const pragaLabels: Record<PragaAlvo, string> = {
   ratos: "RATO",
   mosquitos: "MOSQUITO",
   cupins: "Cupim",
+  lacraias: "Lacraia",
   pulgas_carrapatos: "Pulgas/Carrapatos",
   outros: "Outros",
 }
