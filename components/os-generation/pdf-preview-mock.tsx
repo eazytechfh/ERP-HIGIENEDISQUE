@@ -90,9 +90,11 @@ export function PdfPreviewMock({
         <base href="${window.location.origin}/" />
         <style>
           @page { size: A4; margin: 5mm; }
+          @page certificado { size: A4 landscape; margin: 5mm; }
           body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 13px; }
           * { box-sizing: border-box; }
           .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; font-size: 13px; line-height: 1.24; }
+          .certificado-a4-page { page: certificado; width: 287mm; min-height: 200mm; margin: 0 auto; }
           .bg-green-600 { background-color: #16a34a; }
           .bg-gray-200 { background-color: #e5e7eb; }
           .bg-gray-100 { background-color: #f3f4f6; }
@@ -189,9 +191,10 @@ export function PdfPreviewMock({
         <title>Certificado ${osNumber}</title>
         <base href="${window.location.origin}/" />
         <style>
-          @page { size: A4; margin: 5mm; }
+          @page { size: A4 landscape; margin: 5mm; }
           body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
           * { box-sizing: border-box; }
+          .certificado-a4-page { width: 287mm; min-height: 200mm; margin: 0 auto; }
           table { border-collapse: collapse; width: 100%; }
           p { margin: 0; }
         </style>

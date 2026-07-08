@@ -13,6 +13,8 @@ const empresaInfo = {
   codigoInea: "UN63.01.01.87",
 }
 
+const certificadoLogoQrSrc = "/images/higiene-disque-certificado-logo-qr.png"
+
 export type CertificadoGarantiaVetor = {
   vetor: string
   garantia: string
@@ -51,60 +53,69 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
         ref={ref}
         className="certificado-a4-page bg-white text-black mx-auto"
         style={{
-          width: "200mm",
-          minHeight: "287mm",
-          padding: "12mm",
+          width: "287mm",
+          minHeight: "200mm",
+          padding: "8mm 10mm",
           fontFamily: "Arial, sans-serif",
-          fontSize: "13px",
-          lineHeight: 1.35,
+          fontSize: "12px",
+          lineHeight: 1.25,
           pageBreakBefore: pageBreakBefore ? "always" : "auto",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #111", paddingBottom: "10px" }}>
-          <div>
-            <div style={{ fontSize: "18px", fontWeight: 700 }}>{empresaInfo.nome}</div>
-            <div>{empresaInfo.endereco}</div>
-            <div>{empresaInfo.cidadeUf}</div>
-            <div>Telefones.: {empresaInfo.telefones}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "132mm 1fr", gap: "9mm", alignItems: "start", borderBottom: "2px solid #111", paddingBottom: "5mm" }}>
+          <img
+            src={certificadoLogoQrSrc}
+            alt="Higiene Disque e QR Code"
+            style={{ width: "132mm", height: "40mm", objectFit: "contain", objectPosition: "left center" }}
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3mm", fontSize: "11px" }}>
+            <div style={{ gridColumn: "1 / -1", fontWeight: 700, fontSize: "14px" }}>{empresaInfo.nome}</div>
+            <div style={{ gridColumn: "1 / -1" }}>{empresaInfo.endereco}</div>
+            <div style={{ gridColumn: "1 / -1" }}>{empresaInfo.cidadeUf}</div>
+            <div style={{ gridColumn: "1 / -1" }}>Telefones.: {empresaInfo.telefones}</div>
             <div>{empresaInfo.email}</div>
             <div>{empresaInfo.site}</div>
-          </div>
-          <div style={{ width: "78px", height: "54px", background: "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "20px" }}>
-            HD
+            <InfoLine label="Certificado INEA" value={empresaInfo.certificadoInea} />
+            <InfoLine label="Codigo INEA" value={empresaInfo.codigoInea} />
           </div>
         </div>
 
-        <h1 style={{ textAlign: "center", margin: "28px 0 22px", fontSize: "24px", letterSpacing: 0 }}>
+        <h1 style={{ textAlign: "center", margin: "5mm 0 4mm", fontSize: "24px", letterSpacing: 0 }}>
           CERTIFICADO DE GARANTIA
         </h1>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", border: "1px solid #111", marginBottom: "18px" }}>
-          <InfoBox label="Ordem Servico" value={data.osNumber} />
-          <InfoBox label="Data Servico" value={data.dataServico} />
-          <InfoBox label="Validade CRV" value={data.validadeCrv} />
-          <InfoBox label="Certificado INEA" value={empresaInfo.certificadoInea} />
-          <InfoBox label="Codigo INEA" value={empresaInfo.codigoInea} />
-          <InfoBox label="N Pedido" value={data.pedido || "-"} />
-          <InfoBox label="CPF/CNPJ" value={data.cpfCnpj || "-"} />
-          <InfoBox label="Identidade" value={data.identidade || "-"} />
+        <div style={{ display: "grid", gridTemplateColumns: "25mm 30mm 30mm 36mm 34mm 1fr", gap: "3mm", marginBottom: "3mm", alignItems: "end" }}>
+          <Field label="Ordem Servico" value={data.osNumber} strong />
+          <Field label="Data Servico" value={data.dataServico} />
+          <Field label="Validade CRV" value={data.validadeCrv} />
+          <Field label="Certificado INEA" value={empresaInfo.certificadoInea} />
+          <Field label="Codigo INEA" value={empresaInfo.codigoInea} />
+          <Field label="N Pedido" value={data.pedido || "-"} />
         </div>
 
-        <div style={{ border: "1px solid #111", padding: "10px", marginBottom: "18px" }}>
-          <div><strong>Cliente :</strong> {data.cliente}</div>
-          <div><strong>Endereco :</strong> {data.endereco}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 0.6fr 0.8fr", gap: "8px" }}>
-            <div><strong>Bairro :</strong> {data.bairro}</div>
-            <div><strong>Cidade :</strong> {data.cidade}</div>
-            <div><strong>Estado :</strong> {data.estado}</div>
-            <div><strong>C.E.P :</strong> {data.cep || "-"}</div>
+        <div style={{ border: "1px solid #111", padding: "3mm", marginBottom: "4mm", fontSize: "12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 45mm", gap: "4mm" }}>
+            <InfoLine label="Cliente" value={data.cliente} />
+            <InfoLine label="N Pedido" value={data.pedido || "-"} />
+          </div>
+          <InfoLine label="Endereco" value={data.endereco} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 42mm 20mm 32mm", gap: "4mm" }}>
+            <InfoLine label="Bairro" value={data.bairro} />
+            <InfoLine label="Cidade" value={data.cidade} />
+            <InfoLine label="Estado" value={data.estado} />
+            <InfoLine label="C.E.P" value={data.cep || "-"} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4mm" }}>
+            <InfoLine label="C.P.F/C.N.P.J" value={data.cpfCnpj || "-"} />
+            <InfoLine label="Identidade" value={data.identidade || "-"} />
           </div>
         </div>
 
-        <p style={{ fontWeight: 700, textAlign: "center", margin: "22px 0 18px" }}>
+        <p style={{ fontWeight: 700, textAlign: "center", margin: "3mm 0 3mm", fontSize: "13px" }}>
           CERTIFICAMOS QUE EXECUTAMOS O(S) SERVICO(S) DE DESINSETIZACAO ABAIXO DESCRIMINADO(S)
         </p>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "30px", fontSize: "13px" }}>
+        <table style={{ width: "66%", borderCollapse: "collapse", margin: "0 auto 5mm", fontSize: "12px" }}>
           <thead>
             <tr>
               <th style={thStyle}>Vetor</th>
@@ -123,18 +134,18 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
           </tbody>
         </table>
 
-        <div style={{ textAlign: "center", margin: "22px 0 30px" }}>
+        <div style={{ textAlign: "center", margin: "4mm 0 7mm", fontSize: "13px" }}>
           {data.localEmissao}, {data.dataEmissaoExtenso}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12mm", alignItems: "end" }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ borderTop: "1px solid #111", paddingTop: "8px" }}>{empresaInfo.nome}</div>
+            <div style={{ borderTop: "1px solid #111", paddingTop: "2mm" }}>{empresaInfo.nome}</div>
             <div>{data.responsavel || ""}</div>
           </div>
           <div>
-            <div style={{ fontWeight: 700, marginBottom: "6px" }}>Observacoes</div>
-            <div style={{ minHeight: "88px", border: "1px solid #111", padding: "8px", whiteSpace: "pre-wrap" }}>
+            <div style={{ fontWeight: 700, marginBottom: "1.5mm" }}>Observacoes</div>
+            <div style={{ minHeight: "22mm", border: "1px solid #111", padding: "2mm", whiteSpace: "pre-wrap", fontSize: "11px" }}>
               {data.observacoes || "-"}
             </div>
           </div>
@@ -148,21 +159,29 @@ CertificadoGarantia.displayName = "CertificadoGarantia"
 
 const thStyle = {
   border: "1px solid #111",
-  padding: "8px",
+  padding: "2mm",
   textAlign: "left" as const,
   background: "#e5e7eb",
 }
 
 const tdStyle = {
   border: "1px solid #111",
-  padding: "8px",
+  padding: "2mm",
 }
 
-function InfoBox({ label, value }: { label: string; value: string }) {
+function Field({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div style={{ borderRight: "1px solid #111", borderBottom: "1px solid #111", padding: "8px", minHeight: "54px" }}>
-      <div style={{ fontSize: "11px", fontWeight: 700 }}>{label}</div>
-      <div>{value}</div>
+    <div>
+      <div style={{ fontSize: "10px", fontWeight: 700 }}>{label}</div>
+      <div style={{ borderBottom: "1px solid #111", minHeight: "6mm", fontWeight: strong ? 700 : 400 }}>{value}</div>
+    </div>
+  )
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ minHeight: "6mm" }}>
+      <strong>{label} :</strong> {value}
     </div>
   )
 }

@@ -142,8 +142,9 @@ O sistema usa permissões customizadas em `profiles.permissions` (array de strin
 
 | Arquivo | O que mudou |
 |---|---|
-| `components/os-generation/certificado-garantia.tsx` | Novo modelo visual do Certificado de Garantia com dados extraídos do PDF de referência |
+| `components/os-generation/certificado-garantia.tsx` | Novo modelo visual do Certificado de Garantia em A4 paisagem, com logo/QR e dados extraídos do PDF de referência |
 | `components/os-generation/pdf-preview-mock.tsx` | Preview da OS agora pode anexar/imprimir certificado como documento adicional |
+| `public/images/higiene-disque-certificado-logo-qr.png` | Arte de cabeçalho do certificado com logo e QR Code |
 | `app/dashboard/servicos/page.tsx` | Fluxo de geração ganhou botão de certificado, switch para salvar em serviços agendados e cálculo de garantia/vencimento por vetor |
 
 **Cuidados para futuras alterações nesta área:**
