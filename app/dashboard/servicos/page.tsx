@@ -38,12 +38,14 @@ import {
   Truck,
   Printer,
   Eye,
+  Award,
   Settings
 } from 'lucide-react'
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
 import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
+import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
 import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -385,6 +387,42 @@ function getBillingModeLabel(mode: BillingMode) {
   if (mode === "contrato") return "Incluso em contrato"
   if (mode === "avulso") return "Pagamento avulso"
   return "Adicional"
+}
+
+const certificadoPragaLabels: Record<string, string> = {
+  baratas: "Barata",
+  formigas: "FORMIGA",
+  ratos: "Rato",
+  mosquitos: "Mosquito",
+  cupins: "Cupim",
+  pulgas_carrapatos: "Pulgas/Carrapatos",
+  outros: "Outros",
+}
+
+function addWarrantyToDate(baseDate: Date, amount: number, unit: ServiceRequest["warrantyUnit"]) {
+  const next = new Date(baseDate)
+  if (unit === "anos") {
+    next.setFullYear(next.getFullYear() + amount)
+    return next
+  }
+  if (unit === "meses") {
+    next.setMonth(next.getMonth() + amount)
+    return next
+  }
+  next.setDate(next.getDate() + amount)
+  return next
+}
+
+function formatDateBR(date: Date) {
+  return date.toLocaleDateString("pt-BR")
+}
+
+function formatDateLongBR(date: Date) {
+  const meses = [
+    "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  ]
+  return `${date.getDate()} de ${meses[date.getMonth()]} de ${date.getFullYear()}`
 }
 
 function mapFlowStatusToAgendado(status: FlowServico["status"]): StatusAgendado {
@@ -1340,6 +1378,8 @@ export default function ServicosPage() {
   const [selectedAgendadaOS, setSelectedAgendadaOS] = useState<OSViewerData | null>(null)
   const [isFinalizandoAgendamento, setIsFinalizandoAgendamento] = useState(false)
   const [osDocumentoHtmlSnapshot, setOsDocumentoHtmlSnapshot] = useState("")
+  const [certificadoGerado, setCertificadoGerado] = useState(false)
+  const [salvarCertificadoAgendado, setSalvarCertificadoAgendado] = useState(true)
   const [showBaixaAgendadaModal, setShowBaixaAgendadaModal] = useState(false)
   const [servicoBaixaPendenteId, setServicoBaixaPendenteId] = useState<string | null>(null)
   const [baixaAgendadaAssinada, setBaixaAgendadaAssinada] = useState<"sim" | "nao">("sim")
@@ -2415,6 +2455,98 @@ const handleConfirmarAgendamentoFinal = async () => {
   // Obter contrato selecionado
   const contratoSelecionado = contratosDoCliente.find((c) => c.id === serviceRequest.billing.contractId)
 
+  const podeGerarCertificado = serviceRequest.serviceType === "pragas"
+
+  const certificadoGarantiaData = useMemo<CertificadoGarantiaData | undefined>(() => {
+    if (!podeGerarCertificado || !clienteSelecionado) return undefined
+
+    const dataBase = serviceRequest.schedule.date
+      ? new Date(`${serviceRequest.schedule.date}T00:00:00`)
+      : new Date()
+    const garantiaInformada = Number.parseInt(serviceRequest.warrantyDays || "0", 10)
+    const temGarantiaInformada = Number.isFinite(garantiaInformada) && garantiaInformada > 0
+    const pragas = dadosTecnicosVetores.pragasAlvo.length > 0 ? dadosTecnicosVetores.pragasAlvo : ["outros"]
+
+    const vetores = pragas.map((praga) => {
+      const fallbackMeses = praga === "cupins" ? 24 : 3
+      const amount = temGarantiaInformada ? garantiaInformada : fallbackMeses
+      const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
+      const vencimento = addWarrantyToDate(dataBase, amount, unit)
+      const unitLabel = unit === "anos" ? "Ano(s)" : unit === "meses" ? "Mes(es)" : "Dia(s)"
+
+      return {
+        vetor: certificadoPragaLabels[praga] || praga,
+        garantia: `${String(amount).padStart(2, "0")} ${unitLabel}`,
+        vencimento: formatDateBR(vencimento),
+      }
+    })
+
+    const enderecoCompleto = localSelecionado
+      ? `${localSelecionado.endereco} ${localSelecionado.numero}`.trim()
+      : ""
+    const observacoes = [
+      serviceRequest.notes.trim(),
+      dadosTecnicosVetores.descricaoServico.trim(),
+    ].filter(Boolean).join("\n")
+
+    return {
+      osNumber,
+      dataServico: formatDateBR(dataBase),
+      validadeCrv: "09/08/2027",
+      cliente: clienteSelecionado.nome,
+      pedido: "",
+      endereco: enderecoCompleto,
+      bairro: localSelecionado?.bairro || "",
+      cidade: localSelecionado?.cidade || "",
+      estado: localSelecionado?.estado || "",
+      cep: localSelecionado?.cep || "",
+      cpfCnpj: clienteSelecionado.cpfCnpj,
+      vetores,
+      localEmissao: localSelecionado?.cidade || "Niteroi",
+      dataEmissaoExtenso: formatDateLongBR(dataBase),
+      responsavel: dadosTecnicosVetores.aplicador || nomesResponsaveisSelecionados[0] || "",
+      observacoes,
+    }
+  }, [
+    podeGerarCertificado,
+    clienteSelecionado,
+    serviceRequest.schedule.date,
+    serviceRequest.warrantyDays,
+    serviceRequest.warrantyUnit,
+    serviceRequest.notes,
+    dadosTecnicosVetores.pragasAlvo,
+    dadosTecnicosVetores.descricaoServico,
+    dadosTecnicosVetores.aplicador,
+    localSelecionado,
+    osNumber,
+    nomesResponsaveisSelecionados,
+  ])
+
+  useEffect(() => {
+    if (!podeGerarCertificado) {
+      setCertificadoGerado(false)
+    }
+  }, [podeGerarCertificado])
+
+  const handleGerarCertificado = () => {
+    if (!certificadoGarantiaData) {
+      setToastMessage("Preencha cliente, local e dados do servico antes de gerar o certificado.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 2500)
+      return
+    }
+
+    if (osStatus === "a_gerar") {
+      setOsStatus("gerada")
+      setDataGeracao(new Date().toLocaleDateString("pt-BR"))
+    }
+
+    setCertificadoGerado(true)
+    setToastMessage("Certificado gerado com sucesso.")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2500)
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       <ErpHeader />
@@ -3335,6 +3467,51 @@ const handleConfirmarAgendamentoFinal = async () => {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
+                  <Award className="h-4 w-4 text-primary" />
+                  Certificado de Garantia
+                </CardTitle>
+                <CardDescription>
+                  Disponivel para servicos de controle de vetores.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={certificadoGerado ? "default" : "secondary"}>
+                      {certificadoGerado ? "Certificado gerado" : podeGerarCertificado ? "Pronto para gerar" : "Nao aplicavel"}
+                    </Badge>
+                    {certificadoGerado && salvarCertificadoAgendado ? (
+                      <Badge variant="outline">Sera salvo com a OS</Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="salvar-certificado-agendado"
+                      checked={salvarCertificadoAgendado}
+                      onCheckedChange={setSalvarCertificadoAgendado}
+                      disabled={!certificadoGerado}
+                    />
+                    <Label htmlFor="salvar-certificado-agendado" className="text-sm">
+                      Salvar em servicos agendados
+                    </Label>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant={certificadoGerado ? "outline" : "default"}
+                  onClick={handleGerarCertificado}
+                  disabled={!podeGerarCertificado}
+                  className="gap-2"
+                >
+                  <Award className="h-4 w-4" />
+                  {certificadoGerado ? "Atualizar certificado" : "Gerar certificado"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
                   <ClipboardList className="h-4 w-4 text-primary" />
                   Execucao e Baixa do Servico
                 </CardTitle>
@@ -3561,6 +3738,8 @@ const handleConfirmarAgendamentoFinal = async () => {
               consumos={getTipoOS() === "vetores" ? consumos : []}
               veiculo={veiculoSelecionado ? `${veiculoSelecionado.placa} - ${veiculoSelecionado.modelo}` : undefined}
               mostrarDeclaracaoCupim={isServicoCupim}
+              certificadoData={certificadoGerado ? certificadoGarantiaData : undefined}
+              incluirCertificado={certificadoGerado && salvarCertificadoAgendado}
               onCaptureHtml={setOsDocumentoHtmlSnapshot}
             />
 

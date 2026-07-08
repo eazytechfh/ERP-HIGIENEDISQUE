@@ -2,11 +2,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, AlertCircle, Printer } from "lucide-react"
+import { Award, FileText, AlertCircle, Printer } from "lucide-react"
 import { useEffect, useRef } from "react"
 import type { OSStatus } from "./os-header-card"
 import { OSDocumentVetores } from "./os-document-vetores"
 import { OSDocumentLimpeza } from "./os-document-limpeza"
+import { CertificadoGarantia, type CertificadoGarantiaData } from "./certificado-garantia"
 import type { DadosTecnicosVetores } from "./vetores-form"
 import type { DadosTecnicosLimpeza } from "./limpeza-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
@@ -44,6 +45,8 @@ type PdfPreviewMockProps = {
   consumos?: ConsumoItem[]
   veiculo?: string
   mostrarDeclaracaoCupim?: boolean
+  certificadoData?: CertificadoGarantiaData
+  incluirCertificado?: boolean
   onCaptureHtml?: (html: string) => void
 }
 
@@ -59,15 +62,18 @@ export function PdfPreviewMock({
   consumos = [],
   veiculo,
   mostrarDeclaracaoCupim = false,
+  certificadoData,
+  incluirCertificado = false,
   onCaptureHtml,
 }: PdfPreviewMockProps) {
   const printRef = useRef<HTMLDivElement>(null)
+  const certificadoRef = useRef<HTMLDivElement>(null)
   const isGenerated = status !== "a_gerar"
 
   useEffect(() => {
     if (!onCaptureHtml || !isGenerated || !printRef.current) return
     onCaptureHtml(printRef.current.innerHTML)
-  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dataServico, consumos, veiculo, mostrarDeclaracaoCupim])
+  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dataServico, consumos, veiculo, mostrarDeclaracaoCupim, certificadoData, incluirCertificado])
 
   const handlePrint = () => {
     if (!printRef.current) return
@@ -170,6 +176,35 @@ export function PdfPreviewMock({
     printWindow.print()
   }
 
+  const handlePrintCertificado = () => {
+    if (!certificadoRef.current || !certificadoData) return
+
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Certificado ${osNumber}</title>
+        <base href="${window.location.origin}/" />
+        <style>
+          @page { size: A4; margin: 5mm; }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+          * { box-sizing: border-box; }
+          table { border-collapse: collapse; width: 100%; }
+          p { margin: 0; }
+        </style>
+      </head>
+      <body>
+        ${certificadoRef.current.outerHTML}
+      </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.print()
+  }
+
   const defaultDadosTecnicos: DadosTecnicosVetores = dadosTecnicos || {
     pragasAlvo: ["baratas"],
     tipoAtividade: "quimico",
@@ -215,6 +250,12 @@ export function PdfPreviewMock({
           </CardTitle>
           {isGenerated && (
             <div className="flex gap-2">
+              {certificadoData && (
+                <Button variant="outline" size="sm" onClick={handlePrintCertificado} className="gap-2 bg-transparent">
+                  <Award className="h-4 w-4" />
+                  Imprimir certificado
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2 bg-transparent">
                 <Printer className="h-4 w-4" />
                 Imprimir
@@ -248,7 +289,19 @@ export function PdfPreviewMock({
                   showDeclaracaoCupim={mostrarDeclaracaoCupim}
                 />
               )}
+              {incluirCertificado && certificadoData ? (
+                <CertificadoGarantia
+                  ref={certificadoRef}
+                  data={certificadoData}
+                  pageBreakBefore
+                />
+              ) : null}
             </div>
+            {!incluirCertificado && certificadoData ? (
+              <div className="hidden">
+                <CertificadoGarantia ref={certificadoRef} data={certificadoData} />
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="border-2 border-dashed rounded-lg min-h-[400px] flex flex-col items-center justify-center p-8 border-muted-foreground/30 bg-muted/30">
