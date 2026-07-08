@@ -54,102 +54,134 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
         className="certificado-a4-page bg-white text-black mx-auto"
         style={{
           width: "287mm",
-          minHeight: "200mm",
-          padding: "8mm 10mm",
+          minHeight: "198mm",
+          padding: "0",
           fontFamily: "Arial, sans-serif",
-          fontSize: "12px",
-          lineHeight: 1.25,
+          fontSize: "14px",
+          lineHeight: 1.08,
           pageBreakBefore: pageBreakBefore ? "always" : "auto",
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "132mm 1fr", gap: "9mm", alignItems: "start", borderBottom: "2px solid #111", paddingBottom: "5mm" }}>
-          <img
-            src={certificadoLogoQrSrc}
-            alt="Higiene Disque e QR Code"
-            style={{ width: "132mm", height: "40mm", objectFit: "contain", objectPosition: "left center" }}
-          />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3mm", fontSize: "11px" }}>
-            <div style={{ gridColumn: "1 / -1", fontWeight: 700, fontSize: "14px" }}>{empresaInfo.nome}</div>
-            <div style={{ gridColumn: "1 / -1" }}>{empresaInfo.endereco}</div>
-            <div style={{ gridColumn: "1 / -1" }}>{empresaInfo.cidadeUf}</div>
-            <div style={{ gridColumn: "1 / -1" }}>Telefones.: {empresaInfo.telefones}</div>
-            <div>{empresaInfo.email}</div>
-            <div>{empresaInfo.site}</div>
-            <InfoLine label="Certificado INEA" value={empresaInfo.certificadoInea} />
-            <InfoLine label="Codigo INEA" value={empresaInfo.codigoInea} />
-          </div>
-        </div>
-
-        <h1 style={{ textAlign: "center", margin: "5mm 0 4mm", fontSize: "24px", letterSpacing: 0 }}>
-          CERTIFICADO DE GARANTIA
-        </h1>
-
-        <div style={{ display: "grid", gridTemplateColumns: "25mm 30mm 30mm 36mm 34mm 1fr", gap: "3mm", marginBottom: "3mm", alignItems: "end" }}>
-          <Field label="Ordem Servico" value={data.osNumber} strong />
-          <Field label="Data Servico" value={data.dataServico} />
-          <Field label="Validade CRV" value={data.validadeCrv} />
-          <Field label="Certificado INEA" value={empresaInfo.certificadoInea} />
-          <Field label="Codigo INEA" value={empresaInfo.codigoInea} />
-          <Field label="N Pedido" value={data.pedido || "-"} />
-        </div>
-
-        <div style={{ border: "1px solid #111", padding: "3mm", marginBottom: "4mm", fontSize: "12px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 45mm", gap: "4mm" }}>
-            <InfoLine label="Cliente" value={data.cliente} />
-            <InfoLine label="N Pedido" value={data.pedido || "-"} />
-          </div>
-          <InfoLine label="Endereco" value={data.endereco} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 42mm 20mm 32mm", gap: "4mm" }}>
-            <InfoLine label="Bairro" value={data.bairro} />
-            <InfoLine label="Cidade" value={data.cidade} />
-            <InfoLine label="Estado" value={data.estado} />
-            <InfoLine label="C.E.P" value={data.cep || "-"} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4mm" }}>
-            <InfoLine label="C.P.F/C.N.P.J" value={data.cpfCnpj || "-"} />
-            <InfoLine label="Identidade" value={data.identidade || "-"} />
-          </div>
-        </div>
-
-        <p style={{ fontWeight: 700, textAlign: "center", margin: "3mm 0 3mm", fontSize: "13px" }}>
-          CERTIFICAMOS QUE EXECUTAMOS O(S) SERVICO(S) DE DESINSETIZACAO ABAIXO DESCRIMINADO(S)
-        </p>
-
-        <table style={{ width: "66%", borderCollapse: "collapse", margin: "0 auto 5mm", fontSize: "12px" }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>Vetor</th>
-              <th style={thStyle}>Garantia</th>
-              <th style={thStyle}>Vencimento</th>
-            </tr>
-          </thead>
+        <table style={sheetTableStyle}>
           <tbody>
-            {data.vetores.map((item, index) => (
-              <tr key={`${item.vetor}-${index}`}>
-                <td style={tdStyle}>{item.vetor}</td>
-                <td style={tdStyle}>{item.garantia}</td>
-                <td style={tdStyle}>{item.vencimento}</td>
-              </tr>
-            ))}
+            <tr>
+              <td colSpan={5} style={{ ...cellStyle, padding: "2mm 3mm 1.5mm" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "148mm 1fr", alignItems: "center", gap: "6mm" }}>
+                  <img
+                    src={certificadoLogoQrSrc}
+                    alt="Higiene Disque e QR Code"
+                    style={{
+                      width: "148mm",
+                      height: "41mm",
+                      objectFit: "contain",
+                      objectPosition: "left center",
+                      display: "block",
+                    }}
+                  />
+                  <div style={{ textAlign: "right", fontSize: "13px", lineHeight: 1.22 }}>
+                    <div style={{ fontSize: "22px", fontWeight: 700 }}>Higiene Disque Higienizações Ltda</div>
+                    <div>Av São Gualter, 200, lote 71 B - Piratininga</div>
+                    <div>Niterói - RJ - Cep.: 24355-010</div>
+                    <div>Telefones.: (21)2626-3000&nbsp;&nbsp;-&nbsp;&nbsp;(21)2625-3233</div>
+                    <div>contato@higienedisque.com.br</div>
+                    <div>www.higienedisque.com.br</div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td colSpan={5} style={{ ...cellStyle, padding: "1.2mm 0", textAlign: "center", fontWeight: 700, fontSize: "23px" }}>
+                CERTIFICADO DE GARANTIA
+              </td>
+            </tr>
+            <tr>
+              <InfoHeaderCell label="Código INEA" value={empresaInfo.codigoInea} />
+              <InfoHeaderCell label="Certificado INEA" value={empresaInfo.certificadoInea} />
+              <InfoHeaderCell label="Validade CRV" value={data.validadeCrv} />
+              <InfoHeaderCell label="Data Serviço" value={data.dataServico} />
+              <InfoHeaderCell label="Ordem Serviço" value={data.osNumber} />
+            </tr>
+            <tr>
+              <td colSpan={5} style={{ ...cellStyle, padding: "1.1mm 2mm", fontSize: "12px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "35mm 1fr 34mm 38mm", rowGap: "1.4mm", columnGap: "3mm" }}>
+                  <LabeledValue label="Cliente" value={data.cliente} />
+                  <div />
+                  <div style={{ fontWeight: 700, textAlign: "right" }}>Nº Pedido :</div>
+                  <div>{data.pedido || "-"}</div>
+
+                  <LabeledValue label="Endereço" value={data.endereco} wide />
+                  <div />
+                  <div />
+
+                  <LabeledValue label="Bairro" value={data.bairro} />
+                  <LabeledValue label="Cidade" value={data.cidade} />
+                  <LabeledValue label="Estado" value={data.estado} />
+                  <LabeledValue label="C.E.P" value={data.cep || "-"} />
+
+                  <LabeledValue label="C.P.F" value={data.cpfCnpj || "-"} />
+                  <div />
+                  <LabeledValue label="Identidade" value={data.identidade || "-"} wide />
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td colSpan={5} style={{ ...cellStyle, padding: "4mm 2mm", textAlign: "center", fontWeight: 700, fontSize: "14px" }}>
+                CERTIFICAMOS QUE EXECUTAMOS O(S) SERVIÇO(S) DE DESINSETIZAÇÃO ABAIXO DESCRIMINADO(S)
+              </td>
+            </tr>
+            <tr>
+              <td colSpan={5} style={{ ...cellStyle, padding: 0 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: "12px" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...innerThStyle, width: "50%" }}>Vetor</th>
+                      <th style={{ ...innerThStyle, width: "25%" }}>Garantia</th>
+                      <th style={{ ...innerThStyle, width: "25%", borderRight: 0 }}>Vencimento</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.vetores.map((item, index) => (
+                      <tr key={`${item.vetor}-${index}`}>
+                        <td style={innerTdStyle}>{item.vetor}</td>
+                        <td style={{ ...innerTdStyle, textAlign: "center" }}>{item.garantia}</td>
+                        <td style={{ ...innerTdStyle, textAlign: "center", borderRight: 0 }}>{item.vencimento}</td>
+                      </tr>
+                    ))}
+                    {Array.from({ length: Math.max(0, 3 - data.vetores.length) }).map((_, index) => (
+                      <tr key={`empty-${index}`}>
+                        <td style={innerTdStyle}>&nbsp;</td>
+                        <td style={innerTdStyle}>&nbsp;</td>
+                        <td style={{ ...innerTdStyle, borderRight: 0 }}>&nbsp;</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td colSpan={5} style={{ ...cellStyle, padding: 0 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: "12px" }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ width: "50%", padding: "1.6mm 3mm 3mm", verticalAlign: "top", borderRight: "2px solid #111" }}>
+                        <div style={{ textAlign: "center", fontWeight: 700, marginBottom: "1mm" }}>Observações</div>
+                        <div style={{ whiteSpace: "pre-wrap", minHeight: "22mm" }}>{data.observacoes || "-"}</div>
+                      </td>
+                      <td style={{ width: "50%", padding: "4mm 3mm 3mm", textAlign: "center", verticalAlign: "bottom" }}>
+                        <div style={{ fontWeight: 700, marginBottom: "10mm" }}>
+                          {data.localEmissao}, {data.dataEmissaoExtenso}
+                        </div>
+                        <div style={{ borderTop: "1px solid #777", width: "72%", margin: "0 auto 1.5mm" }} />
+                        <div style={{ fontWeight: 700, fontSize: "10px" }}>Higiene Disque Higienizações Ltda</div>
+                        <div style={{ fontSize: "9px" }}>{data.responsavel || ""}</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
           </tbody>
         </table>
-
-        <div style={{ textAlign: "center", margin: "4mm 0 7mm", fontSize: "13px" }}>
-          {data.localEmissao}, {data.dataEmissaoExtenso}
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12mm", alignItems: "end" }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ borderTop: "1px solid #111", paddingTop: "2mm" }}>{empresaInfo.nome}</div>
-            <div>{data.responsavel || ""}</div>
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, marginBottom: "1.5mm" }}>Observacoes</div>
-            <div style={{ minHeight: "22mm", border: "1px solid #111", padding: "2mm", whiteSpace: "pre-wrap", fontSize: "11px" }}>
-              {data.observacoes || "-"}
-            </div>
-          </div>
-        </div>
       </div>
     )
   },
@@ -157,31 +189,45 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
 
 CertificadoGarantia.displayName = "CertificadoGarantia"
 
-const thStyle = {
-  border: "1px solid #111",
-  padding: "2mm",
-  textAlign: "left" as const,
-  background: "#e5e7eb",
+const sheetTableStyle = {
+  width: "100%",
+  borderCollapse: "collapse" as const,
+  tableLayout: "fixed" as const,
+  border: "2px solid #111",
 }
 
-const tdStyle = {
+const cellStyle = {
   border: "1px solid #111",
-  padding: "2mm",
+  color: "#000",
 }
 
-function Field({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+const innerThStyle = {
+  borderRight: "2px solid #111",
+  borderBottom: "2px solid #111",
+  padding: "1mm 2mm",
+  textAlign: "center" as const,
+  fontWeight: 700,
+}
+
+const innerTdStyle = {
+  borderRight: "2px solid #111",
+  padding: "0.8mm 3mm",
+  height: "6mm",
+}
+
+function InfoHeaderCell({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div style={{ fontSize: "10px", fontWeight: 700 }}>{label}</div>
-      <div style={{ borderBottom: "1px solid #111", minHeight: "6mm", fontWeight: strong ? 700 : 400 }}>{value}</div>
-    </div>
+    <td style={{ ...cellStyle, padding: "1.4mm 2mm", textAlign: "center", height: "14mm" }}>
+      <div style={{ fontSize: "12px", fontWeight: 700, marginBottom: "1mm" }}>{label}</div>
+      <div style={{ fontSize: "13px" }}>{value}</div>
+    </td>
   )
 }
 
-function InfoLine({ label, value }: { label: string; value: string }) {
+function LabeledValue({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
-    <div style={{ minHeight: "6mm" }}>
-      <strong>{label} :</strong> {value}
+    <div style={wide ? { gridColumn: "span 2" } : undefined}>
+      <strong>{label} :</strong>&nbsp;&nbsp;&nbsp;{value}
     </div>
   )
 }
