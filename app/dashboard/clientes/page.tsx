@@ -965,13 +965,10 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                 </Select>
               </div>
 
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {apiMode
-                    ? `${totalCount.toLocaleString("pt-BR")} cliente(s) encontrado(s)`
-                    : `${filteredClientes.length} cliente(s) encontrado(s)`}
-                  {isLoadingPage && <span className="ml-2 text-muted-foreground/60">Carregando...</span>}
-                </p>
+              <div className="mb-3 flex justify-end">
+                {isLoadingPage && (
+                  <span className="mr-auto self-center text-sm text-muted-foreground/60">Carregando...</span>
+                )}
                 <Button type="button" variant="outline" className="gap-2" onClick={exportarClientesCsv}>
                   <Download className="h-4 w-4" />
                   Exportar CSV
