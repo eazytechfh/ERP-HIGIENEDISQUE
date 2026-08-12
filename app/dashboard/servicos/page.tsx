@@ -52,6 +52,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { CLIENTE_COLUMNS_SELETOR, getClienteSupabase, listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { buildLocaisPorCliente, mapClienteToServicoView } from "@/lib/supabase/clientes-view"
 import { setFlowServicos, toIsoDate, type FlowServico } from "@/lib/flow-store"
+import { formatDateOnlyBR, parseDateOnlyLocal } from "@/lib/date-only"
 import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
 import { listEquipeMembrosSupabase } from "@/lib/supabase/equipe-repo"
 import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
@@ -2306,7 +2307,7 @@ const handleConfirmarAgendamentoFinal = async () => {
       ? `${localSelecionado.nome} - ${localSelecionado.endereco}, ${localSelecionado.numero}`
       : "Local nao informado"
     const dataFormatada = serviceRequest.schedule.date
-      ? new Date(`${serviceRequest.schedule.date}T00:00:00`).toLocaleDateString("pt-BR")
+      ? formatDateOnlyBR(serviceRequest.schedule.date)
       : "-"
     const horarioFormatado = `${serviceRequest.schedule.startTime || "--:--"} - ${serviceRequest.schedule.endTime || "--:--"}`
 
@@ -2467,7 +2468,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     if (!podeGerarCertificado || !clienteSelecionado) return undefined
 
     const dataBase = serviceRequest.schedule.date
-      ? new Date(`${serviceRequest.schedule.date}T00:00:00`)
+      ? parseDateOnlyLocal(serviceRequest.schedule.date)
       : new Date()
     const garantiaInformada = Number.parseInt(serviceRequest.warrantyDays || "0", 10)
     const temGarantiaInformada = Number.isFinite(garantiaInformada) && garantiaInformada > 0
@@ -3342,7 +3343,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                       <p className="text-muted-foreground">Data/Horário</p>
                       <p className="font-medium">
                         {serviceRequest.schedule.date
-                          ? `${new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR')} ${serviceRequest.schedule.startTime} - ${serviceRequest.schedule.endTime}`
+                          ? `${formatDateOnlyBR(serviceRequest.schedule.date)} ${serviceRequest.schedule.startTime} - ${serviceRequest.schedule.endTime}`
                           : "-"}
                       </p>
                     </div>
@@ -3409,7 +3410,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                     Agendamento
                   </h3>
                   <div className="space-y-2 text-sm p-4 bg-muted/50 rounded-lg">
-                    <p><span className="text-muted-foreground">Data:</span> {new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR')}</p>
+                    <p><span className="text-muted-foreground">Data:</span> {formatDateOnlyBR(serviceRequest.schedule.date)}</p>
                     <p><span className="text-muted-foreground">Horário:</span> {serviceRequest.schedule.startTime} às {serviceRequest.schedule.endTime}</p>
                     <p><span className="text-muted-foreground">Responsável:</span> {nomesResponsaveisSelecionados.join(", ") || "-"}</p>
                     {serviceRequest.schedule.vehicleId && (
@@ -3753,7 +3754,7 @@ const handleConfirmarAgendamentoFinal = async () => {
               } : undefined}
               dadosTecnicos={getTipoOS() === "vetores" ? dadosTecnicosVetores : undefined}
               dadosTecnicosLimpeza={getTipoOS() === "limpeza" ? dadosTecnicosLimpeza : undefined}
-              dataServico={serviceRequest.schedule.date ? new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR') : undefined}
+              dataServico={serviceRequest.schedule.date ? formatDateOnlyBR(serviceRequest.schedule.date) : undefined}
               consumos={getTipoOS() === "vetores" ? consumos : []}
               veiculo={veiculoSelecionado ? `${veiculoSelecionado.placa} - ${veiculoSelecionado.modelo}` : undefined}
               mostrarDeclaracaoCupim={isServicoCupim}
