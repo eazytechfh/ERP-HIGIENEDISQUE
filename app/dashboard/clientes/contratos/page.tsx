@@ -186,6 +186,7 @@ export default function NovoContratoPage() {
     { value: "mensal", label: "Mensal" },
     { value: "bimestral", label: "Bimestral" },
     { value: "trimestral", label: "Trimestral" },
+    { value: "quadrimestral", label: "Quadrimestral" },
     { value: "semestral", label: "Semestral" },
     { value: "anual", label: "Anual" }
   ]
