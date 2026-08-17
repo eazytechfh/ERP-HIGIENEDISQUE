@@ -43,6 +43,11 @@ type OSDocumentDesentupimentoProps = {
   veiculo?: string
 }
 
+function getDocumentoLabel(cpfCnpj: string): string {
+  const digitos = (cpfCnpj || "").replace(/\D/g, "")
+  return digitos.length > 11 ? "C.N.P.J" : "C.P.F"
+}
+
 function parseValorMonetario(raw: string): number {
   const normalizado = String(raw || "")
     .replace(/[^\d,.-]/g, "")
@@ -137,7 +142,7 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
                   </Linha>
                   <Campo label="Telefones" value={cliente.telefone} />
                   <Linha>
-                    <Campo label="C.N.P.J" value={cliente.cpfCnpj} grow />
+                    <Campo label={getDocumentoLabel(cliente.cpfCnpj)} value={cliente.cpfCnpj} grow />
                     <Campo label="Inscrição" value={dadosTecnicos.inscricao} align="right" />
                   </Linha>
                   <Linha>

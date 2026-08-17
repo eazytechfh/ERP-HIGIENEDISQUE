@@ -19,6 +19,11 @@ const empresaInfo = {
   ctaNumero: "IN00457009",
 }
 
+function getDocumentoLabel(cpfCnpj: string): string {
+  const digitos = (cpfCnpj || "").replace(/\D/g, "")
+  return digitos.length > 11 ? "CNPJ" : "CPF"
+}
+
 const pragaLabels: Record<PragaAlvo, string> = {
   baratas: "BARATA",
   formigas: "FORMIGA",
@@ -169,7 +174,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
                 <span>{cliente.tipoAtividade || "APARTAMENTO"}</span>
               </div>
               <div>
-                <span className="font-bold">C.P.F/CNPJ: </span>
+                <span className="font-bold">{getDocumentoLabel(cliente.cpfCnpj)}: </span>
                 <span>{cliente.cpfCnpj}</span>
               </div>
             </div>

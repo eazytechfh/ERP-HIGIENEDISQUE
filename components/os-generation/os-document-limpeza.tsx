@@ -63,6 +63,11 @@ const coberturaLabels: Record<string, string> = {
   parcialmente_coberta: "Parcialmente Coberta",
 }
 
+function getDocumentoLabel(cpfCnpj: string): string {
+  const digitos = (cpfCnpj || "").replace(/\D/g, "")
+  return digitos.length > 11 ? "C.N.P.J" : "C.P.F"
+}
+
 export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaProps>(
   ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo }, ref) => {
     const cisternas = dadosTecnicos.reservatorios.filter(r => r.tipo === "cisterna")
@@ -146,7 +151,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
                 <span>{cliente.tipoAtividade || "CONDOMINIO"}</span>
               </div>
               <div>
-                <span className="font-bold">C.N.P.J: </span>
+                <span className="font-bold">{getDocumentoLabel(cliente.cpfCnpj)}: </span>
                 <span>{cliente.cpfCnpj}</span>
               </div>
             </div>
