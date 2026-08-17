@@ -121,7 +121,7 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
 
             {/* Bloco de campos */}
             <tr>
-              <td colSpan={3} style={{ ...cellStyle, padding: "1.5mm 8mm 1.5mm 2mm" }}>
+              <td colSpan={3} style={{ ...cellStyle, padding: "1.5mm 20mm 1.5mm 2mm" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.6mm" }}>
                   <Linha>
                     <Campo label="Data Serviço" value={dataServico} />
