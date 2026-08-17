@@ -46,6 +46,11 @@ type CertificadoGarantiaProps = {
   pageBreakBefore?: boolean
 }
 
+function getDocumentoLabel(cpfCnpj: string): string {
+  const digitos = (cpfCnpj || "").replace(/\D/g, "")
+  return digitos.length > 11 ? "C.N.P.J" : "C.P.F"
+}
+
 export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGarantiaProps>(
   ({ data, pageBreakBefore = false }, ref) => {
     return (
@@ -118,7 +123,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                   <LabeledValue label="Estado" value={data.estado} />
                   <LabeledValue label="C.E.P" value={data.cep || ""} />
 
-                  <LabeledValue label="C.P.F" value={data.cpfCnpj || ""} />
+                  <LabeledValue label={getDocumentoLabel(data.cpfCnpj)} value={data.cpfCnpj || ""} />
                   <div />
                   <LabeledValue label="Identidade" value={data.identidade || ""} wide />
                 </div>
@@ -173,7 +178,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                         </div>
                         <div style={{ borderTop: "1px solid #777", width: "72%", margin: "0 auto 1.5mm" }} />
                         <div style={{ fontWeight: 700, fontSize: "12px" }}>Higiene Disque Higienizações Ltda</div>
-                        <div style={{ fontSize: "11px" }}>{data.responsavel || ""}</div>
+                        <div style={{ fontSize: "11px" }}>Rachel Dantas</div>
                       </td>
                     </tr>
                   </tbody>

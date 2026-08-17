@@ -1369,16 +1369,19 @@ export default function ServicosPage() {
     registroTecnico: "55953/02 RJ"
   })
   const [dadosTecnicosDesentupimento, setDadosTecnicosDesentupimento] = useState<DadosTecnicosDesentupimento>({
-    localEntupimento: "",
-    tipoDesentupimento: "mecanico",
-    equipamentoUtilizado: "",
-    diagnostico: "",
-    materialRemovido: "",
-    situacaoFinal: "desobstruido_totalmente",
+    horaServico: "",
+    atendente: "",
+    tecnico: "Eryck Guimaraes",
+    vendedor: "",
+    inscricao: "",
+    homePage: "",
+    contatos: "",
+    origem: "",
+    referencia: "",
     observacoes: "",
-    aplicador: "",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ"
+    servicos: [],
+    desconto: "",
+    condicaoPagamento: ""
   })
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
 

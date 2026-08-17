@@ -11,10 +11,6 @@ const empresaInfo = {
   telefones: "(21)2626-3000 - (21)2625-3233",
   email: "contato@higienedisque.com.br",
   site: "www.higienedisque.com.br",
-  cnpj: "36.490.092/0001-82",
-  codigoInea: "UN63.01.01.87",
-  certificadoCRH: "CTA N IN 100962",
-  validadeCRH: "01/11/2029",
 }
 
 type ClienteInfo = {
@@ -45,21 +41,29 @@ type OSDocumentDesentupimentoProps = {
   veiculo?: string
 }
 
-const tipoDesentupimentoLabels: Record<string, string> = {
-  mecanico: "Mecanico",
-  hidrojateamento: "Hidrojateamento",
-  quimico: "Quimico",
-  outro: "Outro",
+function parseValorMonetario(raw: string): number {
+  const normalizado = String(raw || "")
+    .replace(/[^\d,.-]/g, "")
+    .replace(/\.(?=\d{3},)/g, "")
+    .replace(",", ".")
+  const parsed = Number.parseFloat(normalizado)
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
-const situacaoFinalLabels: Record<string, string> = {
-  desobstruido_totalmente: "Desobstruido Totalmente",
-  desobstruido_parcialmente: "Desobstruido Parcialmente",
-  necessita_retorno: "Necessita Retorno",
+function formatarReal(valor: number): string {
+  return `R$ ${valor.toFixed(2).replace(".", ",")}`
 }
 
 export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDesentupimentoProps>(
   ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo }, ref) => {
+    const totalServicos = dadosTecnicos.servicos.reduce((acc, s) => acc + parseValorMonetario(s.valorServico), 0)
+    const desconto = parseValorMonetario(dadosTecnicos.desconto)
+    const totalPedido = Math.max(0, totalServicos - desconto)
+    const anoServico = (() => {
+      const partes = dataServico.split("/")
+      return partes.length === 3 ? partes[2] : new Date().getFullYear().toString()
+    })()
+
     return (
       <div ref={ref} className="os-a4-page bg-white text-black p-5 mx-auto text-[11px] print:text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
         {/* Header */}
@@ -75,181 +79,128 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
               <p>{empresaInfo.site}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="font-bold text-green-700 text-[9px]">COMPROVANTE DE EXECUCAO DE SERVICOS /</p>
-            <p className="font-bold text-green-700 text-[9px]">Desentupimento</p>
-            <div className="mt-2 border-2 border-black p-1">
-              <p className="font-bold text-center text-[9px]">N</p>
-              <p className="text-center text-sm font-bold text-red-600">{osNumber}</p>
+          <div className="border-2 border-black">
+            <div className="border-b-2 border-black p-1 text-center">
+              <p className="font-bold text-[9px]">N&ordm; PEDIDO</p>
+              <p className="text-sm font-bold">{osNumber}</p>
+            </div>
+            <div className="p-1 text-center">
+              <p className="font-bold text-[9px]">DATA</p>
+              <p className="text-sm font-bold">{dataServico}</p>
             </div>
           </div>
         </div>
 
-        {/* Informacoes da Empresa Especializada */}
+        {/* Titulo */}
         <div className="border border-black mb-3">
-          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px]">
-            INFORMACOES DA EMPRESA ESPECIALIZADA
+          <div className="bg-gray-200 px-2 py-1 font-bold border-b border-black text-center text-[10px]">
+            DEMONSTRATIVO DE PEDIDO
           </div>
-          <div className="grid grid-cols-4 text-[9px]">
-            <div className="border-r border-black p-1">
-              <p className="font-bold">Codigo INEA</p>
-              <p>{empresaInfo.codigoInea}</p>
-            </div>
-            <div className="border-r border-black p-1">
-              <p className="font-bold">Certificado Registro (CRH)</p>
-              <p>{empresaInfo.certificadoCRH}</p>
-            </div>
-            <div className="border-r border-black p-1">
-              <p className="font-bold">Validade (CRH)</p>
-              <p>{empresaInfo.validadeCRH}</p>
-            </div>
-            <div className="p-1">
-              <p className="font-bold">CNPJ</p>
-              <p>{empresaInfo.cnpj}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Informacoes do Cliente */}
-        <div className="border border-black mb-3">
-          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px]">
-            INFORMACOES DO CLIENTE
-          </div>
-          <div className="p-1.5 space-y-0.5 text-[9px]">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-bold">Razao Social: </span>
-                <span>{cliente.nome}</span>
-              </div>
-              <div>
-                <span className="font-bold">Nome Fantasia: </span>
-                <span>{cliente.nomeFantasia || "-"}</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-bold">Tipo Atividade: </span>
-                <span>{cliente.tipoAtividade || "CONDOMINIO"}</span>
-              </div>
-              <div>
-                <span className="font-bold">C.N.P.J: </span>
-                <span>{cliente.cpfCnpj}</span>
-              </div>
-            </div>
-            <div>
-              <span className="font-bold">Endereco: </span>
-              <span>{local.endereco}</span>
+          <div className="p-1.5 space-y-1 text-[9px]">
+            <div className="grid grid-cols-3 gap-2">
+              <div><span className="font-bold">Data Servico: </span>{dataServico}</div>
+              <div><span className="font-bold">Hora Servico: </span>{dadosTecnicos.horaServico || "-"}</div>
+              <div><span className="font-bold">Atendente: </span>{dadosTecnicos.atendente || "-"}</div>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <div>
-                <span className="font-bold">Bairro: </span>
-                <span>{local.bairro}</span>
-              </div>
-              <div>
-                <span className="font-bold">Cidade / UF: </span>
-                <span>{local.cidade}</span>
-              </div>
-              <div>
-                <span className="font-bold">C.E.P: </span>
-                <span>{local.cep}</span>
-              </div>
+              <div className="col-span-2"><span className="font-bold">Tecnico: </span>{dadosTecnicos.tecnico || "-"}</div>
+              <div><span className="font-bold">Vendedor: </span>{dadosTecnicos.vendedor || "-"}</div>
+            </div>
+            <div><span className="font-bold">Cliente: </span>{cliente.nome}</div>
+            <div><span className="font-bold">Endereco: </span>{local.endereco}</div>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="col-span-2"><span className="font-bold">Bairro: </span>{local.bairro}</div>
+              <div><span className="font-bold">Estado: </span>{local.estado}</div>
+              <div><span className="font-bold">C.E.P: </span>{local.cep}</div>
+            </div>
+            <div><span className="font-bold">Cidade: </span>{local.cidade}</div>
+            <div><span className="font-bold">Telefones: </span>{cliente.telefone}</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><span className="font-bold">C.N.P.J: </span>{cliente.cpfCnpj}</div>
+              <div><span className="font-bold">Inscricao: </span>{dadosTecnicos.inscricao || "-"}</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-bold">Telefones: </span>
-                <span>{cliente.telefone}</span>
-              </div>
-              <div>
-                <span className="font-bold">E-Mail: </span>
-                <span>{cliente.email}</span>
-              </div>
+              <div><span className="font-bold">E-mail: </span>{cliente.email}</div>
+              <div><span className="font-bold">Home Page: </span>{dadosTecnicos.homePage || "-"}</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-bold">Contatos: </span>
-                <span>{cliente.contato || "-"}</span>
-              </div>
-              <div>
-                <span className="font-bold">Funcao: </span>
-                <span>{cliente.funcaoContato || "-"}</span>
-              </div>
+              <div><span className="font-bold">Contatos: </span>{dadosTecnicos.contatos || cliente.contato || "-"}</div>
+              <div><span className="font-bold">Origem: </span>{dadosTecnicos.origem || "-"}</div>
             </div>
-            <div>
-              <span className="font-bold">Veiculo associado: </span>
-              <span>{veiculo || "-"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Descricao do Servico */}
-        <div className="border border-black mb-3">
-          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px]">
-            DESCRICAO DO SERVICO
-          </div>
-          <div className="p-1.5 space-y-1.5 text-[9px]">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-bold">Local do Entupimento: </span>
-                <span>{dadosTecnicos.localEntupimento || "-"}</span>
-              </div>
-              <div>
-                <span className="font-bold">Tipo de Desentupimento: </span>
-                <span>{tipoDesentupimentoLabels[dadosTecnicos.tipoDesentupimento] || "-"}</span>
-              </div>
-            </div>
-            <div>
-              <span className="font-bold">Equipamento Utilizado: </span>
-              <span>{dadosTecnicos.equipamentoUtilizado || "-"}</span>
-            </div>
-            <div>
-              <span className="font-bold">Diagnostico / Causa do Entupimento: </span>
-              <p className="mt-0.5">{dadosTecnicos.diagnostico || "-"}</p>
-            </div>
-            <div>
-              <span className="font-bold">Material Removido: </span>
-              <p className="mt-0.5">{dadosTecnicos.materialRemovido || "-"}</p>
-            </div>
-            <div>
-              <span className="font-bold">Situacao Final: </span>
-              <span>{situacaoFinalLabels[dadosTecnicos.situacaoFinal] || "-"}</span>
-            </div>
-            {dadosTecnicos.observacoes && (
-              <div>
-                <span className="font-bold">Observacoes: </span>
-                <p className="mt-0.5">{dadosTecnicos.observacoes}</p>
-              </div>
+            <div><span className="font-bold">Referencia: </span>{dadosTecnicos.referencia || "-"}</div>
+            <div><span className="font-bold">Observacoes: </span>{dadosTecnicos.observacoes || "-"}</div>
+            {veiculo && (
+              <div><span className="font-bold">Veiculo associado: </span>{veiculo}</div>
             )}
           </div>
         </div>
 
-        {/* Assinaturas */}
-        <div className="border border-black">
-          <div className="grid grid-cols-4 text-[9px]">
-            <div className="border-r border-black p-2 text-center">
-              <p className="font-bold mb-1">APLICADOR</p>
-              <p className="mt-6">{dadosTecnicos.aplicador || "-"}</p>
+        {/* Servicos */}
+        <div className="border border-black mb-3">
+          <div className="bg-gray-200 px-2 py-1 font-bold border-b border-black text-center text-[10px]">
+            SERVICOS
+          </div>
+          <table className="w-full text-[9px] border-collapse">
+            <thead>
+              <tr>
+                <th className="border-r border-b border-black p-1 text-left">Descricao</th>
+                <th className="border-r border-b border-black p-1 text-center w-24">Garantia</th>
+                <th className="border-b border-black p-1 text-right w-24">Valor Servico</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dadosTecnicos.servicos.length === 0 ? (
+                <tr>
+                  <td className="border-r border-black p-1">&nbsp;</td>
+                  <td className="border-r border-black p-1">&nbsp;</td>
+                  <td className="p-1">&nbsp;</td>
+                </tr>
+              ) : (
+                dadosTecnicos.servicos.map((servico) => (
+                  <tr key={servico.id}>
+                    <td className="border-r border-black p-1">{servico.descricao || "-"}</td>
+                    <td className="border-r border-black p-1 text-center">{servico.garantia || "-"}</td>
+                    <td className="p-1 text-right">{servico.valorServico || "R$ 0,00"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          <div className="border-t border-black p-1.5 flex flex-col items-end gap-0.5 text-[9px]">
+            <div className="flex gap-4">
+              <span className="font-bold">Total Servicos:</span>
+              <span>{formatarReal(totalServicos)}</span>
             </div>
-            <div className="border-r border-black p-2 text-center">
-              <p className="font-bold mb-1">TECNICO RESPONSAVEL</p>
-              <p className="mt-4">{dadosTecnicos.tecnicoResponsavel || "-"}</p>
-              <p className="text-[8px]">{dadosTecnicos.registroTecnico || ""}</p>
-              <p className="mt-2">_______________________________________</p>
+            <div className="flex gap-4">
+              <span className="font-bold">Desconto:</span>
+              <span>{formatarReal(desconto)}</span>
             </div>
-            <div className="border-r border-black p-2 text-center">
-              <p className="font-bold mb-1">CLIENTE</p>
-              <p className="text-[8px] mt-2">Recebi a presente ordem de servico e confirmo</p>
-              <p className="text-[8px]">a execucao do servico descrito acima.</p>
-              <p className="mt-2">_______________________________</p>
-              <p className="text-[8px]">Assinatura</p>
-              <p className="mt-1">_______________________________</p>
-              <p className="text-[8px]">Nome Legivel</p>
-            </div>
-            <div className="p-2 text-center">
-              <p className="font-bold mb-1">DATA</p>
-              <p className="font-bold mb-1">SERVICO</p>
-              <p className="text-sm font-bold mt-2">{dataServico}</p>
+            <div className="flex gap-4">
+              <span className="font-bold">Total Pedido:</span>
+              <span>{formatarReal(totalPedido)}</span>
             </div>
           </div>
+        </div>
+
+        <div className="text-[9px] mb-3">
+          <span className="font-bold">Condicao de Pagamento: </span>
+          <span>{dadosTecnicos.condicaoPagamento || "-"}</span>
+        </div>
+
+        {/* Atestado */}
+        <div className="text-[9px] text-center mb-4">
+          <p className="font-bold">
+            Atesto que o tecnico esteve neste local, no horario de ______ as ______ horas, executando os servicos descriminados acima
+          </p>
+        </div>
+
+        <div className="text-[9px] text-right mb-8">
+          <p className="font-bold">Rio de Janeiro,____ de ____________________ de {anoServico}</p>
+        </div>
+
+        <div className="text-[9px] text-center">
+          <p>_________________________________________________</p>
+          <p className="font-bold mt-1">Cliente / Ciente</p>
         </div>
       </div>
     )

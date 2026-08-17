@@ -231,16 +231,19 @@ export function PdfPreviewMock({
   }
 
   const defaultDadosTecnicosDesentupimento: DadosTecnicosDesentupimento = dadosTecnicosDesentupimento || {
-    localEntupimento: "",
-    tipoDesentupimento: "mecanico",
-    equipamentoUtilizado: "",
-    diagnostico: "",
-    materialRemovido: "",
-    situacaoFinal: "desobstruido_totalmente",
+    horaServico: "",
+    atendente: "",
+    tecnico: "",
+    vendedor: "",
+    inscricao: "",
+    homePage: "",
+    contatos: "",
+    origem: "",
+    referencia: "",
     observacoes: "",
-    aplicador: "",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ",
+    servicos: [],
+    desconto: "",
+    condicaoPagamento: "",
   }
 
   const defaultCliente: ClienteInfo = cliente || {
