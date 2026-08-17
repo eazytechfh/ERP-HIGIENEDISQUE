@@ -7,9 +7,11 @@ import { useEffect, useRef } from "react"
 import type { OSStatus } from "./os-header-card"
 import { OSDocumentVetores } from "./os-document-vetores"
 import { OSDocumentLimpeza } from "./os-document-limpeza"
+import { OSDocumentDesentupimento } from "./os-document-desentupimento"
 import { CertificadoGarantia, type CertificadoGarantiaData } from "./certificado-garantia"
 import type { DadosTecnicosVetores } from "./vetores-form"
 import type { DadosTecnicosLimpeza } from "./limpeza-form"
+import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
 
 type ClienteInfo = {
@@ -31,7 +33,7 @@ type LocalInfo = {
   cep: string
 }
 
-export type TipoOS = "vetores" | "limpeza"
+export type TipoOS = "vetores" | "limpeza" | "desentupimento"
 
 type PdfPreviewMockProps = {
   status: OSStatus
@@ -41,6 +43,7 @@ type PdfPreviewMockProps = {
   local?: LocalInfo
   dadosTecnicos?: DadosTecnicosVetores
   dadosTecnicosLimpeza?: DadosTecnicosLimpeza
+  dadosTecnicosDesentupimento?: DadosTecnicosDesentupimento
   dataServico?: string
   consumos?: ConsumoItem[]
   veiculo?: string
@@ -58,6 +61,7 @@ export function PdfPreviewMock({
   local,
   dadosTecnicos,
   dadosTecnicosLimpeza,
+  dadosTecnicosDesentupimento,
   dataServico,
   consumos = [],
   veiculo,
@@ -73,7 +77,7 @@ export function PdfPreviewMock({
   useEffect(() => {
     if (!onCaptureHtml || !isGenerated || !printRef.current) return
     onCaptureHtml(printRef.current.innerHTML)
-  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dataServico, consumos, veiculo, mostrarDeclaracaoCupim, certificadoData, incluirCertificado])
+  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dadosTecnicosDesentupimento, dataServico, consumos, veiculo, mostrarDeclaracaoCupim, certificadoData, incluirCertificado])
 
   const handlePrint = () => {
     if (!printRef.current) return
@@ -226,6 +230,19 @@ export function PdfPreviewMock({
     registroTecnico: "55953/02 RJ",
   }
 
+  const defaultDadosTecnicosDesentupimento: DadosTecnicosDesentupimento = dadosTecnicosDesentupimento || {
+    localEntupimento: "",
+    tipoDesentupimento: "mecanico",
+    equipamentoUtilizado: "",
+    diagnostico: "",
+    materialRemovido: "",
+    situacaoFinal: "desobstruido_totalmente",
+    observacoes: "",
+    aplicador: "",
+    tecnicoResponsavel: "Renato Luiz Leal Gomes",
+    registroTecnico: "55953/02 RJ",
+  }
+
   const defaultCliente: ClienteInfo = cliente || {
     nome: "Cliente",
     cpfCnpj: "",
@@ -241,7 +258,12 @@ export function PdfPreviewMock({
     cep: "",
   }
 
-  const tipoOSLabel = tipoOS === "limpeza" ? "Limpeza de Reservatorios" : "Vetores (Dedetizacao)"
+  const tipoOSLabel =
+    tipoOS === "limpeza"
+      ? "Limpeza de Reservatorios"
+      : tipoOS === "desentupimento"
+        ? "Desentupimento"
+        : "Vetores (Dedetizacao)"
 
   return (
     <Card>
@@ -277,6 +299,15 @@ export function PdfPreviewMock({
                   cliente={defaultCliente}
                   local={defaultLocal}
                   dadosTecnicos={defaultDadosTecnicosLimpeza}
+                  dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
+                  veiculo={veiculo}
+                />
+              ) : tipoOS === "desentupimento" ? (
+                <OSDocumentDesentupimento
+                  osNumber={osNumber}
+                  cliente={defaultCliente}
+                  local={defaultLocal}
+                  dadosTecnicos={defaultDadosTecnicosDesentupimento}
                   dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
                   veiculo={veiculo}
                 />
@@ -317,7 +348,9 @@ export function PdfPreviewMock({
             <p className="text-xs text-muted-foreground mt-4 text-center max-w-md">
               {tipoOS === "limpeza"
                 ? 'Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Limpeza e Higienizacao de Reservatorios de Agua, pronto para impressao e assinatura presencial do cliente.'
-                : 'Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Controle de Vetores / Dedetizacao, pronto para impressao e assinatura presencial do cliente.'}
+                : tipoOS === "desentupimento"
+                  ? 'Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Desentupimento, pronto para impressao e assinatura presencial do cliente.'
+                  : 'Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Controle de Vetores / Dedetizacao, pronto para impressao e assinatura presencial do cliente.'}
             </p>
           </div>
         )}

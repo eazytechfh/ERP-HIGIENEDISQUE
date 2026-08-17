@@ -44,6 +44,7 @@ import {
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
 import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/components/os-generation/vetores-form"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
+import { DesentupimentoForm, type DadosTecnicosDesentupimento } from "@/components/os-generation/desentupimento-form"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
 import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
@@ -1367,6 +1368,18 @@ export default function ServicosPage() {
     tecnicoResponsavel: "Renato Luiz Leal Gomes",
     registroTecnico: "55953/02 RJ"
   })
+  const [dadosTecnicosDesentupimento, setDadosTecnicosDesentupimento] = useState<DadosTecnicosDesentupimento>({
+    localEntupimento: "",
+    tipoDesentupimento: "mecanico",
+    equipamentoUtilizado: "",
+    diagnostico: "",
+    materialRemovido: "",
+    situacaoFinal: "desobstruido_totalmente",
+    observacoes: "",
+    aplicador: "",
+    tecnicoResponsavel: "Renato Luiz Leal Gomes",
+    registroTecnico: "55953/02 RJ"
+  })
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
 
   // Estados derivados dos produtos utilizados na OS Vetores.
@@ -1491,9 +1504,24 @@ export default function ServicosPage() {
   }, [servicosAgendados, servicosHydrated])
 
   // Determinar tipo de OS baseado no tipo de servico
+  const isTipoDesentupimento = (serviceType: string): boolean => {
+    if (!serviceType.startsWith("outro_")) return false
+    const id = serviceType.replace("outro_", "")
+    const tipo = tiposServico.find((t) => t.id === id)
+    if (!tipo) return false
+    const nomeNormalizado = tipo.nome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+    return nomeNormalizado.includes("desentup")
+  }
+
   const getTipoOS = (): TipoOS => {
     if (serviceRequest.serviceType === "reservatorio_potavel") {
       return "limpeza"
+    }
+    if (isTipoDesentupimento(serviceRequest.serviceType)) {
+      return "desentupimento"
     }
     return "vetores"
   }
@@ -3663,6 +3691,11 @@ const handleConfirmarAgendamentoFinal = async () => {
                 dados={dadosTecnicosLimpeza}
                 onChange={setDadosTecnicosLimpeza}
               />
+            ) : isTipoDesentupimento(serviceRequest.serviceType) ? (
+              <DesentupimentoForm
+                dados={dadosTecnicosDesentupimento}
+                onChange={setDadosTecnicosDesentupimento}
+              />
             ) : (
               <Card>
                 <CardContent className="py-8">
@@ -3754,6 +3787,7 @@ const handleConfirmarAgendamentoFinal = async () => {
               } : undefined}
               dadosTecnicos={getTipoOS() === "vetores" ? dadosTecnicosVetores : undefined}
               dadosTecnicosLimpeza={getTipoOS() === "limpeza" ? dadosTecnicosLimpeza : undefined}
+              dadosTecnicosDesentupimento={getTipoOS() === "desentupimento" ? dadosTecnicosDesentupimento : undefined}
               dataServico={serviceRequest.schedule.date ? formatDateOnlyBR(serviceRequest.schedule.date) : undefined}
               consumos={getTipoOS() === "vetores" ? consumos : []}
               veiculo={veiculoSelecionado ? `${veiculoSelecionado.placa} - ${veiculoSelecionado.modelo}` : undefined}
