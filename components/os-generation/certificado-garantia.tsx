@@ -123,8 +123,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                   <LabeledValue label="Estado" value={data.estado} />
                   <LabeledValue label="C.E.P" value={data.cep || ""} />
 
-                  <LabeledValue label={getDocumentoLabel(data.cpfCnpj)} value={data.cpfCnpj || ""} />
-                  <div />
+                  <LabeledValue label={getDocumentoLabel(data.cpfCnpj)} value={data.cpfCnpj || ""} wide />
                   <LabeledValue label="Identidade" value={data.identidade || ""} wide />
                 </div>
               </td>
