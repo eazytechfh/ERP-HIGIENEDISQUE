@@ -82,9 +82,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         {/* Header */}
         <div className="flex items-start justify-between border-b-2 border-black pb-3 mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-20 h-14 bg-green-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-base">HD</span>
-            </div>
+            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="w-20 h-14 object-contain" />
             <div className="text-[9px]">
               <h1 className="font-bold text-xs">{empresaInfo.nome}</h1>
               <p>{empresaInfo.endereco}</p>
