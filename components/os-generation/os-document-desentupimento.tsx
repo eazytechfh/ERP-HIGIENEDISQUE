@@ -116,7 +116,7 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
 
             {/* Bloco de campos */}
             <tr>
-              <td colSpan={3} style={{ ...cellStyle, padding: "1.5mm 2mm" }}>
+              <td colSpan={3} style={{ ...cellStyle, padding: "1.5mm 8mm 1.5mm 2mm" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.6mm" }}>
                   <Linha>
                     <Campo label="Data Serviço" value={dataServico} />
@@ -214,17 +214,17 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
           </tbody>
         </table>
 
-        <div style={{ fontWeight: 700, marginTop: "2mm" }}>Condição de Pagamento : {dadosTecnicos.condicaoPagamento || ""}</div>
+        <div style={{ fontWeight: 700, marginTop: "2mm", fontSize: "10.5px" }}>Condição de Pagamento : {dadosTecnicos.condicaoPagamento || ""}</div>
 
-        <div style={{ textAlign: "center", fontWeight: 700, marginTop: "6mm" }}>
+        <div style={{ textAlign: "center", fontWeight: 700, marginTop: "6mm", fontSize: "10.5px" }}>
           Atesto que o técnico esteve neste local, no horário de ______ às ______ horas, executando os serviços descriminados acima
         </div>
 
-        <div style={{ textAlign: "right", fontWeight: 700, marginTop: "6mm" }}>
+        <div style={{ textAlign: "right", fontWeight: 700, marginTop: "6mm", fontSize: "10.5px" }}>
           Rio de Janeiro,____ de ____________________ de {anoServico}
         </div>
 
-        <div style={{ textAlign: "center", marginTop: "10mm" }}>
+        <div style={{ textAlign: "center", marginTop: "10mm", fontSize: "10.5px" }}>
           <div>_________________________________________________</div>
           <div style={{ fontWeight: 700, marginTop: "0.8mm" }}>Cliente / Ciente</div>
         </div>
