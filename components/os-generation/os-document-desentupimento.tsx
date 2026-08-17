@@ -5,13 +5,15 @@ import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
 
 // Empresa Info (mock - pode vir de configuracoes do sistema)
 const empresaInfo = {
-  nome: "Higiene Disque Higienizacoes Ltda",
-  endereco: "Av Sao Gualter, 200, lote 71 B - Piratininga",
-  cidadeUf: "Niteroi - RJ - Cep.: 24355-010",
-  telefones: "(21)2626-3000 - (21)2625-3233",
+  nome: "Higiene Disque Higienizações Ltda",
+  endereco: "Av São Gualter, 200, lote 71 B - Piratininga",
+  cidadeUf: "Niterói - RJ - Cep.: 24355-010",
+  telefones: "(21)2626-3000  -  (21)2625-3233",
   email: "contato@higienedisque.com.br",
   site: "www.higienedisque.com.br",
 }
+
+const logoSrc = "/images/higiene-disque-logo.png"
 
 type ClienteInfo = {
   nome: string
@@ -65,142 +67,166 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
     })()
 
     return (
-      <div ref={ref} className="os-a4-page bg-white text-black p-5 mx-auto text-[11px] print:text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
-        {/* Header */}
-        <div className="flex items-start justify-between border-b-2 border-black pb-3 mb-3">
-          <div className="flex items-center gap-3">
-            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="w-20 h-14 object-contain" />
-            <div className="text-[9px]">
-              <h1 className="font-bold text-xs">{empresaInfo.nome}</h1>
-              <p>{empresaInfo.endereco}</p>
-              <p>{empresaInfo.cidadeUf}</p>
-              <p>Telefones.: {empresaInfo.telefones}</p>
-              <p>{empresaInfo.email}</p>
-              <p>{empresaInfo.site}</p>
-            </div>
-          </div>
-          <div className="border-2 border-black">
-            <div className="border-b-2 border-black p-1 text-center">
-              <p className="font-bold text-[9px]">N&ordm; PEDIDO</p>
-              <p className="text-sm font-bold">{osNumber}</p>
-            </div>
-            <div className="p-1 text-center">
-              <p className="font-bold text-[9px]">DATA</p>
-              <p className="text-sm font-bold">{dataServico}</p>
-            </div>
-          </div>
+      <div
+        ref={ref}
+        className="os-a4-page bg-white text-black mx-auto"
+        style={{ width: "200mm", minHeight: "287mm", padding: "6mm", fontFamily: "Arial, sans-serif", fontSize: "9px", lineHeight: 1.3, color: "#000" }}
+      >
+        <table style={outerTableStyle}>
+          <tbody>
+            {/* Header: logo | empresa | pedido/data */}
+            <tr>
+              <td style={{ ...cellStyle, width: "40mm", padding: "2mm", verticalAlign: "middle" }}>
+                <img src={logoSrc} alt="Higiene Disque" style={{ width: "100%", height: "16mm", objectFit: "contain" }} />
+              </td>
+              <td style={{ ...cellStyle, padding: "2mm", textAlign: "center", verticalAlign: "middle" }}>
+                <div style={{ fontSize: "13px", fontWeight: 700 }}>{empresaInfo.nome}</div>
+                <div>{empresaInfo.endereco}</div>
+                <div>{empresaInfo.cidadeUf}</div>
+                <div>Telefones.: {empresaInfo.telefones}</div>
+                <div>{empresaInfo.email}</div>
+                <div>{empresaInfo.site}</div>
+              </td>
+              <td style={{ ...cellStyle, width: "40mm", padding: 0 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding: "1.5mm", textAlign: "center", borderBottom: "1px solid #111" }}>
+                        <div style={{ fontWeight: 700 }}>Nº PEDIDO</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700 }}>{osNumber}</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: "1.5mm", textAlign: "center" }}>
+                        <div style={{ fontWeight: 700 }}>DATA</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700 }}>{dataServico}</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+
+            {/* Titulo */}
+            <tr>
+              <td colSpan={3} style={{ ...cellStyle, padding: "1mm", textAlign: "center", fontWeight: 700, fontSize: "10px" }}>
+                DEMONSTRATIVO DE PEDIDO
+              </td>
+            </tr>
+
+            {/* Bloco de campos */}
+            <tr>
+              <td colSpan={3} style={{ ...cellStyle, padding: "1.5mm 2mm" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6mm" }}>
+                  <Linha>
+                    <Campo label="Data Serviço" value={dataServico} />
+                    <Campo label="Hora Serviço" value={dadosTecnicos.horaServico} />
+                    <Campo label="Atendente" value={dadosTecnicos.atendente} align="right" />
+                  </Linha>
+                  <Linha>
+                    <Campo label="Técnico" value={dadosTecnicos.tecnico} grow />
+                    <Campo label="Vendedor" value={dadosTecnicos.vendedor} align="right" />
+                  </Linha>
+                  <Campo label="Cliente" value={cliente.nome} bold />
+                  <Campo label="Endereço" value={local.endereco} />
+                  <Linha>
+                    <Campo label="Bairro" value={local.bairro} />
+                    <Campo label="Cidade" value={local.cidade} />
+                    <Campo label="Estado" value={local.estado} align="right" />
+                    <Campo label="C.E.P" value={local.cep} align="right" />
+                  </Linha>
+                  <Campo label="Telefones" value={cliente.telefone} />
+                  <Linha>
+                    <Campo label="C.N.P.J" value={cliente.cpfCnpj} grow />
+                    <Campo label="Inscrição" value={dadosTecnicos.inscricao} align="right" />
+                  </Linha>
+                  <Linha>
+                    <Campo label="E-mail" value={cliente.email} grow />
+                    <Campo label="Home Page" value={dadosTecnicos.homePage} align="right" />
+                  </Linha>
+                  <Linha>
+                    <Campo label="Contatos" value={dadosTecnicos.contatos || cliente.contato} grow />
+                    <Campo label="Origem" value={dadosTecnicos.origem} align="right" />
+                  </Linha>
+                  <Campo label="Referência" value={dadosTecnicos.referencia} />
+                  <Campo label="Observações" value={dadosTecnicos.observacoes} />
+                  {veiculo && <Campo label="Veículo associado" value={veiculo} />}
+                </div>
+              </td>
+            </tr>
+
+            {/* Servicos */}
+            <tr>
+              <td colSpan={3} style={{ ...cellStyle, padding: "1mm", textAlign: "center", fontWeight: 700, fontSize: "10px" }}>
+                SERVIÇOS
+              </td>
+            </tr>
+            <tr>
+              <td colSpan={3} style={{ ...cellStyle, padding: "1.5mm 2mm" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", fontWeight: 700, borderBottom: "1px solid #111", padding: "0 0 0.8mm" }}>Descrição</th>
+                      <th style={{ textAlign: "right", fontWeight: 700, borderBottom: "1px solid #111", padding: "0 0 0.8mm", width: "28mm" }}>Garantia</th>
+                      <th style={{ textAlign: "right", fontWeight: 700, borderBottom: "1px solid #111", padding: "0 0 0.8mm", width: "28mm" }}>Valor Serviço</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dadosTecnicos.servicos.length === 0 ? (
+                      <tr>
+                        <td style={{ padding: "0.8mm 0" }}>&nbsp;</td>
+                        <td style={{ padding: "0.8mm 0" }}>&nbsp;</td>
+                        <td style={{ padding: "0.8mm 0" }}>&nbsp;</td>
+                      </tr>
+                    ) : (
+                      dadosTecnicos.servicos.map((servico) => (
+                        <tr key={servico.id}>
+                          <td style={{ padding: "0.8mm 0" }}>{servico.descricao || "-"}</td>
+                          <td style={{ padding: "0.8mm 0", textAlign: "right" }}>{servico.garantia}</td>
+                          <td style={{ padding: "0.8mm 0", textAlign: "right" }}>{servico.valorServico}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3} style={{ borderTop: "1px solid #111", padding: "1mm 0 0" }} />
+                    </tr>
+                    <tr>
+                      <td />
+                      <td style={{ textAlign: "right", fontWeight: 700, padding: "0.3mm 0" }}>Total Serviços :</td>
+                      <td style={{ textAlign: "right", padding: "0.3mm 0" }}>{formatarReal(totalServicos)}</td>
+                    </tr>
+                    <tr>
+                      <td />
+                      <td style={{ textAlign: "right", fontWeight: 700, padding: "0.3mm 0" }}>Desconto :</td>
+                      <td style={{ textAlign: "right", padding: "0.3mm 0" }}>{formatarReal(desconto)}</td>
+                    </tr>
+                    <tr>
+                      <td />
+                      <td style={{ textAlign: "right", fontWeight: 700, padding: "0.3mm 0" }}>Total Pedido :</td>
+                      <td style={{ textAlign: "right", padding: "0.3mm 0" }}>{formatarReal(totalPedido)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style={{ fontWeight: 700, marginTop: "2mm" }}>Condição de Pagamento : {dadosTecnicos.condicaoPagamento || ""}</div>
+
+        <div style={{ textAlign: "center", fontWeight: 700, marginTop: "6mm" }}>
+          Atesto que o técnico esteve neste local, no horário de ______ às ______ horas, executando os serviços descriminados acima
         </div>
 
-        {/* Titulo */}
-        <div className="border border-black mb-3">
-          <div className="bg-gray-200 px-2 py-1 font-bold border-b border-black text-center text-[10px]">
-            DEMONSTRATIVO DE PEDIDO
-          </div>
-          <div className="p-1.5 space-y-1 text-[9px]">
-            <div className="grid grid-cols-3 gap-2">
-              <div><span className="font-bold">Data Servico: </span>{dataServico}</div>
-              <div><span className="font-bold">Hora Servico: </span>{dadosTecnicos.horaServico || "-"}</div>
-              <div><span className="font-bold">Atendente: </span>{dadosTecnicos.atendente || "-"}</div>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2"><span className="font-bold">Tecnico: </span>{dadosTecnicos.tecnico || "-"}</div>
-              <div><span className="font-bold">Vendedor: </span>{dadosTecnicos.vendedor || "-"}</div>
-            </div>
-            <div><span className="font-bold">Cliente: </span>{cliente.nome}</div>
-            <div><span className="font-bold">Endereco: </span>{local.endereco}</div>
-            <div className="grid grid-cols-4 gap-2">
-              <div className="col-span-2"><span className="font-bold">Bairro: </span>{local.bairro}</div>
-              <div><span className="font-bold">Estado: </span>{local.estado}</div>
-              <div><span className="font-bold">C.E.P: </span>{local.cep}</div>
-            </div>
-            <div><span className="font-bold">Cidade: </span>{local.cidade}</div>
-            <div><span className="font-bold">Telefones: </span>{cliente.telefone}</div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><span className="font-bold">C.N.P.J: </span>{cliente.cpfCnpj}</div>
-              <div><span className="font-bold">Inscricao: </span>{dadosTecnicos.inscricao || "-"}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><span className="font-bold">E-mail: </span>{cliente.email}</div>
-              <div><span className="font-bold">Home Page: </span>{dadosTecnicos.homePage || "-"}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><span className="font-bold">Contatos: </span>{dadosTecnicos.contatos || cliente.contato || "-"}</div>
-              <div><span className="font-bold">Origem: </span>{dadosTecnicos.origem || "-"}</div>
-            </div>
-            <div><span className="font-bold">Referencia: </span>{dadosTecnicos.referencia || "-"}</div>
-            <div><span className="font-bold">Observacoes: </span>{dadosTecnicos.observacoes || "-"}</div>
-            {veiculo && (
-              <div><span className="font-bold">Veiculo associado: </span>{veiculo}</div>
-            )}
-          </div>
+        <div style={{ textAlign: "right", fontWeight: 700, marginTop: "6mm" }}>
+          Rio de Janeiro,____ de ____________________ de {anoServico}
         </div>
 
-        {/* Servicos */}
-        <div className="border border-black mb-3">
-          <div className="bg-gray-200 px-2 py-1 font-bold border-b border-black text-center text-[10px]">
-            SERVICOS
-          </div>
-          <table className="w-full text-[9px] border-collapse">
-            <thead>
-              <tr>
-                <th className="border-r border-b border-black p-1 text-left">Descricao</th>
-                <th className="border-r border-b border-black p-1 text-center w-24">Garantia</th>
-                <th className="border-b border-black p-1 text-right w-24">Valor Servico</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dadosTecnicos.servicos.length === 0 ? (
-                <tr>
-                  <td className="border-r border-black p-1">&nbsp;</td>
-                  <td className="border-r border-black p-1">&nbsp;</td>
-                  <td className="p-1">&nbsp;</td>
-                </tr>
-              ) : (
-                dadosTecnicos.servicos.map((servico) => (
-                  <tr key={servico.id}>
-                    <td className="border-r border-black p-1">{servico.descricao || "-"}</td>
-                    <td className="border-r border-black p-1 text-center">{servico.garantia || "-"}</td>
-                    <td className="p-1 text-right">{servico.valorServico || "R$ 0,00"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-          <div className="border-t border-black p-1.5 flex flex-col items-end gap-0.5 text-[9px]">
-            <div className="flex gap-4">
-              <span className="font-bold">Total Servicos:</span>
-              <span>{formatarReal(totalServicos)}</span>
-            </div>
-            <div className="flex gap-4">
-              <span className="font-bold">Desconto:</span>
-              <span>{formatarReal(desconto)}</span>
-            </div>
-            <div className="flex gap-4">
-              <span className="font-bold">Total Pedido:</span>
-              <span>{formatarReal(totalPedido)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-[9px] mb-3">
-          <span className="font-bold">Condicao de Pagamento: </span>
-          <span>{dadosTecnicos.condicaoPagamento || "-"}</span>
-        </div>
-
-        {/* Atestado */}
-        <div className="text-[9px] text-center mb-4">
-          <p className="font-bold">
-            Atesto que o tecnico esteve neste local, no horario de ______ as ______ horas, executando os servicos descriminados acima
-          </p>
-        </div>
-
-        <div className="text-[9px] text-right mb-8">
-          <p className="font-bold">Rio de Janeiro,____ de ____________________ de {anoServico}</p>
-        </div>
-
-        <div className="text-[9px] text-center">
-          <p>_________________________________________________</p>
-          <p className="font-bold mt-1">Cliente / Ciente</p>
+        <div style={{ textAlign: "center", marginTop: "10mm" }}>
+          <div>_________________________________________________</div>
+          <div style={{ fontWeight: 700, marginTop: "0.8mm" }}>Cliente / Ciente</div>
         </div>
       </div>
     )
@@ -208,3 +234,39 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
 )
 
 OSDocumentDesentupimento.displayName = "OSDocumentDesentupimento"
+
+const outerTableStyle = {
+  width: "100%",
+  borderCollapse: "collapse" as const,
+  border: "2px solid #111",
+}
+
+const cellStyle = {
+  border: "1px solid #111",
+  color: "#000",
+}
+
+function Linha({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: "flex", flexWrap: "wrap", gap: "3mm" }}>{children}</div>
+}
+
+function Campo({
+  label,
+  value,
+  grow = false,
+  align,
+  bold = false,
+}: {
+  label: string
+  value?: string
+  grow?: boolean
+  align?: "right"
+  bold?: boolean
+}) {
+  return (
+    <div style={{ flex: grow ? "1 1 auto" : align === "right" ? "0 0 auto" : "0 1 auto", marginLeft: align === "right" ? "auto" : undefined }}>
+      <span style={{ fontWeight: 700 }}>{label} : </span>
+      <span style={{ fontWeight: bold ? 700 : 400 }}>{value || ""}</span>
+    </div>
+  )
+}
