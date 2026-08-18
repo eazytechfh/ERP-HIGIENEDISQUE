@@ -118,62 +118,64 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
     return (
       <div ref={ref} className="os-a4-page bg-white text-black p-5 mx-auto text-[11px] print:text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
-        {/* Cabecalho - logo + dados da empresa */}
-        <div className="flex items-start justify-between pb-2 mb-2">
-          <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="w-28 h-16 object-contain" />
-          <div className="text-[9px] text-right">
-            <p className="font-bold">{empresaInfo.nome}</p>
-            <p>{empresaInfo.endereco}</p>
-            <p>{empresaInfo.cidadeUf}</p>
-            <p>Telefones.: {empresaInfo.telefones}</p>
-            <p>{empresaInfo.email}</p>
-            <p>{empresaInfo.site}</p>
+        {/* Documento inteiro e uma unica caixa continua (sem espacos entre secoes), igual ao modelo O.S Higienizacao */}
+        <div className="border border-black">
+          {/* Cabecalho - logo + dados da empresa */}
+          <div className="flex items-start justify-between p-1.5 border-b border-black">
+            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="w-28 h-16 object-contain" />
+            <div className="text-[9px] text-right">
+              <p className="font-bold">{empresaInfo.nome}</p>
+              <p>{empresaInfo.endereco}</p>
+              <p>{empresaInfo.cidadeUf}</p>
+              <p>Telefones.: {empresaInfo.telefones}</p>
+              <p>{empresaInfo.email}</p>
+              <p>{empresaInfo.site}</p>
+            </div>
           </div>
-        </div>
 
-        {/* Titulo do comprovante + numero da OS */}
-        <div className="flex items-stretch justify-between border-2 border-black mb-3">
-          <div className="p-1.5">
-            <p className="font-bold text-[14px] leading-tight">COMPROVANTE DE EXECUÇÃO DE SERVIÇOS /</p>
-            <p className="font-bold text-[12px] leading-tight">Limpeza e Higienização de Reservatórios de Água</p>
+          {/* Titulo do comprovante + numero da OS */}
+          <div className="flex items-stretch justify-between border-b border-black">
+            <div className="p-1.5">
+              <p className="font-bold text-[14px] leading-tight">COMPROVANTE DE EXECUÇÃO DE SERVIÇOS /</p>
+              <p className="font-bold text-[12px] leading-tight">Limpeza e Higienização de Reservatórios de Água</p>
+            </div>
+            <div className="border-l border-black p-1.5 text-center min-w-[90px] flex items-center justify-center gap-1">
+              <span className="font-bold text-[11px]">Nº</span>
+              <span className="text-[26px] font-bold leading-none">{osNumber}</span>
+            </div>
           </div>
-          <div className="border-l-2 border-black p-1.5 text-center min-w-[90px] flex items-center justify-center gap-1">
-            <span className="font-bold text-[11px]">Nº</span>
-            <span className="text-[26px] font-bold leading-none">{osNumber}</span>
-          </div>
-        </div>
 
-        {/* Informações da Empresa Especializada */}
-        <div className="border border-black mb-3">
-          <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
-            INFORMAÇÕES DA EMPRESA ESPECIALIZADA
+          {/* Informações da Empresa Especializada */}
+          <div className="border-b border-black">
+            <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
+              INFORMAÇÕES DA EMPRESA ESPECIALIZADA
+            </div>
+            <div className="grid grid-cols-4 text-[9px]">
+              <div className="border-r border-black p-1 text-center">
+                <p className="font-bold">CNPJ</p>
+                <p>{empresaInfo.cnpj}</p>
+              </div>
+              <div className="border-r border-black p-1 text-center">
+                <p className="font-bold">Código INEA</p>
+                <p>{empresaInfo.codigoInea}</p>
+              </div>
+              <div className="border-r border-black p-1 text-center">
+                <p className="font-bold">Certificado Registro (CRH)</p>
+                <p>{empresaInfo.certificadoCRH}</p>
+              </div>
+              <div className="p-1 text-center">
+                <p className="font-bold">Validade (CRH)</p>
+                <p>{empresaInfo.validadeCRH}</p>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-4 text-[9px]">
-            <div className="border-r border-black p-1 text-center">
-              <p className="font-bold">CNPJ</p>
-              <p>{empresaInfo.cnpj}</p>
-            </div>
-            <div className="border-r border-black p-1 text-center">
-              <p className="font-bold">Código INEA</p>
-              <p>{empresaInfo.codigoInea}</p>
-            </div>
-            <div className="border-r border-black p-1 text-center">
-              <p className="font-bold">Certificado Registro (CRH)</p>
-              <p>{empresaInfo.certificadoCRH}</p>
-            </div>
-            <div className="p-1 text-center">
-              <p className="font-bold">Validade (CRH)</p>
-              <p>{empresaInfo.validadeCRH}</p>
-            </div>
-          </div>
-        </div>
 
-        {/* Informações do Cliente */}
-        <div className="border border-black mb-3">
-          <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
-            INFORMAÇÕES DO CLIENTE
-          </div>
-          <div className="text-[9px]">
+          {/* Informações do Cliente */}
+          <div className="border-b border-black">
+            <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
+              INFORMAÇÕES DO CLIENTE
+            </div>
+            <div className="text-[9px]">
             <div className="border-b border-black flex">
               <div className="flex-1 p-1">
                 <span className="font-bold">Razão Social : </span>
@@ -240,7 +242,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         </div>
 
         {/* Descrição dos Serviços - Tabela de Reservatórios */}
-        <div className="border border-black mb-3">
+        <div className="border-b border-black">
           <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
             DESCRIÇÃO DOS SERVIÇOS
           </div>
@@ -299,12 +301,12 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         </div>
 
         {/* Aviso Legal */}
-        <div className="border border-black mb-3 p-2 text-[8px] leading-tight">
+        <div className="border-b border-black p-2 text-[8px] leading-tight text-center">
           <p>
             Ficam os estabelecimentos obrigados à execução SEMESTRAL da limpeza e higienização dos reservatórios de água
             destinados ao consumo humano bem como à realização de análise bacteriológica da água imediatamente após a limpeza.
           </p>
-          <p className="mt-1">
+          <p>
             Artigo 3º, Decreto RJ nº 20356, de 17 de agosto de 1994, que regulamenta a Lei RJ nº 1893, de 20 de novembro de 1991, que
             estabelece obrigatoriedade da limpeza e higienização dos reservatórios de água para fins de manutenção dos padrões de
             potabilidade.
@@ -312,7 +314,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         </div>
 
         {/* Assinaturas */}
-        <div className="border border-black">
+        <div>
           <div className="grid text-[9px] border-b border-black text-center font-bold" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
             <div className="border-r border-black p-1">APLICADOR</div>
             <div className="border-r border-black p-1">TÉCNICO RESPONSÁVEL</div>
@@ -340,6 +342,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
               <p className="font-bold">{dataServico}</p>
             </div>
           </div>
+        </div>
         </div>
       </div>
     )
