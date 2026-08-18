@@ -122,7 +122,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         <div className="border border-black">
           {/* Cabecalho - logo + dados da empresa */}
           <div className="flex items-start justify-between p-1.5 border-b border-black">
-            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="h-20 w-auto object-contain" />
+            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="h-14 w-auto object-contain" />
             <div className="text-[9px] text-right">
               <p className="font-bold">{empresaInfo.nome}</p>
               <p>{empresaInfo.endereco}</p>
@@ -321,15 +321,23 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
             <div className="border-r border-black p-1">CLIENTE</div>
             <div className="p-1">DATA SERVIÇO</div>
           </div>
-          <div className="grid text-[9px]" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
-            <div className="border-r border-black p-2 pt-5 text-center">
-              <div className="border-t border-black w-4/5 mx-auto"></div>
-              <p className="italic mt-0.5">{dadosTecnicos.aplicador || "Eryck Guimaraes"}</p>
+          <div className="grid text-[9px] min-h-[85px]" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
+            <div className="border-r border-black px-2 text-center flex flex-col">
+              <div className="flex-[3]"></div>
+              <div>
+                <div className="border-t border-black w-4/5 mx-auto"></div>
+                <p className="italic mt-0.5">{dadosTecnicos.aplicador || "Eryck Guimaraes"}</p>
+              </div>
+              <div className="flex-[2]"></div>
             </div>
-            <div className="border-r border-black p-2 pt-5 text-center">
-              <div className="border-t border-black w-4/5 mx-auto"></div>
-              <p className="italic mt-0.5">{dadosTecnicos.tecnicoResponsavel || "Renato Luiz Leal Gomes"}</p>
-              <p className="text-[8px]">Nº CRBio - {dadosTecnicos.registroTecnico || "55953/02 RJ"}</p>
+            <div className="border-r border-black px-2 text-center flex flex-col">
+              <div className="flex-[3]"></div>
+              <div>
+                <div className="border-t border-black w-4/5 mx-auto"></div>
+                <p className="italic mt-0.5">{dadosTecnicos.tecnicoResponsavel || "Renato Luiz Leal Gomes"}</p>
+                <p className="text-[8px]">Nº CRBio - {dadosTecnicos.registroTecnico || "55953/02 RJ"}</p>
+              </div>
+              <div className="flex-[2]"></div>
             </div>
             <div className="border-r border-black flex flex-col">
               <p className="text-[8px] text-center px-2 pt-2">
