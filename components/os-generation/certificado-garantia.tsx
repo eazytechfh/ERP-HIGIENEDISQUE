@@ -22,6 +22,7 @@ export type CertificadoGarantiaVetor = {
 }
 
 export type CertificadoGarantiaData = {
+  tipoServico?: "pragas" | "limpeza"
   osNumber: string
   dataServico: string
   validadeCrv: string
@@ -41,6 +42,17 @@ export type CertificadoGarantiaData = {
   observacoes?: string
 }
 
+const certificadoTextos = {
+  pragas: {
+    descricaoServico: "CERTIFICAMOS QUE EXECUTAMOS O(S) SERVIÇO(S) DE DESINSETIZAÇÃO ABAIXO DESCRIMINADO(S)",
+    colunas: ["Vetor", "Garantia", "Vencimento"],
+  },
+  limpeza: {
+    descricaoServico: "CERTIFICAMOS QUE EXECUTAMOS O(S) SERVIÇO(S) DE LIMPEZA E HIGIENIZAÇÃO DE RESERVATÓRIOS DE ÁGUA ABAIXO DESCRIMINADO(S)",
+    colunas: ["Reservatório", "Volume (M³)", "Próxima Higienização"],
+  },
+} as const
+
 type CertificadoGarantiaProps = {
   data: CertificadoGarantiaData
   pageBreakBefore?: boolean
@@ -53,6 +65,7 @@ function getDocumentoLabel(cpfCnpj: string): string {
 
 export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGarantiaProps>(
   ({ data, pageBreakBefore = false }, ref) => {
+    const textos = certificadoTextos[data.tipoServico || "pragas"]
     return (
       <div
         ref={ref}
@@ -130,7 +143,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
             </tr>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: "3.4mm 2mm", textAlign: "center", fontWeight: 700, fontSize: "16px" }}>
-                CERTIFICAMOS QUE EXECUTAMOS O(S) SERVIÇO(S) DE DESINSETIZAÇÃO ABAIXO DESCRIMINADO(S)
+                {textos.descricaoServico}
               </td>
             </tr>
             <tr>
@@ -138,9 +151,9 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                 <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: "15px" }}>
                   <thead>
                     <tr>
-                      <th style={{ ...innerThStyle, width: "50%" }}>Vetor</th>
-                      <th style={{ ...innerThStyle, width: "25%" }}>Garantia</th>
-                      <th style={{ ...innerThStyle, width: "25%", borderRight: 0 }}>Vencimento</th>
+                      <th style={{ ...innerThStyle, width: "50%" }}>{textos.colunas[0]}</th>
+                      <th style={{ ...innerThStyle, width: "25%" }}>{textos.colunas[1]}</th>
+                      <th style={{ ...innerThStyle, width: "25%", borderRight: 0 }}>{textos.colunas[2]}</th>
                     </tr>
                   </thead>
                   <tbody>

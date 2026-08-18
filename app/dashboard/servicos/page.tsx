@@ -402,6 +402,11 @@ const certificadoPragaLabels: Record<string, string> = {
   outros: "Outros",
 }
 
+const reservatorioTipoLabels: Record<string, string> = {
+  cisterna: "Cisterna",
+  caixa_dagua: "Caixa D'Água",
+}
+
 function addWarrantyToDate(baseDate: Date, amount: number, unit: ServiceRequest["warrantyUnit"]) {
   const next = new Date(baseDate)
   if (unit === "anos") {
@@ -2503,7 +2508,7 @@ const handleConfirmarAgendamentoFinal = async () => {
   // Obter contrato selecionado
   const contratoSelecionado = contratosDoCliente.find((c) => c.id === serviceRequest.billing.contractId)
 
-  const podeGerarCertificado = isTipoPragas(serviceRequest.serviceType)
+  const podeGerarCertificado = isTipoPragas(serviceRequest.serviceType) || isTipoHigienizacao(serviceRequest.serviceType)
 
   const certificadoGarantiaData = useMemo<CertificadoGarantiaData | undefined>(() => {
     if (!podeGerarCertificado || !clienteSelecionado) return undefined
@@ -2513,42 +2518,67 @@ const handleConfirmarAgendamentoFinal = async () => {
       : new Date()
     const garantiaInformada = Number.parseInt(serviceRequest.warrantyDays || "0", 10)
     const temGarantiaInformada = Number.isFinite(garantiaInformada) && garantiaInformada > 0
-    const pragas: PragaAlvo[] = dadosTecnicosVetores.pragasAlvo.length > 0 ? dadosTecnicosVetores.pragasAlvo : ["outros"]
-
-    const vetores = pragas.map((praga) => {
-      const fallbackMeses = praga === "cupins" ? 24 : 3
-      const garantiaPorPraga = dadosTecnicosVetores.garantiasPorPraga?.[praga]
-      const garantiaPorPragaQuantidade = Number.parseInt(garantiaPorPraga?.quantidade || "0", 10)
-      const temGarantiaPorPraga = Number.isFinite(garantiaPorPragaQuantidade) && garantiaPorPragaQuantidade > 0
-      const amount = temGarantiaPorPraga
-        ? garantiaPorPragaQuantidade
-        : temGarantiaInformada
-          ? garantiaInformada
-          : fallbackMeses
-      const unit = temGarantiaPorPraga
-        ? garantiaPorPraga?.unidade || "meses"
-        : temGarantiaInformada
-          ? serviceRequest.warrantyUnit
-          : "meses"
-      const vencimento = addWarrantyToDate(dataBase, amount, unit)
-      const unitLabel = unit === "anos" ? "Ano(s)" : unit === "meses" ? "Mes(es)" : "Dia(s)"
-
-      return {
-        vetor: certificadoPragaLabels[praga] || praga,
-        garantia: `${String(amount).padStart(2, "0")} ${unitLabel}`,
-        vencimento: formatDateBR(vencimento),
-      }
-    })
 
     const enderecoCompleto = localSelecionado
       ? `${localSelecionado.endereco} ${localSelecionado.numero}`.trim()
       : ""
-    const observacoes = [
-      serviceRequest.notes.trim(),
-      dadosTecnicosVetores.descricaoServico.trim(),
-    ].filter(Boolean).join("\n")
+
+    let tipoServico: CertificadoGarantiaData["tipoServico"]
+    let vetores: CertificadoGarantiaData["vetores"]
+    let observacoes: string
+    let responsavel: string
+
+    if (isTipoHigienizacao(serviceRequest.serviceType)) {
+      tipoServico = "limpeza"
+      // Periodicidade legal (Decreto RJ 20356/94): limpeza e higienizacao SEMESTRAL, salvo garantia informada
+      const amount = temGarantiaInformada ? garantiaInformada : 6
+      const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
+      const proximaHigienizacao = formatDateBR(addWarrantyToDate(dataBase, amount, unit))
+
+      vetores = dadosTecnicosLimpeza.reservatorios.map((r) => ({
+        vetor: `${reservatorioTipoLabels[r.tipo] || r.tipo} ${r.numero}`,
+        garantia: r.volumeM3 ? `${r.volumeM3} m³` : "-",
+        vencimento: proximaHigienizacao,
+      }))
+      observacoes = serviceRequest.notes.trim()
+      responsavel = dadosTecnicosLimpeza.aplicador || nomesResponsaveisSelecionados[0] || ""
+    } else {
+      tipoServico = "pragas"
+      const pragas: PragaAlvo[] = dadosTecnicosVetores.pragasAlvo.length > 0 ? dadosTecnicosVetores.pragasAlvo : ["outros"]
+
+      vetores = pragas.map((praga) => {
+        const fallbackMeses = praga === "cupins" ? 24 : 3
+        const garantiaPorPraga = dadosTecnicosVetores.garantiasPorPraga?.[praga]
+        const garantiaPorPragaQuantidade = Number.parseInt(garantiaPorPraga?.quantidade || "0", 10)
+        const temGarantiaPorPraga = Number.isFinite(garantiaPorPragaQuantidade) && garantiaPorPragaQuantidade > 0
+        const amount = temGarantiaPorPraga
+          ? garantiaPorPragaQuantidade
+          : temGarantiaInformada
+            ? garantiaInformada
+            : fallbackMeses
+        const unit = temGarantiaPorPraga
+          ? garantiaPorPraga?.unidade || "meses"
+          : temGarantiaInformada
+            ? serviceRequest.warrantyUnit
+            : "meses"
+        const vencimento = addWarrantyToDate(dataBase, amount, unit)
+        const unitLabel = unit === "anos" ? "Ano(s)" : unit === "meses" ? "Mes(es)" : "Dia(s)"
+
+        return {
+          vetor: certificadoPragaLabels[praga] || praga,
+          garantia: `${String(amount).padStart(2, "0")} ${unitLabel}`,
+          vencimento: formatDateBR(vencimento),
+        }
+      })
+      observacoes = [
+        serviceRequest.notes.trim(),
+        dadosTecnicosVetores.descricaoServico.trim(),
+      ].filter(Boolean).join("\n")
+      responsavel = dadosTecnicosVetores.aplicador || nomesResponsaveisSelecionados[0] || ""
+    }
 
     return {
+      tipoServico,
       osNumber,
       dataServico: formatDateBR(dataBase),
       validadeCrv: "09/08/2027",
@@ -2563,7 +2593,7 @@ const handleConfirmarAgendamentoFinal = async () => {
       vetores,
       localEmissao: localSelecionado?.cidade || "Niteroi",
       dataEmissaoExtenso: formatDateLongBR(dataBase),
-      responsavel: dadosTecnicosVetores.aplicador || nomesResponsaveisSelecionados[0] || "",
+      responsavel,
       observacoes,
     }
   }, [
@@ -2574,13 +2604,17 @@ const handleConfirmarAgendamentoFinal = async () => {
     serviceRequest.warrantyDays,
     serviceRequest.warrantyUnit,
     serviceRequest.notes,
+    serviceRequest.serviceType,
     dadosTecnicosVetores.pragasAlvo,
     dadosTecnicosVetores.garantiasPorPraga,
     dadosTecnicosVetores.descricaoServico,
     dadosTecnicosVetores.aplicador,
+    dadosTecnicosLimpeza.reservatorios,
+    dadosTecnicosLimpeza.aplicador,
     localSelecionado,
     osNumber,
     nomesResponsaveisSelecionados,
+    tiposServico,
   ])
 
   useEffect(() => {
@@ -3532,7 +3566,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   Certificado de Garantia
                 </CardTitle>
                 <CardDescription>
-                  Disponivel para servicos de controle de vetores.
+                  Disponivel para servicos de controle de vetores e de higienizacao de reservatorios.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
