@@ -1507,20 +1507,36 @@ export default function ServicosPage() {
   }, [servicosAgendados, servicosHydrated])
 
   // Determinar tipo de OS baseado no tipo de servico
-  const isTipoDesentupimento = (serviceType: string): boolean => {
-    if (!serviceType.startsWith("outro_")) return false
-    const id = serviceType.replace("outro_", "")
-    const tipo = tiposServico.find((t) => t.id === id)
-    if (!tipo) return false
-    const nomeNormalizado = tipo.nome
+  // serviceType e sempre o id do registro em tiposServico (ver SelectItem do dropdown de Tipo de Servico)
+  const getTipoServicoAtual = (serviceType: string): TipoServico | undefined =>
+    tiposServico.find((t) => t.id === serviceType)
+
+  const nomeTipoNormalizado = (tipo: TipoServico): string =>
+    tipo.nome
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
-    return nomeNormalizado.includes("desentup")
+
+  const isTipoPragas = (serviceType: string): boolean =>
+    getTipoServicoAtual(serviceType)?.categoria === "pragas"
+
+  const isTipoReservatorioPotavel = (serviceType: string): boolean =>
+    getTipoServicoAtual(serviceType)?.categoria === "reservatorio_potavel"
+
+  const isTipoDesentupimento = (serviceType: string): boolean => {
+    const tipo = getTipoServicoAtual(serviceType)
+    if (!tipo) return false
+    return nomeTipoNormalizado(tipo).includes("desentup")
+  }
+
+  const isTipoHigienizacao = (serviceType: string): boolean => {
+    const tipo = getTipoServicoAtual(serviceType)
+    if (!tipo) return false
+    return nomeTipoNormalizado(tipo).includes("higien")
   }
 
   const getTipoOS = (): TipoOS => {
-    if (serviceRequest.serviceType === "reservatorio_potavel") {
+    if (isTipoReservatorioPotavel(serviceRequest.serviceType) || isTipoHigienizacao(serviceRequest.serviceType)) {
       return "limpeza"
     }
     if (isTipoDesentupimento(serviceRequest.serviceType)) {
@@ -2412,7 +2428,7 @@ const handleConfirmarAgendamentoFinal = async () => {
         setToastMessage("Serviço salvo. Verifique o aviso sobre o financeiro acima.")
         setShowToast(true)
         setTimeout(() => { setShowToast(false); setActiveTab("agendados") }, 4000)
-      } else if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
+      } else if (isTipoPragas(serviceRequest.serviceType) && consumos.length === 0) {
         setToastMessage("Aviso: Voce ainda nao informou produtos utilizados. Isso pode ser preenchido apos a execucao.")
         setShowToast(true)
         setTimeout(() => {
@@ -2448,13 +2464,7 @@ const handleConfirmarAgendamentoFinal = async () => {
 
   const getTipoNome = (serviceType: string): string => {
     if (!serviceType) return "-"
-    if (serviceType.startsWith("outro_")) {
-      const id = serviceType.replace("outro_", "")
-      const tipo = tiposServico.find((t) => t.id === id)
-      return tipo?.nome || "Outro"
-    }
-    const tipo = tiposServico.find((t) => t.categoria === serviceType)
-    return tipo?.nome || serviceType
+    return getTipoServicoAtual(serviceType)?.nome || serviceType
   }
 
   const handleSalvarTipo = async () => {
@@ -2480,7 +2490,7 @@ const handleConfirmarAgendamentoFinal = async () => {
   const equipesSelecionadas = equipesData.filter((e) => serviceRequest.schedule.teamIds.includes(e.id))
   const nomesResponsaveisSelecionados = equipesSelecionadas.map((e) => e.nome)
   const veiculoSelecionado = veiculosData.find((v) => v.id === serviceRequest.schedule.vehicleId)
-  const isServicoCupim = serviceRequest.serviceType === "pragas" && (
+  const isServicoCupim = isTipoPragas(serviceRequest.serviceType) && (
     serviceRequest.serviceName.toLowerCase().includes("cupim") ||
     dadosTecnicosVetores.pragasAlvo.includes("cupins")
   )
@@ -2493,7 +2503,7 @@ const handleConfirmarAgendamentoFinal = async () => {
   // Obter contrato selecionado
   const contratoSelecionado = contratosDoCliente.find((c) => c.id === serviceRequest.billing.contractId)
 
-  const podeGerarCertificado = serviceRequest.serviceType === "pragas"
+  const podeGerarCertificado = isTipoPragas(serviceRequest.serviceType)
 
   const certificadoGarantiaData = useMemo<CertificadoGarantiaData | undefined>(() => {
     if (!podeGerarCertificado || !clienteSelecionado) return undefined
@@ -2781,7 +2791,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                         </SelectTrigger>
                         <SelectContent>
                           {tiposServico.map((tipo) => (
-                            <SelectItem key={tipo.id} value={tipo.categoria === "outro" ? `outro_${tipo.id}` : tipo.categoria}>
+                            <SelectItem key={tipo.id} value={tipo.id}>
                               {tipo.nome}
                             </SelectItem>
                           ))}
@@ -3683,13 +3693,13 @@ const handleConfirmarAgendamentoFinal = async () => {
             </div>
 
             {/* CARD 4 - Dados Técnicos da OS (editável) */}
-            {serviceRequest.serviceType === "pragas" ? (
+            {isTipoPragas(serviceRequest.serviceType) ? (
               <VetoresForm
                 dados={dadosTecnicosVetores}
                 onChange={setDadosTecnicosVetores}
                 produtosDisponiveis={opcoesProdutoEstoque}
               />
-            ) : serviceRequest.serviceType === "reservatorio_potavel" ? (
+            ) : (isTipoReservatorioPotavel(serviceRequest.serviceType) || isTipoHigienizacao(serviceRequest.serviceType)) ? (
               <LimpezaForm
                 dados={dadosTecnicosLimpeza}
                 onChange={setDadosTecnicosLimpeza}
