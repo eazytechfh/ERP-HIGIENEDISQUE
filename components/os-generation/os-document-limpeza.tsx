@@ -83,7 +83,9 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
     const cisternasPadded: (Reservatorio | null)[] = [...cisternas, ...Array(Math.max(0, 5 - cisternas.length)).fill(null)].slice(0, 5)
     const caixasPadded: (Reservatorio | null)[] = [...caixasDagua, ...Array(Math.max(0, 10 - caixasDagua.length)).fill(null)].slice(0, 10)
 
-    // Linhas de grupo com "checkbox" (X) para cada atributo categorico, uma sub-linha por opcao
+    // Linhas de grupo com "checkbox" (X) para cada atributo categorico, uma sub-linha por opcao.
+    // O rotulo do atributo ocupa uma unica celula com rowSpan, centralizada verticalmente
+    // ao longo de todas as suas sub-linhas, igual ao modelo original.
     const renderGroupRows = (
       attributeLabel: string,
       options: { value: string; label: string }[],
@@ -91,16 +93,21 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
     ) =>
       options.map((opt, i) => (
         <tr key={`${attributeLabel}-${opt.value}`}>
-          <td className="border-r border-b border-black p-0.5 font-bold align-top">
-            {i === 0 ? attributeLabel : ""}
-          </td>
-          <td className="border-r border-b border-black p-0.5 text-[8px]">{opt.label}</td>
+          {i === 0 && (
+            <td
+              rowSpan={options.length}
+              className="border-r border-b border-black p-0.5 font-bold align-middle leading-tight"
+            >
+              {attributeLabel}
+            </td>
+          )}
+          <td className="border-r border-b border-black p-0.5 leading-tight">{opt.label}</td>
           {cisternasPadded.map((r, ci) => (
             <td key={`c${ci}`} className="border-r border-b border-black p-0.5 text-center font-bold">
               {r && getValue(r) === opt.value ? "X" : ""}
             </td>
           ))}
-          <td className="border-r border-b border-black p-0.5 text-[8px]">{opt.label}</td>
+          <td className="border-r border-b border-black p-0.5 leading-tight">{opt.label}</td>
           {caixasPadded.map((r, ci) => (
             <td key={`x${ci}`} className={`border-b border-black p-0.5 text-center font-bold ${ci < caixasPadded.length - 1 ? "border-r" : ""}`}>
               {r && getValue(r) === opt.value ? "X" : ""}
@@ -231,21 +238,28 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
           <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px]">
             DESCRIÇÃO DOS SERVIÇOS
           </div>
-          <div className="bg-gray-100 px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
+          <div className="bg-black text-white px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
             CONDIÇÕES DOS RESERVATÓRIOS DE ÁGUA
           </div>
 
-          <table className="w-full text-[8px] border-collapse">
+          <table className="w-full table-fixed text-[8px] border-collapse">
+            <colgroup>
+              <col style={{ width: "15%" }} />
+              <col style={{ width: "9%" }} />
+              {[1, 2, 3, 4, 5].map(n => <col key={`cc${n}`} style={{ width: "3.4%" }} />)}
+              <col style={{ width: "9%" }} />
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <col key={`xc${n}`} style={{ width: "5%" }} />)}
+            </colgroup>
             <thead>
-              <tr>
-                <th className="border-r border-b border-black p-0.5 text-left">Tipos Reservatório</th>
-                <th className="border-r border-b border-black p-0.5 text-left">Cisternas</th>
+              <tr className="bg-black text-white">
+                <th className="border-r border-b border-white/40 p-0.5 text-left font-bold">Tipos Reservatório</th>
+                <th className="border-r border-b border-white/40 p-0.5 text-left font-bold">Cisternas</th>
                 {[1, 2, 3, 4, 5].map(n => (
-                  <th key={`c${n}`} className="border-r border-b border-black p-0.5 text-center w-[26px]">{n}</th>
+                  <th key={`c${n}`} className="border-r border-b border-white/40 p-0.5 text-center font-bold">{n}</th>
                 ))}
-                <th className="border-r border-b border-black p-0.5 text-left">Caixas D' Água</th>
+                <th className="border-r border-b border-white/40 p-0.5 text-left font-bold">Caixas D' Água</th>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n, i) => (
-                  <th key={`x${n}`} className={`border-b border-black p-0.5 text-center w-[22px] ${i < 9 ? "border-r" : ""}`}>{n}</th>
+                  <th key={`x${n}`} className={`border-b border-white/40 p-0.5 text-center font-bold ${i < 9 ? "border-r" : ""}`}>{n}</th>
                 ))}
               </tr>
             </thead>
