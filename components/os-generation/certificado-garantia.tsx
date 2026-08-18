@@ -22,7 +22,7 @@ export type CertificadoGarantiaVetor = {
 }
 
 export type CertificadoGarantiaData = {
-  tipoServico?: "pragas" | "limpeza"
+  tipoServico?: "pragas" | "limpeza" | "gordura"
   osNumber: string
   dataServico: string
   validadeCrv: string
@@ -50,6 +50,10 @@ const certificadoTextos = {
   limpeza: {
     descricaoServico: "CERTIFICAMOS QUE EXECUTAMOS O(S) SERVIÇO(S) DE LIMPEZA E HIGIENIZAÇÃO DE RESERVATÓRIOS DE ÁGUA ABAIXO DESCRIMINADO(S)",
     colunas: ["Reservatório", "Volume (M³)", "Próxima Higienização"],
+  },
+  gordura: {
+    descricaoServico: "CERTIFICAMOS QUE EXECUTAMOS O(S) SERVIÇO(S) DE LIMPEZA DE CAIXA DE GORDURA ABAIXO DESCRIMINADO(S)",
+    colunas: ["Serviço", "Garantia", "Vencimento"],
   },
 } as const
 

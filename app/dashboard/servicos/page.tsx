@@ -1540,11 +1540,17 @@ export default function ServicosPage() {
     return nomeTipoNormalizado(tipo).includes("higien")
   }
 
+  const isTipoGordura = (serviceType: string): boolean => {
+    const tipo = getTipoServicoAtual(serviceType)
+    if (!tipo) return false
+    return nomeTipoNormalizado(tipo).includes("gordura")
+  }
+
   const getTipoOS = (): TipoOS => {
     if (isTipoReservatorioPotavel(serviceRequest.serviceType) || isTipoHigienizacao(serviceRequest.serviceType)) {
       return "limpeza"
     }
-    if (isTipoDesentupimento(serviceRequest.serviceType)) {
+    if (isTipoDesentupimento(serviceRequest.serviceType) || isTipoGordura(serviceRequest.serviceType)) {
       return "desentupimento"
     }
     return "vetores"
@@ -2508,7 +2514,10 @@ const handleConfirmarAgendamentoFinal = async () => {
   // Obter contrato selecionado
   const contratoSelecionado = contratosDoCliente.find((c) => c.id === serviceRequest.billing.contractId)
 
-  const podeGerarCertificado = isTipoPragas(serviceRequest.serviceType) || isTipoHigienizacao(serviceRequest.serviceType)
+  const podeGerarCertificado =
+    isTipoPragas(serviceRequest.serviceType) ||
+    isTipoHigienizacao(serviceRequest.serviceType) ||
+    isTipoGordura(serviceRequest.serviceType)
 
   const certificadoGarantiaData = useMemo<CertificadoGarantiaData | undefined>(() => {
     if (!podeGerarCertificado || !clienteSelecionado) return undefined
@@ -2542,6 +2551,25 @@ const handleConfirmarAgendamentoFinal = async () => {
       }))
       observacoes = serviceRequest.notes.trim()
       responsavel = dadosTecnicosLimpeza.aplicador || nomesResponsaveisSelecionados[0] || ""
+    } else if (isTipoGordura(serviceRequest.serviceType)) {
+      tipoServico = "gordura"
+      const amount = temGarantiaInformada ? garantiaInformada : 3
+      const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
+      const vencimentoPadrao = formatDateBR(addWarrantyToDate(dataBase, amount, unit))
+      const servicosGordura = dadosTecnicosDesentupimento.servicos.length > 0
+        ? dadosTecnicosDesentupimento.servicos
+        : [{ id: "gordura-default", descricao: "Limpeza de Caixa de Gordura", garantia: "", valorServico: "" }]
+
+      vetores = servicosGordura.map((s) => ({
+        vetor: s.descricao || "Limpeza de Caixa de Gordura",
+        garantia: s.garantia?.trim() || "-",
+        vencimento: vencimentoPadrao,
+      }))
+      observacoes = [
+        serviceRequest.notes.trim(),
+        dadosTecnicosDesentupimento.observacoes.trim(),
+      ].filter(Boolean).join("\n")
+      responsavel = dadosTecnicosDesentupimento.tecnico || nomesResponsaveisSelecionados[0] || ""
     } else {
       tipoServico = "pragas"
       const pragas: PragaAlvo[] = dadosTecnicosVetores.pragasAlvo.length > 0 ? dadosTecnicosVetores.pragasAlvo : ["outros"]
@@ -2611,6 +2639,9 @@ const handleConfirmarAgendamentoFinal = async () => {
     dadosTecnicosVetores.aplicador,
     dadosTecnicosLimpeza.reservatorios,
     dadosTecnicosLimpeza.aplicador,
+    dadosTecnicosDesentupimento.servicos,
+    dadosTecnicosDesentupimento.observacoes,
+    dadosTecnicosDesentupimento.tecnico,
     localSelecionado,
     osNumber,
     nomesResponsaveisSelecionados,
@@ -3566,7 +3597,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   Certificado de Garantia
                 </CardTitle>
                 <CardDescription>
-                  Disponivel para servicos de controle de vetores e de higienizacao de reservatorios.
+                  Disponivel para servicos de controle de vetores, higienizacao de reservatorios e limpeza de caixa de gordura.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -3738,7 +3769,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                 dados={dadosTecnicosLimpeza}
                 onChange={setDadosTecnicosLimpeza}
               />
-            ) : isTipoDesentupimento(serviceRequest.serviceType) ? (
+            ) : (isTipoDesentupimento(serviceRequest.serviceType) || isTipoGordura(serviceRequest.serviceType)) ? (
               <DesentupimentoForm
                 dados={dadosTecnicosDesentupimento}
                 onChange={setDadosTecnicosDesentupimento}

@@ -62,7 +62,7 @@ export function DesentupimentoForm({ dados, onChange }: DesentupimentoFormProps)
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
           <Wrench className="h-5 w-5 text-primary" />
-          Dados Tecnicos - Desentupimento (Demonstrativo de Pedido)
+          Dados Tecnicos - Demonstrativo de Pedido
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
