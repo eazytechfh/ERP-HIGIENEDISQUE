@@ -122,7 +122,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         <div className="border border-black">
           {/* Cabecalho - logo + dados da empresa */}
           <div className="flex items-start justify-between p-1.5 border-b border-black">
-            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="h-14 w-auto object-contain" />
+            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="w-28 h-16 object-contain" />
             <div className="text-[9px] text-right">
               <p className="font-bold">{empresaInfo.nome}</p>
               <p>{empresaInfo.endereco}</p>
