@@ -101,13 +101,13 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
               {attributeLabel}
             </td>
           )}
-          <td className="border-r border-b border-black p-0.5 leading-tight">{opt.label}</td>
+          <td className="border-r border-b border-black p-0.5 whitespace-nowrap">{opt.label}</td>
           {cisternasPadded.map((r, ci) => (
             <td key={`c${ci}`} className="border-r border-b border-black p-0.5 text-center font-bold">
               {r && getValue(r) === opt.value ? "X" : ""}
             </td>
           ))}
-          <td className="border-r border-b border-black p-0.5 leading-tight">{opt.label}</td>
+          <td className="border-r border-b border-black p-0.5 whitespace-nowrap">{opt.label}</td>
           {caixasPadded.map((r, ci) => (
             <td key={`x${ci}`} className={`border-b border-black p-0.5 text-center font-bold ${ci < caixasPadded.length - 1 ? "border-r" : ""}`}>
               {r && getValue(r) === opt.value ? "X" : ""}
@@ -252,20 +252,20 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
           <table className="w-full table-fixed text-[8px] border-collapse">
             <colgroup>
-              <col style={{ width: "15%" }} />
-              <col style={{ width: "9%" }} />
-              {[1, 2, 3, 4, 5].map(n => <col key={`cc${n}`} style={{ width: "3.4%" }} />)}
-              <col style={{ width: "9%" }} />
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <col key={`xc${n}`} style={{ width: "5%" }} />)}
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "14%" }} />
+              {[1, 2, 3, 4, 5].map(n => <col key={`cc${n}`} style={{ width: "3.93%" }} />)}
+              <col style={{ width: "14%" }} />
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <col key={`xc${n}`} style={{ width: "3.93%" }} />)}
             </colgroup>
             <thead>
               <tr>
-                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold">Tipos Reservatório</th>
-                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold">Cisternas</th>
+                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Tipos Reservatório</th>
+                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Cisternas</th>
                 {[1, 2, 3, 4, 5].map(n => (
                   <th key={`c${n}`} className="border-r border-b-2 border-black p-0.5 text-center font-bold">{n}</th>
                 ))}
-                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold">Caixas D' Água</th>
+                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Caixas D' Água</th>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n, i) => (
                   <th key={`x${n}`} className={`border-b-2 border-black p-0.5 text-center font-bold ${i < 9 ? "border-r" : ""}`}>{n}</th>
                 ))}
