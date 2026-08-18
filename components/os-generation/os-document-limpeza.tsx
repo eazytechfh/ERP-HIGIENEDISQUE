@@ -132,36 +132,36 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         </div>
 
         {/* Titulo do comprovante + numero da OS */}
-        <div className="flex items-center justify-between border-2 border-black mb-3">
+        <div className="flex items-stretch justify-between bg-black text-white mb-3">
           <div className="p-1.5">
             <p className="font-bold text-[10px] leading-tight">COMPROVANTE DE EXECUÇÃO DE SERVIÇOS /</p>
             <p className="font-bold text-[10px] leading-tight">Limpeza e Higienização de Reservatórios de Água</p>
           </div>
-          <div className="border-l-2 border-black p-1.5 text-center min-w-[70px]">
+          <div className="border-l border-white/40 p-1.5 text-center min-w-[70px] flex flex-col justify-center">
             <p className="font-bold text-[9px]">Nº</p>
-            <p className="text-sm font-bold">{osNumber}</p>
+            <p className="text-base font-bold text-orange-400">{osNumber}</p>
           </div>
         </div>
 
         {/* Informações da Empresa Especializada */}
         <div className="border border-black mb-3">
-          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px]">
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-[9px] text-center">
             INFORMAÇÕES DA EMPRESA ESPECIALIZADA
           </div>
           <div className="grid grid-cols-4 text-[9px]">
-            <div className="border-r border-black p-1">
+            <div className="border-r border-black p-1 text-center">
               <p className="font-bold">CNPJ</p>
               <p>{empresaInfo.cnpj}</p>
             </div>
-            <div className="border-r border-black p-1">
+            <div className="border-r border-black p-1 text-center">
               <p className="font-bold">Código INEA</p>
               <p>{empresaInfo.codigoInea}</p>
             </div>
-            <div className="border-r border-black p-1">
+            <div className="border-r border-black p-1 text-center">
               <p className="font-bold">Certificado Registro (CRH)</p>
               <p>{empresaInfo.certificadoCRH}</p>
             </div>
-            <div className="p-1">
+            <div className="p-1 text-center">
               <p className="font-bold">Validade (CRH)</p>
               <p>{empresaInfo.validadeCRH}</p>
             </div>
@@ -170,63 +170,69 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
         {/* Informações do Cliente */}
         <div className="border border-black mb-3">
-          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px]">
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-[9px] text-center">
             INFORMAÇÕES DO CLIENTE
           </div>
-          <div className="p-1.5 space-y-0.5 text-[9px]">
-            <div>
-              <span className="font-bold">Razão Social: </span>
-              <span>{cliente.nome}</span>
+          <div className="text-[9px]">
+            <div className="border-b border-black flex">
+              <div className="flex-1 p-1">
+                <span className="font-bold">Razão Social : </span>
+                <span>{cliente.nome}</span>
+              </div>
             </div>
-            <div>
-              <span className="font-bold">Nome Fantasia: </span>
-              <span>{cliente.nomeFantasia || "-"}</span>
+            <div className="border-b border-black flex">
+              <div className="flex-1 p-1">
+                <span className="font-bold">Nome Fantasia : </span>
+                <span>{cliente.nomeFantasia || "-"}</span>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-bold">Tipo Atividade: </span>
+            <div className="border-b border-black flex">
+              <div className="flex-1 border-r border-black p-1">
+                <span className="font-bold">Tipo Atividade : </span>
                 <span>{cliente.tipoAtividade || "CONDOMINIO"}</span>
               </div>
-              <div>
-                <span className="font-bold">{getDocumentoLabel(cliente.cpfCnpj)}: </span>
+              <div className="flex-1 p-1">
+                <span className="font-bold">{getDocumentoLabel(cliente.cpfCnpj)} : </span>
                 <span>{cliente.cpfCnpj}</span>
               </div>
             </div>
-            <div>
-              <span className="font-bold">Endereço: </span>
-              <span>{local.endereco}</span>
+            <div className="border-b border-black flex">
+              <div className="flex-1 p-1">
+                <span className="font-bold">Endereço : </span>
+                <span>{local.endereco}</span>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <span className="font-bold">Bairro: </span>
+            <div className="border-b border-black flex">
+              <div className="flex-1 border-r border-black p-1">
+                <span className="font-bold">Bairro : </span>
                 <span>{local.bairro}</span>
               </div>
-              <div>
-                <span className="font-bold">Cidade / UF: </span>
+              <div className="flex-1 border-r border-black p-1">
+                <span className="font-bold">Cidade / UF : </span>
                 <span>{local.cidade}</span>
               </div>
-              <div>
-                <span className="font-bold">C.E.P: </span>
+              <div className="flex-1 p-1">
+                <span className="font-bold">C.E.P : </span>
                 <span>{local.cep}</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-bold">Telefones: </span>
+            <div className="border-b border-black flex">
+              <div className="flex-1 border-r border-black p-1">
+                <span className="font-bold">Telefones : </span>
                 <span>{cliente.telefone}</span>
               </div>
-              <div>
-                <span className="font-bold">E-Mail: </span>
+              <div className="flex-1 p-1">
+                <span className="font-bold">E-Mail : </span>
                 <span>{cliente.email}</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="font-bold">Contatos: </span>
+            <div className="flex">
+              <div className="flex-1 border-r border-black p-1">
+                <span className="font-bold">Contatos : </span>
                 <span>{cliente.contato || "-"}</span>
               </div>
-              <div>
-                <span className="font-bold">Função: </span>
+              <div className="flex-1 p-1">
+                <span className="font-bold">Função : </span>
                 <span>{cliente.funcaoContato || "-"}</span>
               </div>
             </div>
@@ -235,7 +241,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
         {/* Descrição dos Serviços - Tabela de Reservatórios */}
         <div className="border border-black mb-3">
-          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px]">
+          <div className="bg-black text-white px-2 py-0.5 font-bold text-[9px]">
             DESCRIÇÃO DOS SERVIÇOS
           </div>
           <div className="bg-black text-white px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
@@ -307,34 +313,31 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
         {/* Assinaturas */}
         <div className="border border-black">
-          <div className="grid grid-cols-4 text-[9px]">
-            <div className="border-r border-black p-2 text-center">
-              <p className="font-bold mb-1">APLICADOR</p>
-              <p className="mt-6">{dadosTecnicos.aplicador || "Eryck Guimaraes"}</p>
+          <div className="grid text-[9px] bg-black text-white text-center font-bold" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
+            <div className="border-r border-white/40 p-1">APLICADOR</div>
+            <div className="border-r border-white/40 p-1">TÉCNICO RESPONSÁVEL</div>
+            <div className="border-r border-white/40 p-1">CLIENTE</div>
+            <div className="p-1">DATA SERVIÇO</div>
+          </div>
+          <div className="grid text-[9px]" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
+            <div className="border-r border-black p-2 pt-6 text-center">
+              <p className="italic">{dadosTecnicos.aplicador || "Eryck Guimaraes"}</p>
             </div>
-            <div className="border-r border-black p-2 text-center">
-              <p className="font-bold mb-1">TÉCNICO RESPONSÁVEL</p>
-              <p className="mt-4">{dadosTecnicos.tecnicoResponsavel || "Renato Luiz Leal Gomes"}</p>
+            <div className="border-r border-black p-2 pt-6 text-center">
+              <p className="italic">{dadosTecnicos.tecnicoResponsavel || "Renato Luiz Leal Gomes"}</p>
               <p className="text-[8px]">Nº CRBio - {dadosTecnicos.registroTecnico || "55953/02 RJ"}</p>
             </div>
-            <div className="border-r border-black p-2 text-center">
-              <p className="font-bold mb-1">CLIENTE</p>
-              <p className="text-[8px] mt-2">Recebi a presente ordem de serviço e a relação</p>
-              <p className="text-[8px]">de medidas preventivas necessárias em anexo.</p>
-              <div className="grid grid-cols-2 gap-1 mt-4">
-                <div>
-                  <p>_______________</p>
-                  <p className="text-[8px]">Nome Legível</p>
-                </div>
-                <div>
-                  <p>_______________</p>
-                  <p className="text-[8px]">Assinatura</p>
-                </div>
+            <div className="border-r border-black flex flex-col">
+              <p className="text-[8px] text-center px-2 pt-2">
+                Recebi a presente ordem de serviço e a relação de medidas preventivas necessárias em anexo.
+              </p>
+              <div className="grid grid-cols-2 border-t border-black mt-auto">
+                <div className="border-r border-black text-center text-[8px] py-1">Nome Legível</div>
+                <div className="text-center text-[8px] py-1">Assinatura</div>
               </div>
             </div>
-            <div className="p-2 text-center">
-              <p className="font-bold mb-1">DATA SERVIÇO</p>
-              <p className="text-sm font-bold mt-4">{dataServico}</p>
+            <div className="p-2 text-center flex items-center justify-center">
+              <p className="font-bold">{dataServico}</p>
             </div>
           </div>
         </div>
