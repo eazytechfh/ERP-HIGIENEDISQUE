@@ -47,6 +47,7 @@ import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generati
 import { DesentupimentoForm, type DadosTecnicosDesentupimento } from "@/components/os-generation/desentupimento-form"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
+import { buildPrintDocument, openPrintWindow } from "@/components/os-generation/print-utils"
 import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -1765,140 +1766,12 @@ export default function ServicosPage() {
     setTimeout(() => setShowToast(false), 2000)
   }
 
-  const buildOSDocumentHtml = (contentHtml: string, osNumberValue: string) => `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>OS ${osNumberValue}</title>
-  <base href="${typeof window !== "undefined" ? window.location.origin : ""}/" />
-  <style>
-    @page { size: A4; margin: 5mm; }
-    @page certificado { size: A4 landscape; margin: 5mm; }
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 13px; }
-    * { box-sizing: border-box; }
-    .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; font-size: 13px; line-height: 1.24; }
-    .certificado-a4-page { page: certificado; width: 287mm; min-height: 200mm; margin: 0 auto; }
-    .bg-green-600 { background-color: #16a34a; }
-    .bg-gray-200 { background-color: #e5e7eb; }
-    .bg-gray-100 { background-color: #f3f4f6; }
-    .bg-black { background-color: #000; }
-    .text-white { color: #fff; }
-    .text-green-700 { color: #15803d; }
-    .text-red-600 { color: #dc2626; }
-    .text-gray-500 { color: #6b7280; }
-    .font-bold { font-weight: bold; }
-    .text-xs { font-size: 12px; }
-    .text-lg { font-size: 20px; }
-    .text-sm { font-size: 13px; }
-    .text-\[8px\] { font-size: 10px; }
-    .text-\[9px\] { font-size: 11px; }
-    .text-\[10px\] { font-size: 12px; }
-    .text-\[11px\] { font-size: 13px; }
-    .text-\[13px\] { font-size: 13px; }
-    .border { border: 1px solid #000; }
-    .border-black { border-color: #000; }
-    .border-t { border-top: 1px solid #000; }
-    .border-r { border-right: 1px solid #000; }
-    .border-b { border-bottom: 1px solid #000; }
-    .border-2 { border-width: 2px; }
-    .border-l { border-left: 1px solid #000; }
-    .border-b-2 { border-bottom-width: 2px; }
-    .border-collapse { border-collapse: collapse; }
-    .rounded { border-radius: 0.25rem; }
-    .p-0\.5 { padding: 0.08rem; }
-    .p-1 { padding: 0.15rem; }
-    .p-1\.5 { padding: 0.2rem; }
-    .p-2 { padding: 0.25rem; }
-    .p-5 { padding: 0.75rem; }
-    .p-6 { padding: 1rem; }
-    .p-8 { padding: 1rem; }
-    .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-    .py-0\.5 { padding-top: 0.05rem; padding-bottom: 0.05rem; }
-    .py-1 { padding-top: 0.1rem; padding-bottom: 0.1rem; }
-    .py-2 { padding-top: 0.15rem; padding-bottom: 0.15rem; }
-    .mb-4 { margin-bottom: 0.35rem; }
-    .mt-0\.5 { margin-top: 0.08rem; }
-    .mt-1 { margin-top: 0.15rem; }
-    .mt-2 { margin-top: 0.2rem; }
-    .mt-4 { margin-top: 0.3rem; }
-    .mt-auto { margin-top: auto; }
-    .mb-2 { margin-bottom: 0.2rem; }
-    .mb-8 { margin-bottom: 0.4rem; }
-    .pb-4 { padding-bottom: 0.35rem; }
-    .pt-1 { padding-top: 0.15rem; }
-    .pt-2 { padding-top: 0.25rem; }
-    .mx-auto { margin-left: auto; margin-right: auto; }
-    .gap-1 { gap: 0.25rem; }
-    .gap-2 { gap: 0.5rem; }
-    .gap-4 { gap: 1rem; }
-    .gap-8 { gap: 2rem; }
-    .flex { display: flex; }
-    .flex-wrap { flex-wrap: wrap; }
-    .flex-col { flex-direction: column; }
-    .flex-1 { flex: 1 1 0%; }
-    .flex-\[2\] { flex: 2; }
-    .flex-\[3\] { flex: 3; }
-    .grid { display: grid; }
-    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .items-center { align-items: center; }
-    .items-start { align-items: flex-start; }
-    .items-stretch { align-items: stretch; }
-    .justify-center { justify-content: center; }
-    .justify-between { justify-content: space-between; }
-    .text-center { text-align: center; }
-    .text-left { text-align: left; }
-    .text-right { text-align: right; }
-    .text-black { color: #000; }
-    .text-\[12px\] { font-size: 14px; }
-    .text-\[14px\] { font-size: 16px; }
-    .text-\[26px\] { font-size: 28px; }
-    .bg-white { background-color: #fff; }
-    .w-full { width: 100%; }
-    .w-4 { width: 1rem; }
-    .w-24 { width: 5rem; }
-    .w-28 { width: 5.25rem; }
-    .w-1\/4 { width: 25%; }
-    .w-4\/5 { width: 80%; }
-    .h-4 { height: 1rem; }
-    .h-16 { height: 3rem; }
-    .min-h-\[40px\] { min-height: 18px; }
-    .min-h-\[60px\] { min-height: 24px; }
-    .min-h-\[85px\] { min-height: 38px; }
-    .min-w-\[90px\] { min-width: 45px; }
-    .inline-flex { display: inline-flex; }
-    .leading-tight { line-height: 1.15; }
-    .leading-none { line-height: 1; }
-    .italic { font-style: italic; }
-    .whitespace-nowrap { white-space: nowrap; }
-    .table-fixed { table-layout: fixed; }
-    .object-contain { object-fit: contain; }
-    .align-top { vertical-align: top; }
-    .align-middle { vertical-align: middle; }
-    .space-y-1 > * + * { margin-top: 0.15rem; }
-    p { margin: 0; }
-    table { border-collapse: collapse; width: 100%; font-size: 11px; }
-    th, td { line-height: 1.22; }
-    @media print {
-      body { margin: 0; padding: 0; }
-      .no-print { display: none; }
-      .print\:text-\[10px\] { font-size: 12px; }
-      .print\:text-\[13px\] { font-size: 13px; }
-    }
-  </style>
-</head>
-<body>
-  ${contentHtml}
-</body>
-</html>`
+  const buildOSDocumentHtml = (contentHtml: string, osNumberValue: string) =>
+    buildPrintDocument(contentHtml, `OS ${osNumberValue}`)
 
   const openAndPrintSavedOS = (contentHtml: string, osNumberValue: string) => {
     if (!contentHtml) return false
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) return false
-    printWindow.document.write(buildOSDocumentHtml(contentHtml, osNumberValue))
-    printWindow.document.close()
-    printWindow.print()
+    openPrintWindow(contentHtml, `OS ${osNumberValue}`)
     return true
   }
 
