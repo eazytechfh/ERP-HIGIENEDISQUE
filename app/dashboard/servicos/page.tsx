@@ -1801,47 +1801,80 @@ export default function ServicosPage() {
     .border-r { border-right: 1px solid #000; }
     .border-b { border-bottom: 1px solid #000; }
     .border-2 { border-width: 2px; }
+    .border-l { border-left: 1px solid #000; }
+    .border-b-2 { border-bottom-width: 2px; }
+    .border-collapse { border-collapse: collapse; }
     .rounded { border-radius: 0.25rem; }
+    .p-0\.5 { padding: 0.08rem; }
     .p-1 { padding: 0.15rem; }
+    .p-1\.5 { padding: 0.2rem; }
     .p-2 { padding: 0.25rem; }
     .p-5 { padding: 0.75rem; }
     .p-6 { padding: 1rem; }
     .p-8 { padding: 1rem; }
     .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+    .py-0\.5 { padding-top: 0.05rem; padding-bottom: 0.05rem; }
     .py-1 { padding-top: 0.1rem; padding-bottom: 0.1rem; }
     .py-2 { padding-top: 0.15rem; padding-bottom: 0.15rem; }
     .mb-4 { margin-bottom: 0.35rem; }
+    .mt-0\.5 { margin-top: 0.08rem; }
     .mt-1 { margin-top: 0.15rem; }
     .mt-2 { margin-top: 0.2rem; }
     .mt-4 { margin-top: 0.3rem; }
+    .mt-auto { margin-top: auto; }
     .mb-2 { margin-bottom: 0.2rem; }
     .mb-8 { margin-bottom: 0.4rem; }
+    .pb-4 { padding-bottom: 0.35rem; }
+    .pt-1 { padding-top: 0.15rem; }
+    .pt-2 { padding-top: 0.25rem; }
+    .mx-auto { margin-left: auto; margin-right: auto; }
+    .gap-1 { gap: 0.25rem; }
     .gap-2 { gap: 0.5rem; }
     .gap-4 { gap: 1rem; }
     .gap-8 { gap: 2rem; }
     .flex { display: flex; }
     .flex-wrap { flex-wrap: wrap; }
+    .flex-col { flex-direction: column; }
+    .flex-1 { flex: 1 1 0%; }
+    .flex-\[2\] { flex: 2; }
+    .flex-\[3\] { flex: 3; }
     .grid { display: grid; }
     .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .items-center { align-items: center; }
     .items-start { align-items: flex-start; }
+    .items-stretch { align-items: stretch; }
     .justify-center { justify-content: center; }
     .justify-between { justify-content: space-between; }
     .text-center { text-align: center; }
     .text-left { text-align: left; }
     .text-right { text-align: right; }
+    .text-black { color: #000; }
+    .text-\[12px\] { font-size: 14px; }
+    .text-\[14px\] { font-size: 16px; }
+    .text-\[26px\] { font-size: 28px; }
+    .bg-white { background-color: #fff; }
     .w-full { width: 100%; }
     .w-4 { width: 1rem; }
     .w-24 { width: 5rem; }
+    .w-28 { width: 5.25rem; }
     .w-1\/4 { width: 25%; }
+    .w-4\/5 { width: 80%; }
     .h-4 { height: 1rem; }
     .h-16 { height: 3rem; }
     .min-h-\[40px\] { min-height: 18px; }
     .min-h-\[60px\] { min-height: 24px; }
+    .min-h-\[85px\] { min-height: 38px; }
+    .min-w-\[90px\] { min-width: 45px; }
     .inline-flex { display: inline-flex; }
     .leading-tight { line-height: 1.15; }
+    .leading-none { line-height: 1; }
+    .italic { font-style: italic; }
+    .whitespace-nowrap { white-space: nowrap; }
+    .table-fixed { table-layout: fixed; }
+    .object-contain { object-fit: contain; }
     .align-top { vertical-align: top; }
+    .align-middle { vertical-align: middle; }
     .space-y-1 > * + * { margin-top: 0.15rem; }
     p { margin: 0; }
     table { border-collapse: collapse; width: 100%; font-size: 11px; }
@@ -1849,6 +1882,8 @@ export default function ServicosPage() {
     @media print {
       body { margin: 0; padding: 0; }
       .no-print { display: none; }
+      .print\:text-\[10px\] { font-size: 12px; }
+      .print\:text-\[13px\] { font-size: 13px; }
     }
   </style>
 </head>
