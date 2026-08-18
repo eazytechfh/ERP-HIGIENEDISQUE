@@ -132,20 +132,20 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         </div>
 
         {/* Titulo do comprovante + numero da OS */}
-        <div className="flex items-stretch justify-between bg-black text-white mb-3">
+        <div className="flex items-stretch justify-between border-2 border-black mb-3">
           <div className="p-1.5">
             <p className="font-bold text-[10px] leading-tight">COMPROVANTE DE EXECUÇÃO DE SERVIÇOS /</p>
             <p className="font-bold text-[10px] leading-tight">Limpeza e Higienização de Reservatórios de Água</p>
           </div>
-          <div className="border-l border-white/40 p-1.5 text-center min-w-[70px] flex flex-col justify-center">
+          <div className="border-l-2 border-black p-1.5 text-center min-w-[70px] flex flex-col justify-center">
             <p className="font-bold text-[9px]">Nº</p>
-            <p className="text-base font-bold text-orange-400">{osNumber}</p>
+            <p className="text-base font-bold text-red-600">{osNumber}</p>
           </div>
         </div>
 
         {/* Informações da Empresa Especializada */}
         <div className="border border-black mb-3">
-          <div className="bg-black text-white px-2 py-0.5 font-bold text-[9px] text-center">
+          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
             INFORMAÇÕES DA EMPRESA ESPECIALIZADA
           </div>
           <div className="grid grid-cols-4 text-[9px]">
@@ -170,7 +170,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
         {/* Informações do Cliente */}
         <div className="border border-black mb-3">
-          <div className="bg-black text-white px-2 py-0.5 font-bold text-[9px] text-center">
+          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
             INFORMAÇÕES DO CLIENTE
           </div>
           <div className="text-[9px]">
@@ -241,10 +241,10 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
         {/* Descrição dos Serviços - Tabela de Reservatórios */}
         <div className="border border-black mb-3">
-          <div className="bg-black text-white px-2 py-0.5 font-bold text-[9px]">
+          <div className="bg-gray-200 px-2 py-0.5 font-bold border-b border-black text-[9px]">
             DESCRIÇÃO DOS SERVIÇOS
           </div>
-          <div className="bg-black text-white px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
+          <div className="bg-gray-100 px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
             CONDIÇÕES DOS RESERVATÓRIOS DE ÁGUA
           </div>
 
@@ -257,15 +257,15 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <col key={`xc${n}`} style={{ width: "5%" }} />)}
             </colgroup>
             <thead>
-              <tr className="bg-black text-white">
-                <th className="border-r border-b border-white/40 p-0.5 text-left font-bold">Tipos Reservatório</th>
-                <th className="border-r border-b border-white/40 p-0.5 text-left font-bold">Cisternas</th>
+              <tr>
+                <th className="border-r border-b border-black p-0.5 text-left font-bold">Tipos Reservatório</th>
+                <th className="border-r border-b border-black p-0.5 text-left font-bold">Cisternas</th>
                 {[1, 2, 3, 4, 5].map(n => (
-                  <th key={`c${n}`} className="border-r border-b border-white/40 p-0.5 text-center font-bold">{n}</th>
+                  <th key={`c${n}`} className="border-r border-b border-black p-0.5 text-center font-bold">{n}</th>
                 ))}
-                <th className="border-r border-b border-white/40 p-0.5 text-left font-bold">Caixas D' Água</th>
+                <th className="border-r border-b border-black p-0.5 text-left font-bold">Caixas D' Água</th>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n, i) => (
-                  <th key={`x${n}`} className={`border-b border-white/40 p-0.5 text-center font-bold ${i < 9 ? "border-r" : ""}`}>{n}</th>
+                  <th key={`x${n}`} className={`border-b border-black p-0.5 text-center font-bold ${i < 9 ? "border-r" : ""}`}>{n}</th>
                 ))}
               </tr>
             </thead>
@@ -313,10 +313,10 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
         {/* Assinaturas */}
         <div className="border border-black">
-          <div className="grid text-[9px] bg-black text-white text-center font-bold" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
-            <div className="border-r border-white/40 p-1">APLICADOR</div>
-            <div className="border-r border-white/40 p-1">TÉCNICO RESPONSÁVEL</div>
-            <div className="border-r border-white/40 p-1">CLIENTE</div>
+          <div className="grid text-[9px] border-b border-black text-center font-bold" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
+            <div className="border-r border-black p-1">APLICADOR</div>
+            <div className="border-r border-black p-1">TÉCNICO RESPONSÁVEL</div>
+            <div className="border-r border-black p-1">CLIENTE</div>
             <div className="p-1">DATA SERVIÇO</div>
           </div>
           <div className="grid text-[9px]" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
