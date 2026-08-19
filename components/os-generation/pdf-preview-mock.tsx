@@ -72,6 +72,7 @@ export function PdfPreviewMock({
   onCaptureHtml,
 }: PdfPreviewMockProps) {
   const printRef = useRef<HTMLDivElement>(null)
+  const osOnlyRef = useRef<HTMLDivElement>(null)
   const certificadoRef = useRef<HTMLDivElement>(null)
   const isGenerated = status !== "a_gerar"
 
@@ -81,8 +82,12 @@ export function PdfPreviewMock({
   }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dadosTecnicosDesentupimento, dataServico, consumos, veiculo, mostrarDeclaracaoCupim, certificadoData, incluirCertificado])
 
   const handlePrint = () => {
-    if (!printRef.current) return
-    openPrintWindow(printRef.current.innerHTML, `OS ${osNumber}`)
+    // Imprime somente a OS (sem o certificado, que tem orientacao landscape
+    // e usa um @page nomeado). Misturar as duas no mesmo job de impressao faz
+    // o navegador aplicar uma unica orientacao a todas as paginas, deixando a
+    // OS deitada. O certificado tem seu proprio botao/print job separado.
+    if (!osOnlyRef.current) return
+    openPrintWindow(osOnlyRef.current.innerHTML, `OS ${osNumber}`)
   }
 
   const handlePrintCertificado = () => {
@@ -174,36 +179,38 @@ export function PdfPreviewMock({
         {isGenerated ? (
           <div className="border rounded-lg overflow-auto max-h-[800px] bg-gray-100 p-4">
             <div ref={printRef}>
-              {tipoOS === "limpeza" ? (
-                <OSDocumentLimpeza
-                  osNumber={osNumber}
-                  cliente={defaultCliente}
-                  local={defaultLocal}
-                  dadosTecnicos={defaultDadosTecnicosLimpeza}
-                  dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
-                  veiculo={veiculo}
-                />
-              ) : tipoOS === "desentupimento" ? (
-                <OSDocumentDesentupimento
-                  osNumber={osNumber}
-                  cliente={defaultCliente}
-                  local={defaultLocal}
-                  dadosTecnicos={defaultDadosTecnicosDesentupimento}
-                  dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
-                  veiculo={veiculo}
-                />
-              ) : (
-                <OSDocumentVetores
-                  osNumber={osNumber}
-                  cliente={defaultCliente}
-                  local={defaultLocal}
-                  dadosTecnicos={defaultDadosTecnicos}
-                  dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
-                  consumos={consumos}
-                  veiculo={veiculo}
-                  showDeclaracaoCupim={mostrarDeclaracaoCupim}
-                />
-              )}
+              <div ref={osOnlyRef}>
+                {tipoOS === "limpeza" ? (
+                  <OSDocumentLimpeza
+                    osNumber={osNumber}
+                    cliente={defaultCliente}
+                    local={defaultLocal}
+                    dadosTecnicos={defaultDadosTecnicosLimpeza}
+                    dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
+                    veiculo={veiculo}
+                  />
+                ) : tipoOS === "desentupimento" ? (
+                  <OSDocumentDesentupimento
+                    osNumber={osNumber}
+                    cliente={defaultCliente}
+                    local={defaultLocal}
+                    dadosTecnicos={defaultDadosTecnicosDesentupimento}
+                    dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
+                    veiculo={veiculo}
+                  />
+                ) : (
+                  <OSDocumentVetores
+                    osNumber={osNumber}
+                    cliente={defaultCliente}
+                    local={defaultLocal}
+                    dadosTecnicos={defaultDadosTecnicos}
+                    dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
+                    consumos={consumos}
+                    veiculo={veiculo}
+                    showDeclaracaoCupim={mostrarDeclaracaoCupim}
+                  />
+                )}
+              </div>
               {incluirCertificado && certificadoData ? (
                 <CertificadoGarantia
                   ref={certificadoRef}
