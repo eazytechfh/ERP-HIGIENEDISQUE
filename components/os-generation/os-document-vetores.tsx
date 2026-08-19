@@ -461,9 +461,9 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
               <div className="border-t border-black pt-1">
                 <p>Recebi a presente ordem de servico e a relacao</p>
                 <p>de medidas preventivas necessarias em anexo.</p>
-                <div className="mt-4 border-b border-black" />
+                <div className="border-b border-black" style={{ marginTop: 22 }} />
                 <p className="text-[9px]">Assinatura</p>
-                <div className="mt-2 border-b border-black" />
+                <div className="border-b border-black" style={{ marginTop: 18 }} />
                 <p className="text-[9px]">Nome Legivel</p>
               </div>
             </div>
@@ -476,7 +476,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
               <p className="font-bold mb-2">TECNICO RESPONSAVEL</p>
               <p className="mt-4">{tecnicoResponsavel || dadosTecnicos.tecnicoResponsavel || "Renato Luiz Leal Gomes"}</p>
               <p className="text-[9px] mt-2">N CRBio - {registroTecnico || dadosTecnicos.registroTecnico || "55953/02 RJ"}</p>
-              <div className="mt-4 border-b border-black" />
+              <div className="border-b border-black" style={{ marginTop: 20 }} />
             </div>
             <div className="p-2 text-center">
               <p className="font-bold mb-2">APLICADOR</p>
