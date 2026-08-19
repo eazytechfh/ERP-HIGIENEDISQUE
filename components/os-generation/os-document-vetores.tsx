@@ -93,6 +93,59 @@ const osVetoresA4Styles = `
   .os-a4-page td {
     line-height: 1.22;
   }
+  .os-a4-page.p-6 {
+    padding: 16px !important;
+  }
+  .os-a4-page .p-1 {
+    padding: 2.4px !important;
+  }
+  .os-a4-page .p-2 {
+    padding: 4px !important;
+  }
+  .os-a4-page .py-1 {
+    padding-top: 1.6px !important;
+    padding-bottom: 1.6px !important;
+  }
+  .os-a4-page .py-2 {
+    padding-top: 2.4px !important;
+    padding-bottom: 2.4px !important;
+  }
+  .os-a4-page .mb-4 {
+    margin-bottom: 5.6px !important;
+  }
+  .os-a4-page .mb-2 {
+    margin-bottom: 3.2px !important;
+  }
+  .os-a4-page .mb-8 {
+    margin-bottom: 6.4px !important;
+  }
+  .os-a4-page .mt-1 {
+    margin-top: 2.4px !important;
+  }
+  .os-a4-page .mt-2 {
+    margin-top: 3.2px !important;
+  }
+  .os-a4-page .mt-4 {
+    margin-top: 4.8px !important;
+  }
+  .os-a4-page .space-y-1 > * + * {
+    margin-top: 2.4px !important;
+  }
+  .os-a4-page .leading-tight {
+    line-height: 1.15 !important;
+  }
+  .os-a4-page .min-h-\\[40px\\] {
+    min-height: 18px !important;
+  }
+  .os-a4-page .min-h-\\[60px\\] {
+    min-height: 24px !important;
+  }
+  .os-a4-page .w-24 {
+    width: 80px !important;
+  }
+  .os-a4-page .h-16 {
+    height: 48px !important;
+  }
 `
 
 export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresProps>(
