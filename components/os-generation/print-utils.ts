@@ -7,11 +7,27 @@
 // previa dentro do app. Aqui, em vez de duplicar CSS, clonamos as folhas de
 // estilo reais que o Next.js ja injetou no <head> do app — a impressao fica
 // sempre em sincronia com o app, sem manutencao manual.
+//
+// Le o CSS ja carregado (via cssRules) em vez de clonar as tags <link>, que
+// disparariam um novo download assincrono dentro da janela de impressao e
+// podiam perder a corrida contra o print() (saindo sem nenhum estilo).
 function getAppStylesheetHtml(): string {
   if (typeof document === "undefined") return ""
-  return Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-    .map((el) => el.outerHTML)
-    .join("\n")
+  const blocks: string[] = []
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      const cssText = Array.from(sheet.cssRules)
+        .map((rule) => rule.cssText)
+        .join("\n")
+      if (cssText) blocks.push(`<style>${cssText}</style>`)
+    } catch {
+      // Folha de estilo cross-origin sem CORS (ex.: fonte externa) nao
+      // permite ler cssRules; mantem como <link> igual antes.
+      const href = (sheet as CSSStyleSheet).href
+      if (href) blocks.push(`<link rel="stylesheet" href="${href}">`)
+    }
+  }
+  return blocks.join("\n")
 }
 
 const baseStyle = `
