@@ -117,16 +117,16 @@ const osVetoresA4Styles = `
     margin-bottom: 3.2px !important;
   }
   .os-a4-page .mb-8 {
-    margin-bottom: 6.4px !important;
+    margin-bottom: 3px !important;
   }
   .os-a4-page .mt-1 {
     margin-top: 2.4px !important;
   }
   .os-a4-page .mt-2 {
-    margin-top: 3.2px !important;
+    margin-top: 1.6px !important;
   }
   .os-a4-page .mt-4 {
-    margin-top: 4.8px !important;
+    margin-top: 2.5px !important;
   }
   .os-a4-page .space-y-1 > * + * {
     margin-top: 2.4px !important;
