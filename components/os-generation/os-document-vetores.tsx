@@ -474,9 +474,9 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
             </div>
             <div className="border-r border-black p-2 text-center">
               <p className="font-bold mb-2">TECNICO RESPONSAVEL</p>
-              <p className="mt-4">{tecnicoResponsavel || dadosTecnicos.tecnicoResponsavel || "Renato Luiz Leal Gomes"}</p>
-              <p className="text-[9px] mt-2">N CRBio - {registroTecnico || dadosTecnicos.registroTecnico || "55953/02 RJ"}</p>
               <div className="border-b border-black" style={{ marginTop: 20 }} />
+              <p className="mt-1">{tecnicoResponsavel || dadosTecnicos.tecnicoResponsavel || "Renato Luiz Leal Gomes"}</p>
+              <p className="text-[9px] mt-2">N CRBio - {registroTecnico || dadosTecnicos.registroTecnico || "55953/02 RJ"}</p>
             </div>
             <div className="p-2 text-center">
               <p className="font-bold mb-2">APLICADOR</p>
