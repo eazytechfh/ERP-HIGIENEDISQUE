@@ -38,7 +38,8 @@ import {
   Truck,
   Printer,
   Eye,
-  Settings
+  Settings,
+  Receipt
 } from 'lucide-react'
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
 import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
@@ -127,6 +128,7 @@ type ServiceRequest = {
     revenueCategoryId?: string
     notifyEmail?: boolean
     notifyWhatsapp?: boolean
+    issueReceipt?: boolean
   }
   warrantyDays: string
   warrantyUnit: "dias" | "meses" | "anos"
@@ -385,6 +387,174 @@ function getBillingModeLabel(mode: BillingMode) {
   if (mode === "contrato") return "Incluso em contrato"
   if (mode === "avulso") return "Pagamento avulso"
   return "Adicional"
+}
+
+const EXTENSO_UNIDADES = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"]
+const EXTENSO_DEZ_A_DEZENOVE = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"]
+const EXTENSO_DEZENAS = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"]
+const EXTENSO_CENTENAS = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"]
+
+function grupoPorExtenso(numero: number): string {
+  if (numero === 0) return ""
+  if (numero === 100) return "cem"
+  const centena = Math.floor(numero / 100)
+  const resto = numero % 100
+  const partes: string[] = []
+  if (centena > 0) partes.push(EXTENSO_CENTENAS[centena])
+  if (resto > 0) {
+    if (resto < 10) partes.push(EXTENSO_UNIDADES[resto])
+    else if (resto < 20) partes.push(EXTENSO_DEZ_A_DEZENOVE[resto - 10])
+    else {
+      const dezena = Math.floor(resto / 10)
+      const unidade = resto % 10
+      partes.push(unidade > 0 ? `${EXTENSO_DEZENAS[dezena]} e ${EXTENSO_UNIDADES[unidade]}` : EXTENSO_DEZENAS[dezena])
+    }
+  }
+  return partes.join(" e ")
+}
+
+function valorPorExtenso(valor: number): string {
+  const inteiro = Math.floor(Math.abs(valor))
+  const centavos = Math.round((Math.abs(valor) - inteiro) * 100)
+
+  if (inteiro === 0 && centavos === 0) return "Zero Reais"
+
+  const milhoes = Math.floor(inteiro / 1_000_000)
+  const milhares = Math.floor((inteiro % 1_000_000) / 1000)
+  const unidades = inteiro % 1000
+
+  const partes: string[] = []
+  if (milhoes > 0) partes.push(`${grupoPorExtenso(milhoes)} ${milhoes === 1 ? "milhão" : "milhões"}`)
+  if (milhares > 0) partes.push(`${milhares === 1 ? "mil" : `${grupoPorExtenso(milhares)} mil`}`)
+  if (unidades > 0) partes.push(grupoPorExtenso(unidades))
+
+  const reaisExtenso = partes.join(" e ")
+  const reaisLabel = inteiro === 1 ? "Real" : "Reais"
+  let resultado = inteiro > 0 ? `${reaisExtenso} ${reaisLabel}` : ""
+
+  if (centavos > 0) {
+    const centavosExtenso = grupoPorExtenso(centavos)
+    const centavosLabel = centavos === 1 ? "Centavo" : "Centavos"
+    resultado = resultado ? `${resultado} e ${centavosExtenso} ${centavosLabel}` : `${centavosExtenso} ${centavosLabel}`
+  }
+
+  return resultado.charAt(0).toUpperCase() + resultado.slice(1)
+}
+
+const RECIBO_EMPRESA = {
+  nome: "Higiene Disque Higienizações Ltda",
+  endereco: "Av São Gualter, 200, lote 71 B - Piratininga",
+  cidadeUf: "Niterói - RJ - Cep.: 24355-010",
+  telefones: "(21)2626-3000 - (21)2625-3233",
+  email: "contato@higienedisque.com.br",
+  site: "www.higienedisque.com.br",
+}
+
+type ReciboDocumentoParams = {
+  osNumber: string
+  clienteNome: string
+  clienteEndereco: string
+  clienteCpfCnpj: string
+  clienteEmail: string
+  valor: number
+  dataEmissao: string
+  descricaoServico: string
+  descricaoTipo: string
+}
+
+function buildReciboContentHtml(params: ReciboDocumentoParams): string {
+  const valorFormatado = params.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return `
+    <div class="recibo-box">
+      <div class="recibo-header">
+        <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" class="recibo-logo" />
+        <div class="recibo-empresa">
+          <p class="font-bold">${RECIBO_EMPRESA.nome}</p>
+          <p>${RECIBO_EMPRESA.endereco}</p>
+          <p>${RECIBO_EMPRESA.cidadeUf}</p>
+          <p>Telefones.: ${RECIBO_EMPRESA.telefones}</p>
+          <p>${RECIBO_EMPRESA.email}</p>
+          <p>${RECIBO_EMPRESA.site}</p>
+        </div>
+      </div>
+
+      <div class="recibo-titulo">RECIBO DE PAGAMENTO</div>
+
+      <div class="recibo-linha recibo-linha-valor">
+        <div class="recibo-col">
+          <p><span class="font-bold">Título:</span> ${params.osNumber}</p>
+          <p><span class="font-bold">Extenso:</span> ${valorPorExtenso(params.valor)}</p>
+        </div>
+        <div class="recibo-col-meio">
+          <p><span class="font-bold">Emissão:</span> ${params.dataEmissao}</p>
+          <p><span class="font-bold">Vencto:</span> ${params.dataEmissao}</p>
+        </div>
+        <div class="recibo-valor">R$ ${valorFormatado}</div>
+      </div>
+
+      <div class="recibo-linha">
+        <p><span class="font-bold">Cliente :</span> ${params.clienteNome}</p>
+        <p><span class="font-bold">Endereço :</span> ${params.clienteEndereco}</p>
+        <p><span class="font-bold">C.P.F :</span> ${params.clienteCpfCnpj || "-"} &nbsp;&nbsp; <span class="font-bold">E-mail :</span> ${params.clienteEmail || "-"}</p>
+      </div>
+
+      <div class="recibo-discriminacao-titulo">DESCRIMINAÇÃO</div>
+      <div class="recibo-discriminacao">
+        <p>Relação de Pedidos</p>
+        <p>${params.osNumber} - ${params.descricaoTipo}: ${params.descricaoServico}</p>
+      </div>
+
+      <p class="recibo-data-assinatura">Rio de Janeiro, ${params.dataEmissao}</p>
+      <div class="recibo-assinatura">
+        <p>_________________________________________________</p>
+        <p class="font-bold">Funcionário</p>
+      </div>
+
+      <p class="recibo-pix-texto">Quer pagar com PIX ? Escaneie o código abaixo e pague via celular</p>
+      <img src="/images/pix-qrcode.jpg" alt="QR Code PIX" class="recibo-qrcode" />
+    </div>
+  `
+}
+
+function buildReciboDocumentHtml(params: ReciboDocumentoParams): string {
+  const contentHtml = buildReciboContentHtml(params)
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Recibo ${params.osNumber}</title>
+  <base href="${typeof window !== "undefined" ? window.location.origin : ""}/" />
+  <style>
+    @page { size: A4; margin: 10mm; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 13px; color: #000; }
+    * { box-sizing: border-box; }
+    p { margin: 0; }
+    .font-bold { font-weight: bold; }
+    .recibo-box { width: 190mm; margin: 0 auto; border: 1px solid #000; }
+    .recibo-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 2px solid #000; gap: 12px; }
+    .recibo-logo { height: 40px; }
+    .recibo-empresa { text-align: right; font-size: 11px; line-height: 1.35; }
+    .recibo-titulo { text-align: center; font-size: 18px; font-weight: bold; padding: 8px; border-bottom: 1px solid #000; }
+    .recibo-linha { padding: 8px 12px; border-bottom: 1px solid #000; }
+    .recibo-linha-valor { display: flex; align-items: stretch; padding: 0; }
+    .recibo-col { flex: 1; padding: 8px 12px; }
+    .recibo-col-meio { flex: 1; padding: 8px 12px; border-left: 1px solid #000; }
+    .recibo-valor { display: flex; align-items: center; justify-content: center; padding: 8px 16px; border-left: 2px solid #000; font-size: 22px; font-weight: bold; white-space: nowrap; }
+    .recibo-discriminacao-titulo { text-align: center; font-weight: bold; padding: 6px; border-bottom: 1px solid #000; background: #f3f4f6; }
+    .recibo-discriminacao { padding: 8px 12px; min-height: 60px; border-bottom: 1px solid #000; }
+    .recibo-data-assinatura { text-align: center; margin-top: 24px; }
+    .recibo-assinatura { text-align: center; margin-top: 24px; }
+    .recibo-pix-texto { text-align: center; font-weight: bold; margin-top: 16px; }
+    .recibo-qrcode { display: block; margin: 8px auto 16px; width: 32mm; height: 32mm; }
+    @media print {
+      body { margin: 0; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  ${contentHtml}
+</body>
+</html>`
 }
 
 function mapFlowStatusToAgendado(status: FlowServico["status"]): StatusAgendado {
@@ -798,6 +968,7 @@ function ServicosAgendadosContent({
   servicos,
   onVerOS,
   onImprimirOS,
+  onVerRecibo,
   onAtualizarStatus,
   onSolicitarBaixa,
   onSolicitarCancelamento,
@@ -806,6 +977,7 @@ function ServicosAgendadosContent({
   servicos: ServicoAgendado[]
   onVerOS: (servico: ServicoAgendado) => void
   onImprimirOS: (servico: ServicoAgendado) => void
+  onVerRecibo: (servico: ServicoAgendado) => void
   onAtualizarStatus: (id: string, status: StatusAgendado) => void
   onSolicitarBaixa: (id: string) => void
   onSolicitarCancelamento: (id: string) => void
@@ -1017,6 +1189,12 @@ function ServicosAgendadosContent({
                       <Printer className="h-4 w-4" />
                       Imprimir
                     </Button>
+                    {servico.billingDocument === "recibo" && (
+                      <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onVerRecibo(servico)}>
+                        <Receipt className="h-4 w-4" />
+                        Ver Recibo
+                      </Button>
+                    )}
                     <Select
                       value={servico.status === "agendado" ? undefined : servico.status}
                       onValueChange={(value) => {
@@ -1762,6 +1940,15 @@ export default function ServicosPage() {
     return true
   }
 
+  const abrirEImprimirRecibo = (params: ReciboDocumentoParams) => {
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) return false
+    printWindow.document.write(buildReciboDocumentHtml(params))
+    printWindow.document.close()
+    printWindow.print()
+    return true
+  }
+
   const handleImprimirOS = () => {
     window.print()
     if (osStatus === "gerada") {
@@ -1941,6 +2128,21 @@ export default function ServicosPage() {
     setToastMessage(`Impressao da ${servico.osNumber} enviada.`)
     setShowToast(true)
     setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleVerReciboAgendado = (servico: ServicoAgendado) => {
+    const clienteDoRecibo = clientesData.find((c) => c.id === servico.clienteId)
+    abrirEImprimirRecibo({
+      osNumber: servico.osNumber,
+      clienteNome: servico.cliente,
+      clienteEndereco: servico.local,
+      clienteCpfCnpj: clienteDoRecibo?.cpfCnpj || "",
+      clienteEmail: clienteDoRecibo?.email || "",
+      valor: servico.billingValue || 0,
+      dataEmissao: servico.data,
+      descricaoServico: servico.servico,
+      descricaoTipo: getTipoNome(servico.tipo),
+    })
   }
 
   const persistServicoAgendado = async (
@@ -2328,6 +2530,26 @@ const handleConfirmarAgendamentoFinal = async () => {
     try {
       setPageError("")
       const { financeiroErro } = await persistServicoAgendado(novoServico)
+
+      if (
+        isBillingDireto(serviceRequest.billing.mode) &&
+        serviceRequest.billing.billingDocument === "recibo" &&
+        serviceRequest.billing.issueReceipt
+      ) {
+        abrirEImprimirRecibo({
+          osNumber: novoServico.osNumber,
+          clienteNome: clienteSelecionado?.nome || "Cliente não informado",
+          clienteEndereco: localSelecionado
+            ? `${localSelecionado.endereco}, ${localSelecionado.numero} - ${localSelecionado.bairro} - ${localSelecionado.cidade}/${localSelecionado.estado} - Cep : ${localSelecionado.cep}`
+            : "-",
+          clienteCpfCnpj: clienteSelecionado?.cpfCnpj || "",
+          clienteEmail: clienteSelecionado?.email || "",
+          valor: novoServico.billingValue || 0,
+          dataEmissao: new Date().toLocaleDateString("pt-BR"),
+          descricaoServico: serviceRequest.serviceName || "Serviço sem nome",
+          descricaoTipo: getTipoNome(serviceRequest.serviceType),
+        })
+      }
 
       if (financeiroErro) {
         setPageError(`Serviço salvo! Mas a receita NÃO foi registrada no financeiro: ${financeiroErro}`)
@@ -3042,6 +3264,38 @@ const handleConfirmarAgendamentoFinal = async () => {
                               </>
                             ) : null}
                           </button>
+
+                          {serviceRequest.billing.billingDocument === "recibo" && (
+                            <button
+                              type="button"
+                              onClick={() => handleBillingChange("issueReceipt", !serviceRequest.billing.issueReceipt)}
+                              className={`w-full rounded-lg border-2 p-4 space-y-1 text-left transition-colors ${
+                                serviceRequest.billing.issueReceipt
+                                  ? "border-green-500 bg-green-50"
+                                  : "border-dashed border-muted-foreground/30 hover:border-muted-foreground/60 hover:bg-muted/30"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                  <div className={`rounded-lg p-2 ${serviceRequest.billing.issueReceipt ? "bg-green-100" : "bg-muted"}`}>
+                                    <Printer className={`h-5 w-5 ${serviceRequest.billing.issueReceipt ? "text-green-600" : "text-muted-foreground"}`} />
+                                  </div>
+                                  <div>
+                                    <p className={`font-semibold ${serviceRequest.billing.issueReceipt ? "text-green-700" : ""}`}>
+                                      Emitir Recibo
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">Se marcado, um recibo de pagamento sera gerado e impresso ao confirmar o agendamento.</p>
+                                  </div>
+                                </div>
+                                <Checkbox
+                                  checked={serviceRequest.billing.issueReceipt || false}
+                                  onCheckedChange={(checked) => handleBillingChange("issueReceipt", checked === true)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={serviceRequest.billing.issueReceipt ? "border-green-500 data-[state=checked]:bg-green-500" : ""}
+                                />
+                              </div>
+                            </button>
+                          )}
 
                           {serviceRequest.billing.mode === "adicional" && (
                             <>
@@ -3794,6 +4048,7 @@ const handleConfirmarAgendamentoFinal = async () => {
               servicos={servicosAgendados}
               onVerOS={handleVerOSAgendada}
               onImprimirOS={handleImprimirOSAgendada}
+              onVerRecibo={handleVerReciboAgendado}
               onAtualizarStatus={handleAtualizarStatusAgendada}
               onSolicitarBaixa={handleSolicitarBaixaAgendada}
               onSolicitarCancelamento={handleSolicitarCancelamento}
