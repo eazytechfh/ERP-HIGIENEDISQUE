@@ -104,15 +104,15 @@ export function PdfPreviewMock({
     produtos: [],
     medidasPreventivas: "",
     aplicador: "",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ",
+    tecnicoResponsavel: "",
+    registroTecnico: "",
   }
 
   const defaultDadosTecnicosLimpeza: DadosTecnicosLimpeza = dadosTecnicosLimpeza || {
     reservatorios: [],
     aplicador: "Eryck Guimaraes",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ",
+    tecnicoResponsavel: "",
+    registroTecnico: "",
   }
 
   const defaultDadosTecnicosDesentupimento: DadosTecnicosDesentupimento = dadosTecnicosDesentupimento || {

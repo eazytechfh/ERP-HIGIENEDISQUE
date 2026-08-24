@@ -47,6 +47,7 @@ import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/compon
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { DesentupimentoForm, type DadosTecnicosDesentupimento } from "@/components/os-generation/desentupimento-form"
 import { preencherDadosDesentupimento } from "@/components/os-generation/desentupimento-defaults"
+import { selecionarTecnicoResponsavel } from "@/components/os-generation/tecnico-responsavel"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
 import { buildPrintDocument, openPrintWindow } from "@/components/os-generation/print-utils"
@@ -58,7 +59,7 @@ import { buildLocaisPorCliente, mapClienteToServicoView } from "@/lib/supabase/c
 import { setFlowServicos, toIsoDate, type FlowServico } from "@/lib/flow-store"
 import { formatDateOnlyBR, parseDateOnlyLocal } from "@/lib/date-only"
 import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
-import { listEquipeMembrosSupabase } from "@/lib/supabase/equipe-repo"
+import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabase/equipe-repo"
 import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
 import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
 import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
@@ -1311,6 +1312,7 @@ export default function ServicosPage() {
   const clientesRequestIdRef = useRef(0)
   const [contratosSupabase, setContratosSupabase] = useState<Contrato[]>([])
   const [equipesData, setEquipesData] = useState<Equipe[]>([])
+  const [equipeMembrosData, setEquipeMembrosData] = useState<EquipeMembroInput[]>([])
   const [veiculosData, setVeiculosData] = useState<Veiculo[]>([])
   const [produtosData, setProdutosData] = useState<any[]>([])
   const [categoriasFinanceirasReceita, setCategoriasFinanceirasReceita] = useState<FinanceiroCategoriaItem[]>([])
@@ -1399,6 +1401,7 @@ export default function ServicosPage() {
               tipo: mapEquipeTipo(`${membro.cargo} ${membro.nome} ${membro.perfilAcesso}`),
             })),
         )
+        setEquipeMembrosData(equipeRows)
         setVeiculosData(
           veiculosRows
             .filter((veiculo) => veiculo.ativo)
@@ -1418,6 +1421,7 @@ export default function ServicosPage() {
         if (mounted) {
           setContratosSupabase([])
           setEquipesData([])
+          setEquipeMembrosData([])
           setVeiculosData([])
           setProdutosData([])
           setCategoriasFinanceirasReceita([])
@@ -1544,15 +1548,25 @@ export default function ServicosPage() {
     produtos: [],
     medidasPreventivas: "",
     aplicador: "FERNANDO",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ"
+    tecnicoResponsavel: "",
+    registroTecnico: ""
   })
   const [dadosTecnicosLimpeza, setDadosTecnicosLimpeza] = useState<DadosTecnicosLimpeza>({
     reservatorios: [],
     aplicador: "Eryck Guimaraes",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ"
+    tecnicoResponsavel: "",
+    registroTecnico: ""
   })
+  const tecnicoResponsavelEquipe = useMemo(
+    () => selecionarTecnicoResponsavel(equipeMembrosData),
+    [equipeMembrosData],
+  )
+
+  useEffect(() => {
+    if (!tecnicoResponsavelEquipe) return
+    setDadosTecnicosVetores((dados) => ({ ...dados, tecnicoResponsavel: tecnicoResponsavelEquipe.nome }))
+    setDadosTecnicosLimpeza((dados) => ({ ...dados, tecnicoResponsavel: tecnicoResponsavelEquipe.nome }))
+  }, [tecnicoResponsavelEquipe])
   const [dadosTecnicosDesentupimento, setDadosTecnicosDesentupimento] = useState<DadosTecnicosDesentupimento>({
     horaServico: "",
     atendente: "",

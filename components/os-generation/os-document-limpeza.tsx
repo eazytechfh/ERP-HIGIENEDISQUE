@@ -334,8 +334,8 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
               <div className="flex-[3]"></div>
               <div>
                 <div className="border-t border-black w-4/5 mx-auto"></div>
-                <p className="italic mt-0.5">{dadosTecnicos.tecnicoResponsavel || "Renato Luiz Leal Gomes"}</p>
-                <p className="text-[8px]">Nº CRBio - {dadosTecnicos.registroTecnico || "55953/02 RJ"}</p>
+                <p className="italic mt-0.5">{dadosTecnicos.tecnicoResponsavel || "-"}</p>
+                <p className="text-[8px]">Nº CRBio - {dadosTecnicos.registroTecnico || "-"}</p>
               </div>
               <div className="flex-[2]"></div>
             </div>
