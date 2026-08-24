@@ -80,7 +80,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
           padding: "5mm",
           fontFamily: "Arial, sans-serif",
           fontSize: "12px",
-          lineHeight: 1.1,
+          lineHeight: 1.25,
           overflowWrap: "anywhere",
           pageBreakBefore: pageBreakBefore ? "always" : "auto",
         }}
@@ -89,7 +89,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
           <tbody>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: "1.5mm 3mm 1mm" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "50% 1fr", alignItems: "center", gap: "2%" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "56% 1fr", alignItems: "center", gap: "1.5%" }}>
                   <img
                     src={certificadoLogoQrSrc}
                     alt="Higiene Disque e QR Code"
@@ -101,7 +101,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                       display: "block",
                     }}
                   />
-                  <div style={{ textAlign: "right", fontSize: "1em", lineHeight: 1.16 }}>
+                  <div style={{ textAlign: "right", fontSize: "1em", lineHeight: 1.32 }}>
                     <div style={{ fontSize: "1.56em", fontWeight: 700 }}>Higiene Disque Higienizações Ltda</div>
                     <div>Av São Gualter, 200, lote 71 B - Piratininga</div>
                     <div>Niterói - RJ - Cep.: 24355-010</div>
@@ -126,7 +126,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
             </tr>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: "0.8mm 1.5mm", fontSize: "1em" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "13% 1fr 13% 14.5%", rowGap: "1mm", columnGap: "1%", alignItems: "center" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "13% 1fr 13% 14.5%", rowGap: "1.4mm", columnGap: "1%", alignItems: "center", lineHeight: 1.3 }}>
                   <LabeledValue label="Cliente" value={data.cliente} wide />
                   <div style={{ fontWeight: 700, textAlign: "right" }}>Nº Pedido :</div>
                   <div>{data.pedido || ""}</div>
@@ -240,7 +240,7 @@ const innerTdStyle = {
 function InfoHeaderCell({ label, value }: { label: string; value: string }) {
   return (
     <td style={{ ...cellStyle, padding: "0.8mm 1.4mm", textAlign: "center", height: "10mm" }}>
-      <div style={{ fontSize: "1em", fontWeight: 700, marginBottom: "0.5mm" }}>{label}</div>
+      <div style={{ fontSize: "1em", fontWeight: 700, marginBottom: "0.8mm" }}>{label}</div>
       <div style={{ fontSize: "1.107em" }}>{value}</div>
     </td>
   )
