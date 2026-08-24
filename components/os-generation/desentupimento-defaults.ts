@@ -18,6 +18,8 @@ const formasPagamento: Record<string, string> = {
   transferencia: "Transferência",
 }
 
+const responsavelPadraoDesentupimento = "Bruna Freitas"
+
 function formatarHorario(inicio: string, fim: string): string {
   if (inicio && fim) return `${inicio} - ${fim}`
   return inicio || fim
@@ -45,15 +47,15 @@ export function preencherDadosDesentupimento(
   dados: DadosTecnicosDesentupimento,
   origem: OrigemDadosDesentupimento,
 ): DadosTecnicosDesentupimento {
-  const usuario = origem.usuario.trim()
   const servico = origem.servico.trim()
   const valorServico = formatarValor(origem.valor, origem.modoCobranca)
 
   return {
     ...dados,
     horaServico: dados.horaServico || formatarHorario(origem.inicio, origem.fim),
-    atendente: dados.atendente || usuario,
-    vendedor: dados.vendedor || usuario,
+    atendente: dados.atendente || responsavelPadraoDesentupimento,
+    tecnico: dados.tecnico || responsavelPadraoDesentupimento,
+    vendedor: dados.vendedor || responsavelPadraoDesentupimento,
     condicaoPagamento: dados.condicaoPagamento || formasPagamento[origem.formaPagamento] || origem.formaPagamento,
     servicos: dados.servicos.length > 0 || (!servico && !valorServico)
       ? dados.servicos

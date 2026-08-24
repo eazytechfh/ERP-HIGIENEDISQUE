@@ -7,7 +7,7 @@ import type { DadosTecnicosDesentupimento } from "./desentupimento-form.tsx"
 const dadosVazios: DadosTecnicosDesentupimento = {
   horaServico: "",
   atendente: "",
-  tecnico: "Eryck Guimaraes",
+  tecnico: "",
   vendedor: "",
   inscricao: "",
   homePage: "",
@@ -31,8 +31,9 @@ test("preenche os dados da OS a partir de uma cobrança direta", () => {
     formaPagamento: "pix",
   })
 
-  assert.equal(resultado.atendente, "Fernanda Souza")
-  assert.equal(resultado.vendedor, "Fernanda Souza")
+  assert.equal(resultado.atendente, "Bruna Freitas")
+  assert.equal(resultado.tecnico, "Bruna Freitas")
+  assert.equal(resultado.vendedor, "Bruna Freitas")
   assert.equal(resultado.horaServico, "09:00 - 11:30")
   assert.equal(resultado.servicos[0]?.descricao, "Desentupimento de coluna")
   assert.equal(resultado.servicos[0]?.valorServico, "R$ 1.250,50")
@@ -58,6 +59,7 @@ test("preserva campos e serviços editados manualmente", () => {
   const resultado = preencherDadosDesentupimento({
     ...dadosVazios,
     atendente: "Atendente escolhido",
+    tecnico: "Técnico escolhido",
     vendedor: "Vendedor escolhido",
     horaServico: "Após as 14h",
     condicaoPagamento: "2 parcelas",
@@ -73,6 +75,7 @@ test("preserva campos e serviços editados manualmente", () => {
   })
 
   assert.equal(resultado.atendente, "Atendente escolhido")
+  assert.equal(resultado.tecnico, "Técnico escolhido")
   assert.equal(resultado.vendedor, "Vendedor escolhido")
   assert.equal(resultado.horaServico, "Após as 14h")
   assert.equal(resultado.condicaoPagamento, "2 parcelas")

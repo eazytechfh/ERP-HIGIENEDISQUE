@@ -102,7 +102,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                     }}
                   />
                   <div style={{ textAlign: "right", fontSize: "1em", lineHeight: 1.32 }}>
-                    <div style={{ fontSize: "1.56em", fontWeight: 700 }}>Higiene Disque Higienizações Ltda</div>
+                    <div className="certificate-company-title" style={{ fontSize: "1.46em", fontWeight: 700 }}>Higiene Disque Higienizações Ltda</div>
                     <div>Av São Gualter, 200, lote 71 B - Piratininga</div>
                     <div>Niterói - RJ - Cep.: 24355-010</div>
                     <div>Telefones.: (21)2626-3000&nbsp;&nbsp;-&nbsp;&nbsp;(21)2625-3233</div>
@@ -126,7 +126,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
             </tr>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: "0.8mm 1.5mm", fontSize: "1em" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "13% 1fr 13% 14.5%", rowGap: "1.4mm", columnGap: "1%", alignItems: "center", lineHeight: 1.3 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "20% 1fr 12% 15%", rowGap: "1.4mm", columnGap: "1%", alignItems: "center", lineHeight: 1.3 }}>
                   <LabeledValue label="Cliente" value={data.cliente} wide />
                   <div style={{ fontWeight: 700, textAlign: "right" }}>Nº Pedido :</div>
                   <div>{data.pedido || ""}</div>
@@ -248,7 +248,7 @@ function InfoHeaderCell({ label, value }: { label: string; value: string }) {
 
 function LabeledValue({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
-    <div style={wide ? { gridColumn: "span 2" } : undefined}>
+    <div className="certificate-client-field" style={wide ? { gridColumn: "span 2" } : undefined}>
       <strong>{label} :</strong>&nbsp;&nbsp;&nbsp;{value}
     </div>
   )

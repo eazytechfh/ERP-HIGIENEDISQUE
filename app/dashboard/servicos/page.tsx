@@ -1570,7 +1570,7 @@ export default function ServicosPage() {
   const [dadosTecnicosDesentupimento, setDadosTecnicosDesentupimento] = useState<DadosTecnicosDesentupimento>({
     horaServico: "",
     atendente: "",
-    tecnico: "Eryck Guimaraes",
+    tecnico: "",
     vendedor: "",
     inscricao: "",
     homePage: "",

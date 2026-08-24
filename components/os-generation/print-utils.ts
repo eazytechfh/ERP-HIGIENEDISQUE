@@ -48,7 +48,8 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
   body.certificate-print { display: flex; align-items: center; justify-content: center; }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
-  .certificado-a5-page { ${certificateDimensions} margin: 0 auto; }
+  .certificado-a5-page { ${certificateDimensions} margin: 0 auto; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
+  .certificate-company-title, .certificate-client-field { white-space: nowrap; }
   @media print {
     body { margin: 0; padding: 0; }
     .no-print { display: none; }

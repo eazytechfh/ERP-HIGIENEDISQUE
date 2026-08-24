@@ -30,6 +30,8 @@ test("lets the print dialog choose the certificate paper and fills its printable
   )
   assert.match(html, /\.certificado-a5-page\s*{[^}]*padding:\s*4\.76vw !important;/s)
   assert.match(html, /body\.certificate-print\s*{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s)
+  assert.match(html, /\.certificado-a5-page\s*{[^}]*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;[^}]*overflow:\s*hidden;/s)
+  assert.match(html, /\.certificate-company-title,\s*\.certificate-client-field\s*{\s*white-space:\s*nowrap;/s)
   assert.match(html, /<body class="certificate-print">/)
   assert.doesNotMatch(html, /size:\s*A[45]/)
 })
