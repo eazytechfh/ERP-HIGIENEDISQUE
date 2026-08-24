@@ -32,11 +32,11 @@ function getAppStylesheetHtml(): string {
 
 const baseStyle = `
   @page { size: A4; margin: 5mm; }
-  @page certificado { size: A4 landscape; margin: 5mm; }
+  @page certificado { size: A5 landscape; margin: 5mm; }
   * { box-sizing: border-box; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
-  .certificado-a4-page { page: certificado; width: 287mm; min-height: 200mm; margin: 0 auto; }
+  .certificado-a5-page { page: certificado; width: 200mm; min-height: 138mm; margin: 0 auto; }
   @media print {
     body { margin: 0; padding: 0; }
     .no-print { display: none; }
