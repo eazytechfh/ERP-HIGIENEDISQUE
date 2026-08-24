@@ -18,15 +18,18 @@ test("lets the print dialog choose the certificate paper and fills its printable
 
   assert.match(
     html,
-    /@page\s*{\s*size:\s*landscape;\s*margin:\s*5mm;/,
+    /@page\s*{\s*size:\s*landscape;\s*margin:\s*0;/,
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*width:\s*100% !important;[^}]*height:\s*100% !important;/s,
+    /\.certificado-a5-page\s*{[^}]*font-size:\s*1\.51vw !important;/s,
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*font-size:\s*clamp\(12px,\s*1\.59vw,\s*18px\) !important;/s,
+    /\.certificado-a5-page\s*{[^}]*width:\s*min\(100%,\s*141\.892vh\) !important;[^}]*aspect-ratio:\s*210 \/ 148;/s,
   )
+  assert.match(html, /\.certificado-a5-page\s*{[^}]*padding:\s*4\.76vw !important;/s)
+  assert.match(html, /body\.certificate-print\s*{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s)
+  assert.match(html, /<body class="certificate-print">/)
   assert.doesNotMatch(html, /size:\s*A[45]/)
 })

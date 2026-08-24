@@ -89,7 +89,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
           <tbody>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: "1.5mm 3mm 1mm" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "56% 1fr", alignItems: "center", gap: "1.5%" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "50% 1fr", alignItems: "center", gap: "2%" }}>
                   <img
                     src={certificadoLogoQrSrc}
                     alt="Higiene Disque e QR Code"
@@ -101,8 +101,8 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                       display: "block",
                     }}
                   />
-                  <div style={{ textAlign: "right", fontSize: "0.917em", lineHeight: 1.16 }}>
-                    <div style={{ fontSize: "1.727em", fontWeight: 700 }}>Higiene Disque Higienizações Ltda</div>
+                  <div style={{ textAlign: "right", fontSize: "1em", lineHeight: 1.16 }}>
+                    <div style={{ fontSize: "1.56em", fontWeight: 700 }}>Higiene Disque Higienizações Ltda</div>
                     <div>Av São Gualter, 200, lote 71 B - Piratininga</div>
                     <div>Niterói - RJ - Cep.: 24355-010</div>
                     <div>Telefones.: (21)2626-3000&nbsp;&nbsp;-&nbsp;&nbsp;(21)2625-3233</div>
@@ -113,7 +113,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
               </td>
             </tr>
             <tr>
-              <td colSpan={5} style={{ ...cellStyle, padding: "0.7mm 0", textAlign: "center", fontWeight: 700, fontSize: "1.667em" }}>
+              <td colSpan={5} style={{ ...cellStyle, padding: "0.7mm 0", textAlign: "center", fontWeight: 700, fontSize: "1.773em" }}>
                 CERTIFICADO DE GARANTIA
               </td>
             </tr>
@@ -125,7 +125,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
               <InfoHeaderCell label="Ordem Serviço" value={data.osNumber} />
             </tr>
             <tr>
-              <td colSpan={5} style={{ ...cellStyle, padding: "0.8mm 1.5mm", fontSize: "0.917em" }}>
+              <td colSpan={5} style={{ ...cellStyle, padding: "0.8mm 1.5mm", fontSize: "1em" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "13% 1fr 13% 14.5%", rowGap: "1mm", columnGap: "1%", alignItems: "center" }}>
                   <LabeledValue label="Cliente" value={data.cliente} />
                   <div />
@@ -147,13 +147,13 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
               </td>
             </tr>
             <tr>
-              <td colSpan={5} style={{ ...cellStyle, padding: "2.3mm 1.4mm", textAlign: "center", fontWeight: 700, fontSize: "1em" }}>
+              <td colSpan={5} style={{ ...cellStyle, padding: "2.3mm 1.4mm", textAlign: "center", fontWeight: 700, fontSize: "1.107em" }}>
                 {textos.descricaoServico}
               </td>
             </tr>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: 0 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: "0.917em" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: "1em" }}>
                   <thead>
                     <tr>
                       <th style={{ ...innerThStyle, width: "50%" }}>{textos.colunas[0]}</th>
@@ -182,7 +182,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
             </tr>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: 0 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: "0.917em" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: "1em" }}>
                   <tbody>
                     <tr>
                       <td style={{ width: "50%", padding: "1.4mm 3mm 2.5mm", verticalAlign: "top", borderRight: "2px solid #111" }}>
@@ -194,8 +194,8 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                           {data.localEmissao}, {data.dataEmissaoExtenso}
                         </div>
                         <div style={{ borderTop: "1px solid #777", width: "72%", margin: "0 auto 1.5mm" }} />
-                        <div style={{ fontWeight: 700, fontSize: "0.909em" }}>Higiene Disque Higienizações Ltda</div>
-                        <div style={{ fontSize: "0.818em" }}>Rachel Dantas</div>
+                        <div style={{ fontWeight: 700, fontSize: "0.893em" }}>Higiene Disque Higienizações Ltda</div>
+                        <div style={{ fontSize: "0.773em" }}>Rachel Dantas</div>
                       </td>
                     </tr>
                   </tbody>
@@ -241,8 +241,8 @@ const innerTdStyle = {
 function InfoHeaderCell({ label, value }: { label: string; value: string }) {
   return (
     <td style={{ ...cellStyle, padding: "0.8mm 1.4mm", textAlign: "center", height: "10mm" }}>
-      <div style={{ fontSize: "0.917em", fontWeight: 700, marginBottom: "0.5mm" }}>{label}</div>
-      <div style={{ fontSize: "1em" }}>{value}</div>
+      <div style={{ fontSize: "1em", fontWeight: 700, marginBottom: "0.5mm" }}>{label}</div>
+      <div style={{ fontSize: "1.107em" }}>{value}</div>
     </td>
   )
 }

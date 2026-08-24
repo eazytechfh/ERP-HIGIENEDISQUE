@@ -37,14 +37,16 @@ type PrintOptions = {
 
 function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   const pageSize = page === "certificate" ? "landscape" : "A4"
+  const pageMargin = page === "certificate" ? "0" : "5mm"
   const certificateDimensions = page === "certificate"
-    ? "width: 100% !important; height: 100% !important; min-height: 0 !important; padding: 0 !important; font-size: clamp(12px, 1.59vw, 18px) !important;"
+    ? "width: min(100%, 141.892vh) !important; height: auto !important; max-height: 100% !important; aspect-ratio: 210 / 148; padding: 4.76vw !important; font-size: 1.51vw !important;"
     : "width: 210mm; height: 148mm; padding: 5mm;"
   return `
-  @page { size: ${pageSize}; margin: 5mm; }
+  @page { size: ${pageSize}; margin: ${pageMargin}; }
   * { box-sizing: border-box; }
   html, body { width: 100%; height: 100%; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+  body.certificate-print { display: flex; align-items: center; justify-content: center; }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
   .certificado-a5-page { ${certificateDimensions} margin: 0 auto; }
   @media print {
@@ -56,7 +58,9 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
 
 export function buildPrintDocument(bodyHtml: string, title: string, options: PrintOptions = {}): string {
   const origin = typeof window !== "undefined" ? window.location.origin : ""
-  const baseStyle = getBaseStyle(options.page ?? "service-order")
+  const page = options.page ?? "service-order"
+  const baseStyle = getBaseStyle(page)
+  const bodyClass = page === "certificate" ? ' class="certificate-print"' : ""
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -66,7 +70,7 @@ export function buildPrintDocument(bodyHtml: string, title: string, options: Pri
   ${getAppStylesheetHtml()}
   <style>${baseStyle}${options.extraStyle ?? ""}</style>
 </head>
-<body>
+<body${bodyClass}>
   ${bodyHtml}
 </body>
 </html>`
