@@ -46,6 +46,7 @@ import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-heade
 import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/components/os-generation/vetores-form"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { DesentupimentoForm, type DadosTecnicosDesentupimento } from "@/components/os-generation/desentupimento-form"
+import { preencherDadosDesentupimento } from "@/components/os-generation/desentupimento-defaults"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
 import { buildPrintDocument, openPrintWindow } from "@/components/os-generation/print-utils"
@@ -1294,7 +1295,7 @@ export default function ServicosPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const clienteIdParam = searchParams.get("clienteId")
-  const { can } = useAccess()
+  const { can, profile } = useAccess()
 
   // Estados principais
   const [activeTab, setActiveTab] = useState("nova-solicitacao")
@@ -1567,6 +1568,33 @@ export default function ServicosPage() {
     desconto: "",
     condicaoPagamento: ""
   })
+
+  useEffect(() => {
+    if (currentStep !== 3 || (!isTipoDesentupimento(serviceRequest.serviceType) && !isTipoGordura(serviceRequest.serviceType))) {
+      return
+    }
+
+    setDadosTecnicosDesentupimento((dadosAtuais) => preencherDadosDesentupimento(dadosAtuais, {
+      usuario: profile?.nome || "",
+      inicio: serviceRequest.schedule.startTime,
+      fim: serviceRequest.schedule.endTime,
+      servico: serviceRequest.serviceName || getTipoServicoAtual(serviceRequest.serviceType)?.nome || "",
+      modoCobranca: serviceRequest.billing.mode,
+      valor: serviceRequest.billing.price || "",
+      formaPagamento: serviceRequest.billing.paymentMethod || "",
+    }))
+  }, [
+    currentStep,
+    profile?.nome,
+    serviceRequest.serviceType,
+    serviceRequest.serviceName,
+    serviceRequest.schedule.startTime,
+    serviceRequest.schedule.endTime,
+    serviceRequest.billing.mode,
+    serviceRequest.billing.price,
+    serviceRequest.billing.paymentMethod,
+    tiposServico,
+  ])
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
 
   // Estados derivados dos produtos utilizados na OS Vetores.
