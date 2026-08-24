@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog"
+import { DIAS_VENCIMENTO_CONTRATO } from "@/components/contratos/dias-vencimento"
 import { listClientesSupabase, upsertClienteSupabase, getClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { mapClienteToResumoView } from "@/lib/supabase/clientes-view"
 import { upsertFlowContrato, type FlowContrato } from "@/lib/flow-store"
@@ -862,7 +863,7 @@ export default function NovoContratoPage() {
                       <SelectValue placeholder="Selecione o dia" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.from({ length: 28 }, (_, i) => i + 1).map(dia => (
+                      {DIAS_VENCIMENTO_CONTRATO.map(dia => (
                         <SelectItem key={dia} value={dia.toString()}>Dia {dia}</SelectItem>
                       ))}
                     </SelectContent>
