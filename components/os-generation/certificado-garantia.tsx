@@ -127,8 +127,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: "0.8mm 1.5mm", fontSize: "1em" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "13% 1fr 13% 14.5%", rowGap: "1mm", columnGap: "1%", alignItems: "center" }}>
-                  <LabeledValue label="Cliente" value={data.cliente} />
-                  <div />
+                  <LabeledValue label="Cliente" value={data.cliente} wide />
                   <div style={{ fontWeight: 700, textAlign: "right" }}>Nº Pedido :</div>
                   <div>{data.pedido || ""}</div>
 
