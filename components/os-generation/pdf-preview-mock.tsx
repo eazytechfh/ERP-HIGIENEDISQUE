@@ -2,9 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Award, FileText, AlertCircle, Printer } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import type { OSStatus } from "./os-header-card"
 import { OSDocumentVetores } from "./os-document-vetores"
 import { OSDocumentLimpeza } from "./os-document-limpeza"
@@ -14,7 +13,7 @@ import type { DadosTecnicosVetores } from "./vetores-form"
 import type { DadosTecnicosLimpeza } from "./limpeza-form"
 import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
-import { openPrintWindow, type CertificatePaperSize } from "./print-utils"
+import { openPrintWindow } from "./print-utils"
 
 type ClienteInfo = {
   nome: string
@@ -75,7 +74,6 @@ export function PdfPreviewMock({
   const printRef = useRef<HTMLDivElement>(null)
   const osOnlyRef = useRef<HTMLDivElement>(null)
   const certificadoRef = useRef<HTMLDivElement>(null)
-  const [certificatePaperSize, setCertificatePaperSize] = useState<CertificatePaperSize>("a5")
   const isGenerated = status !== "a_gerar"
 
   useEffect(() => {
@@ -96,7 +94,6 @@ export function PdfPreviewMock({
     if (!certificadoRef.current || !certificadoData) return
     openPrintWindow(certificadoRef.current.outerHTML, `Certificado ${osNumber}`, {
       page: "certificate",
-      certificatePaperSize,
     })
   }
 
@@ -167,24 +164,10 @@ export function PdfPreviewMock({
           {isGenerated && (
             <div className="flex gap-2">
               {certificadoData && (
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={certificatePaperSize}
-                    onValueChange={(value) => setCertificatePaperSize(value as CertificatePaperSize)}
-                  >
-                    <SelectTrigger className="h-9 w-[150px]" aria-label="Tamanho do papel do certificado">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="a5">Papel A5</SelectItem>
-                      <SelectItem value="a4">Papel A4</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button variant="outline" size="sm" onClick={handlePrintCertificado} className="gap-2 bg-transparent">
-                    <Award className="h-4 w-4" />
-                    Imprimir certificado
-                  </Button>
-                </div>
+                <Button variant="outline" size="sm" onClick={handlePrintCertificado} className="gap-2 bg-transparent">
+                  <Award className="h-4 w-4" />
+                  Imprimir certificado
+                </Button>
               )}
               <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2 bg-transparent">
                 <Printer className="h-4 w-4" />

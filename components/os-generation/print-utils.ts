@@ -32,27 +32,18 @@ function getAppStylesheetHtml(): string {
 
 type PrintOptions = {
   page?: "service-order" | "certificate"
-  certificatePaperSize?: CertificatePaperSize
   extraStyle?: string
 }
 
-export type CertificatePaperSize = "a5" | "a4"
-
-function getBaseStyle(
-  page: NonNullable<PrintOptions["page"]>,
-  certificatePaperSize: CertificatePaperSize = "a5",
-): string {
-  const isCertificateA4 = page === "certificate" && certificatePaperSize === "a4"
-  const pageSize = page === "certificate"
-    ? isCertificateA4 ? "A4 landscape" : "A5 landscape"
-    : "A4"
-  const pageMargin = page === "certificate" ? "0" : "5mm"
-  const certificateDimensions = isCertificateA4
-    ? "width: 297mm !important; height: 210mm !important; padding: 8mm !important;"
+function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
+  const pageSize = page === "certificate" ? "landscape" : "A4"
+  const certificateDimensions = page === "certificate"
+    ? "width: 100% !important; height: 100% !important; min-height: 0 !important; padding: 0 !important;"
     : "width: 210mm; height: 148mm; padding: 5mm;"
   return `
-  @page { size: ${pageSize}; margin: ${pageMargin}; }
+  @page { size: ${pageSize}; margin: 5mm; }
   * { box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
   .certificado-a5-page { ${certificateDimensions} margin: 0 auto; }
@@ -65,7 +56,7 @@ function getBaseStyle(
 
 export function buildPrintDocument(bodyHtml: string, title: string, options: PrintOptions = {}): string {
   const origin = typeof window !== "undefined" ? window.location.origin : ""
-  const baseStyle = getBaseStyle(options.page ?? "service-order", options.certificatePaperSize)
+  const baseStyle = getBaseStyle(options.page ?? "service-order")
   return `<!DOCTYPE html>
 <html>
 <head>

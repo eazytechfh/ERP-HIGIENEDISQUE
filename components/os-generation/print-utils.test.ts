@@ -9,7 +9,7 @@ test("keeps service orders on A4 by default", () => {
   assert.match(html, /@page\s*{\s*size:\s*A4;\s*margin:\s*5mm;/)
 })
 
-test("uses A5 landscape as the default page for a certificate print job", () => {
+test("lets the print dialog choose the certificate paper and fills its printable area", () => {
   const html = buildPrintDocument(
     '<div class="certificado-a5-page">Certificado</div>',
     "Certificado",
@@ -18,25 +18,11 @@ test("uses A5 landscape as the default page for a certificate print job", () => 
 
   assert.match(
     html,
-    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*0;/,
+    /@page\s*{\s*size:\s*landscape;\s*margin:\s*5mm;/,
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*width:\s*210mm;[^}]*height:\s*148mm;[^}]*padding:\s*5mm;/s,
+    /\.certificado-a5-page\s*{[^}]*width:\s*100% !important;[^}]*height:\s*100% !important;/s,
   )
-  assert.doesNotMatch(html, /@page certificado/)
-})
-
-test("uses A4 landscape when selected for a certificate print job", () => {
-  const html = buildPrintDocument(
-    '<div class="certificado-a5-page">Certificado</div>',
-    "Certificado",
-    { page: "certificate", certificatePaperSize: "a4" },
-  )
-
-  assert.match(html, /@page\s*{\s*size:\s*A4 landscape;\s*margin:\s*0;/)
-  assert.match(
-    html,
-    /\.certificado-a5-page\s*{[^}]*width:\s*297mm !important;[^}]*height:\s*210mm !important;[^}]*padding:\s*8mm !important;/s,
-  )
+  assert.doesNotMatch(html, /size:\s*A[45]/)
 })
