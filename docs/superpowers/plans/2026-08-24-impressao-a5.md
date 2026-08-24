@@ -4,7 +4,7 @@
 
 **Goal:** Abrir somente o Certificado de Garantia no dialogo de impressao ja dimensionado para papel A5 paisagem, sem ajuste manual de escala.
 
-**Architecture:** Manter OS, recibo, historico e contratos em seus formatos atuais. Alterar exclusivamente a pagina nomeada `certificado` e o componente visual do certificado, reduzindo suas dimensoes fisicas de A4 paisagem para a area util de um A5 paisagem.
+**Architecture:** Manter OS, recibo, historico e contratos em seus formatos atuais. Usar um perfil explicito no job separado do certificado para que seu `@page` padrao seja A5 paisagem, reduzindo o componente visual para a area util correspondente.
 
 **Tech Stack:** Next.js 16, React 19, TypeScript e CSS Paged Media (`@page`, milimetros).
 
@@ -28,7 +28,7 @@
 
 **Interfaces:**
 - Consumes: HTML com a classe `.certificado-a5-page`.
-- Produces: pagina nomeada `certificado` em A5 paisagem, sem alterar a pagina A4 padrao da OS.
+- Produces: perfil `certificate` cujo `@page` padrao e A5 paisagem, sem alterar o perfil A4 padrao da OS.
 
 - [ ] **Step 1: Escrever teste de regressao para OS A4 e certificado A5**
 
@@ -37,11 +37,12 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { buildPrintDocument } from "./print-utils.ts"
 
-test("mantem a OS em A4 e configura somente o certificado em A5 paisagem", () => {
-  const html = buildPrintDocument('<div class="certificado-a5-page">Certificado</div>', "Certificado")
+test("configura o job do certificado em A5 paisagem", () => {
+  const html = buildPrintDocument('<div class="certificado-a5-page">Certificado</div>', "Certificado", {
+    page: "certificate",
+  })
 
-  assert.match(html, /@page\s*{\s*size:\s*A4;\s*margin:\s*5mm;/)
-  assert.match(html, /@page certificado\s*{\s*size:\s*A5 landscape;\s*margin:\s*5mm;/)
+  assert.match(html, /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*5mm;/)
   assert.match(html, /\.certificado-a5-page\s*{[^}]*width:\s*200mm;[^}]*min-height:\s*138mm;/s)
   assert.doesNotMatch(html, /\.certificado-a4-page/)
 })
@@ -51,17 +52,16 @@ test("mantem a OS em A4 e configura somente o certificado em A5 paisagem", () =>
 
 Run: `node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types components/os-generation/print-utils.test.ts`
 
-Expected: FAIL porque a pagina nomeada ainda usa `A4 landscape` e a classe ainda mede `287 x 200 mm`.
+Expected: FAIL porque ainda nao existe um perfil que torne A5 paisagem a pagina padrao do job.
 
 - [ ] **Step 3: Alterar apenas as regras do certificado**
 
-Em `baseStyle`, preservar literalmente as regras da OS e substituir somente as regras do certificado:
+Gerar o tamanho da pagina padrao conforme o perfil do job:
 
 ```css
-@page { size: A4; margin: 5mm; }
-@page certificado { size: A5 landscape; margin: 5mm; }
+@page { size: A5 landscape; margin: 5mm; }
 .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
-.certificado-a5-page { page: certificado; width: 200mm; min-height: 138mm; margin: 0 auto; }
+.certificado-a5-page { width: 200mm; min-height: 138mm; margin: 0 auto; }
 ```
 
 - [ ] **Step 4: Incluir o teste no script do projeto**

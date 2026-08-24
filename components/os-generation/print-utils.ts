@@ -30,21 +30,29 @@ function getAppStylesheetHtml(): string {
   return blocks.join("\n")
 }
 
-const baseStyle = `
-  @page { size: A4; margin: 5mm; }
-  @page certificado { size: A5 landscape; margin: 5mm; }
+type PrintOptions = {
+  page?: "service-order" | "certificate"
+  extraStyle?: string
+}
+
+function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
+  const pageSize = page === "certificate" ? "A5 landscape" : "A4"
+  return `
+  @page { size: ${pageSize}; margin: 5mm; }
   * { box-sizing: border-box; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
-  .certificado-a5-page { page: certificado; width: 200mm; min-height: 138mm; margin: 0 auto; }
+  .certificado-a5-page { width: 200mm; min-height: 138mm; margin: 0 auto; }
   @media print {
     body { margin: 0; padding: 0; }
     .no-print { display: none; }
   }
 `
+}
 
-export function buildPrintDocument(bodyHtml: string, title: string, extraStyle = ""): string {
+export function buildPrintDocument(bodyHtml: string, title: string, options: PrintOptions = {}): string {
   const origin = typeof window !== "undefined" ? window.location.origin : ""
+  const baseStyle = getBaseStyle(options.page ?? "service-order")
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -52,7 +60,7 @@ export function buildPrintDocument(bodyHtml: string, title: string, extraStyle =
   <title>${title}</title>
   <base href="${origin}/" />
   ${getAppStylesheetHtml()}
-  <style>${baseStyle}${extraStyle}</style>
+  <style>${baseStyle}${options.extraStyle ?? ""}</style>
 </head>
 <body>
   ${bodyHtml}
@@ -60,7 +68,7 @@ export function buildPrintDocument(bodyHtml: string, title: string, extraStyle =
 </html>`
 }
 
-export function openPrintWindow(bodyHtml: string, title: string, extraStyle = ""): void {
+export function openPrintWindow(bodyHtml: string, title: string, options: PrintOptions = {}): void {
   const printWindow = window.open("", "_blank")
   if (!printWindow) return
 
@@ -72,7 +80,7 @@ export function openPrintWindow(bodyHtml: string, title: string, extraStyle = ""
     printWindow.print()
   }
 
-  printWindow.document.write(buildPrintDocument(bodyHtml, title, extraStyle))
+  printWindow.document.write(buildPrintDocument(bodyHtml, title, options))
   printWindow.document.close()
 
   // As folhas de estilo (<link>) carregam de forma assincrona; espera o

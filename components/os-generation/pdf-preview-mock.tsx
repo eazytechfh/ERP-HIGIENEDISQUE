@@ -83,7 +83,7 @@ export function PdfPreviewMock({
 
   const handlePrint = () => {
     // Imprime somente a OS (sem o certificado, que tem orientacao landscape
-    // e usa um @page nomeado). Misturar as duas no mesmo job de impressao faz
+    // e usa um perfil de pagina proprio). Misturar as duas no mesmo job faz
     // o navegador aplicar uma unica orientacao a todas as paginas, deixando a
     // OS deitada. O certificado tem seu proprio botao/print job separado.
     if (!osOnlyRef.current) return
@@ -92,7 +92,9 @@ export function PdfPreviewMock({
 
   const handlePrintCertificado = () => {
     if (!certificadoRef.current || !certificadoData) return
-    openPrintWindow(certificadoRef.current.outerHTML, `Certificado ${osNumber}`)
+    openPrintWindow(certificadoRef.current.outerHTML, `Certificado ${osNumber}`, {
+      page: "certificate",
+    })
   }
 
   const defaultDadosTecnicos: DadosTecnicosVetores = dadosTecnicos || {
