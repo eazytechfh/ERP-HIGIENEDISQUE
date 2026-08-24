@@ -37,12 +37,13 @@ type PrintOptions = {
 
 function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   const pageSize = page === "certificate" ? "A5 landscape" : "A4"
+  const pageMargin = page === "certificate" ? "0" : "5mm"
   return `
-  @page { size: ${pageSize}; margin: 5mm; }
+  @page { size: ${pageSize}; margin: ${pageMargin}; }
   * { box-sizing: border-box; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
-  .certificado-a5-page { width: 200mm; min-height: 138mm; margin: 0 auto; }
+  .certificado-a5-page { width: 210mm; height: 148mm; padding: 5mm; margin: 0 auto; }
   @media print {
     body { margin: 0; padding: 0; }
     .no-print { display: none; }

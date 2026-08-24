@@ -75,9 +75,9 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
         ref={ref}
         className="certificado-a5-page bg-white text-black mx-auto"
         style={{
-          width: "200mm",
-          minHeight: "138mm",
-          padding: "0",
+          width: "210mm",
+          height: "148mm",
+          padding: "5mm",
           fontFamily: "Arial, sans-serif",
           fontSize: "11px",
           lineHeight: 1.1,
@@ -213,6 +213,7 @@ CertificadoGarantia.displayName = "CertificadoGarantia"
 
 const sheetTableStyle = {
   width: "100%",
+  height: "100%",
   borderCollapse: "collapse" as const,
   tableLayout: "fixed" as const,
   border: "2px solid #111",

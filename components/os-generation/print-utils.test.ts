@@ -18,11 +18,11 @@ test("uses A5 landscape as the default page for a certificate print job", () => 
 
   assert.match(
     html,
-    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*5mm;/,
+    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*0;/,
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*width:\s*200mm;[^}]*min-height:\s*138mm;/s,
+    /\.certificado-a5-page\s*{[^}]*width:\s*210mm;[^}]*height:\s*148mm;[^}]*padding:\s*5mm;/s,
   )
   assert.doesNotMatch(html, /@page certificado/)
 })
