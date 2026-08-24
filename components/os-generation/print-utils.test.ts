@@ -24,5 +24,9 @@ test("lets the print dialog choose the certificate paper and fills its printable
     html,
     /\.certificado-a5-page\s*{[^}]*width:\s*100% !important;[^}]*height:\s*100% !important;/s,
   )
+  assert.match(
+    html,
+    /\.certificado-a5-page\s*{[^}]*font-size:\s*clamp\(12px,\s*1\.59vw,\s*18px\) !important;/s,
+  )
   assert.doesNotMatch(html, /size:\s*A[45]/)
 })
