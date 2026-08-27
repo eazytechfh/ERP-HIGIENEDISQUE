@@ -36,7 +36,7 @@ type PrintOptions = {
 }
 
 function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
-  const pageSize = page === "certificate" ? "landscape" : "A4"
+  const pageSize = page === "certificate" ? "A5 landscape" : "A4"
   const pageMargin = page === "certificate" ? "0" : "5mm"
   const certificateDimensions = page === "certificate"
     ? "width: min(100%, 141.892vh) !important; height: auto !important; max-height: 100% !important; aspect-ratio: 210 / 148; padding: 4.76vw !important; font-size: 1.51vw !important;"
