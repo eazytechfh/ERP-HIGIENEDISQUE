@@ -37,7 +37,14 @@ type PrintOptions = {
 
 function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   const pageSize = page === "certificate" ? "A5 landscape" : "A4"
-  const pageMargin = page === "certificate" ? "0" : "5mm"
+  // margin: 0 pede pagina sem nenhuma borda (impressao "sangrada"). O driver
+  // "Salvar como PDF" aceita isso de boa, mas quase nenhuma impressora fisica
+  // consegue marcar tinta ate a borda do papel: ela tem uma margem de
+  // hardware fixa (tipicamente 3-5mm) e simplesmente corta o que cai nela -
+  // foi isso que cortou o topo/esquerda do certificado impresso. Uma margem
+  // pequena e nao-zero fica dentro do que praticamente qualquer impressora
+  // consegue imprimir de verdade.
+  const pageMargin = page === "certificate" ? "4mm" : "5mm"
   // vw/vh nao tem um viewport consistente entre motores de impressao: alguns
   // resolvem contra a pagina @page (210mm x 148mm), outros contra a janela de
   // tela do browser que abriu o print (muito maior). Esse descompasso fazia
@@ -45,7 +52,8 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   // ficava do tamanho certo, cortando o certificado a ~1/4 da folha impressa.
   // mm/px sao unidades absolutas: resolvem igual em qualquer viewport, entao
   // usamos exatamente as mesmas dimensoes da folha A5 (@page) sem nenhuma
-  // conta em vw/vh.
+  // conta em vw/vh. max-width/max-height garantem que a folha encolha para
+  // caber dentro da area imprimivel reduzida pela margem acima, sem cortar.
   const certificateDimensions = page === "certificate"
     ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
     : "width: 210mm; height: 148mm; padding: 5mm;"
