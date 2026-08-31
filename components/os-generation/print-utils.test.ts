@@ -48,7 +48,7 @@ test("fits the certificate to a half-letter landscape page", () => {
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*width:\s*100% !important;[^}]*height:\s*calc\(100% - 1mm\) !important;/s,
+    /\.certificado-a5-page\s*{[^}]*width:\s*100% !important;[^}]*height:\s*100% !important;/s,
   )
   assert.match(
     html,
@@ -70,7 +70,7 @@ test("moves only the certificate away from the top and left printer edges", () =
 
   assert.match(
     certificateHtml,
-    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*3mm\);/s,
+    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*5mm\);/s,
   )
   assert.doesNotMatch(serviceOrderHtml, /<body class="certificate-print">/)
 })

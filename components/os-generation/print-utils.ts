@@ -100,7 +100,7 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   // conta em vw/vh. max-width/max-height garantem que a folha encolha para
   // caber dentro da area imprimivel reduzida pela margem acima, sem cortar.
   const certificateDimensions = isHalfLetter
-    ? "width: 100% !important; height: calc(100% - 1mm) !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
+    ? "width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
     : isCertificate
       ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
       : "width: 210mm; height: 148mm; padding: 5mm;"
