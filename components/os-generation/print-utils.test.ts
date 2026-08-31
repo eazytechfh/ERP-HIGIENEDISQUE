@@ -18,7 +18,7 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
 
   assert.match(
     html,
-    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*2mm 4mm 4mm 4mm;/,
+    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*1mm 4mm 4mm 4mm;/,
   )
   assert.match(
     html,
@@ -48,7 +48,7 @@ test("moves only the certificate away from the top and left printer edges", () =
 
   assert.match(
     certificateHtml,
-    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*15mm\);/s,
+    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*0mm\);/s,
   )
   assert.doesNotMatch(serviceOrderHtml, /<body class="certificate-print">/)
 })
