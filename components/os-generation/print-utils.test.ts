@@ -18,7 +18,7 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
 
   assert.match(
     html,
-    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*1mm 4mm 4mm 4mm;/,
+    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*2mm 4mm 4mm 4mm;/,
   )
   assert.match(
     html,
@@ -35,28 +35,6 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   assert.match(html, /<body class="certificate-print">/)
 })
 
-test("fits the certificate to a half-letter landscape page", () => {
-  const html = buildPrintDocument(
-    '<div class="certificado-a5-page">Certificado</div>',
-    "Certificado",
-    { page: "certificate-half-letter" },
-  )
-
-  assert.match(
-    html,
-    /@page\s*{\s*size:\s*215\.9mm 139\.7mm;\s*margin:\s*2mm 4mm 4mm 4mm;/,
-  )
-  assert.match(
-    html,
-    /\.certificado-a5-page\s*{[^}]*width:\s*100% !important;[^}]*height:\s*100% !important;/s,
-  )
-  assert.match(
-    html,
-    /body\.half-letter-certificate-print\s*{[^}]*display:\s*flex;[^}]*align-items:\s*flex-start;[^}]*justify-content:\s*center;[^}]*}/s,
-  )
-  assert.match(html, /<body class="half-letter-certificate-print">/)
-})
-
 test("moves only the certificate away from the top and left printer edges", () => {
   const certificateHtml = buildPrintDocument(
     '<div class="certificado-a5-page">Certificado</div>',
@@ -70,7 +48,7 @@ test("moves only the certificate away from the top and left printer edges", () =
 
   assert.match(
     certificateHtml,
-    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*5mm\);/s,
+    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*15mm\);/s,
   )
   assert.doesNotMatch(serviceOrderHtml, /<body class="certificate-print">/)
 })

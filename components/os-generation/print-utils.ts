@@ -31,7 +31,7 @@ function getAppStylesheetHtml(): string {
 }
 
 type PrintOptions = {
-  page?: "service-order" | "certificate" | "certificate-half-letter"
+  page?: "service-order" | "certificate"
   extraStyle?: string
 }
 
@@ -79,9 +79,7 @@ export function waitForPrintImages(images: Iterable<PrintImage>, timeoutMs = 3_0
 }
 
 function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
-  const isCertificate = page === "certificate" || page === "certificate-half-letter"
-  const isHalfLetter = page === "certificate-half-letter"
-  const pageSize = isHalfLetter ? "215.9mm 139.7mm" : page === "certificate" ? "A5 landscape" : "A4"
+  const pageSize = page === "certificate" ? "A5 landscape" : "A4"
   // margin: 0 pede pagina sem nenhuma borda (impressao "sangrada"). O driver
   // "Salvar como PDF" aceita isso de boa, mas quase nenhuma impressora fisica
   // consegue marcar tinta ate a borda do papel: ela tem uma margem de
@@ -89,7 +87,7 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   // foi isso que cortou o topo/esquerda do certificado impresso. Uma margem
   // pequena e nao-zero fica dentro do que praticamente qualquer impressora
   // consegue imprimir de verdade.
-  const pageMargin = isHalfLetter ? "2mm 4mm 4mm 4mm" : page === "certificate" ? "1mm 4mm 4mm 4mm" : "5mm"
+  const pageMargin = page === "certificate" ? "1mm 4mm 4mm 4mm" : "5mm"
   // vw/vh nao tem um viewport consistente entre motores de impressao: alguns
   // resolvem contra a pagina @page (210mm x 148mm), outros contra a janela de
   // tela do browser que abriu o print (muito maior). Esse descompasso fazia
@@ -99,18 +97,15 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   // usamos exatamente as mesmas dimensoes da folha A5 (@page) sem nenhuma
   // conta em vw/vh. max-width/max-height garantem que a folha encolha para
   // caber dentro da area imprimivel reduzida pela margem acima, sem cortar.
-  const certificateDimensions = isHalfLetter
-    ? "width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
-    : isCertificate
-      ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
-      : "width: 210mm; height: 148mm; padding: 5mm;"
+  const certificateDimensions = page === "certificate"
+    ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
+    : "width: 210mm; height: 148mm; padding: 5mm;"
   return `
   @page { size: ${pageSize}; margin: ${pageMargin}; }
   * { box-sizing: border-box; }
   html, body { width: 100%; height: 100%; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
   body.certificate-print { display: flex; align-items: center; justify-content: center; transform: translate(3mm, 5mm); }
-  body.half-letter-certificate-print { display: flex; align-items: flex-start; justify-content: center; }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
   .certificado-a5-page { ${certificateDimensions} margin: 0 auto; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
   .certificate-company-title, .certificate-client-field { white-space: nowrap; }
@@ -125,11 +120,7 @@ export function buildPrintDocument(bodyHtml: string, title: string, options: Pri
   const origin = typeof window !== "undefined" ? window.location.origin : ""
   const page = options.page ?? "service-order"
   const baseStyle = getBaseStyle(page)
-  const bodyClass = page === "certificate"
-    ? ' class="certificate-print"'
-    : page === "certificate-half-letter"
-      ? ' class="half-letter-certificate-print"'
-      : ""
+  const bodyClass = page === "certificate" ? ' class="certificate-print"' : ""
   return `<!DOCTYPE html>
 <html>
 <head>
