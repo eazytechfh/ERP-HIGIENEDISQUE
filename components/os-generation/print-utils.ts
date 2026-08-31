@@ -38,8 +38,16 @@ type PrintOptions = {
 function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   const pageSize = page === "certificate" ? "A5 landscape" : "A4"
   const pageMargin = page === "certificate" ? "0" : "5mm"
+  // vw/vh nao tem um viewport consistente entre motores de impressao: alguns
+  // resolvem contra a pagina @page (210mm x 148mm), outros contra a janela de
+  // tela do browser que abriu o print (muito maior). Esse descompasso fazia
+  // fonte/padding calculados em vw ficarem enormes enquanto a caixa em si
+  // ficava do tamanho certo, cortando o certificado a ~1/4 da folha impressa.
+  // mm/px sao unidades absolutas: resolvem igual em qualquer viewport, entao
+  // usamos exatamente as mesmas dimensoes da folha A5 (@page) sem nenhuma
+  // conta em vw/vh.
   const certificateDimensions = page === "certificate"
-    ? "width: min(100%, 141.892vh) !important; height: auto !important; max-height: 100% !important; aspect-ratio: 210 / 148; padding: 4.76vw !important; font-size: 1.51vw !important;"
+    ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
     : "width: 210mm; height: 148mm; padding: 5mm;"
   return `
   @page { size: ${pageSize}; margin: ${pageMargin}; }

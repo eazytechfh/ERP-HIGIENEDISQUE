@@ -22,13 +22,13 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*font-size:\s*1\.51vw !important;/s,
+    /\.certificado-a5-page\s*{[^}]*font-size:\s*12px !important;/s,
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*width:\s*min\(100%,\s*141\.892vh\) !important;[^}]*aspect-ratio:\s*210 \/ 148;/s,
+    /\.certificado-a5-page\s*{[^}]*width:\s*210mm !important;[^}]*height:\s*148mm !important;[^}]*max-width:\s*100% !important;[^}]*max-height:\s*100% !important;/s,
   )
-  assert.match(html, /\.certificado-a5-page\s*{[^}]*padding:\s*4\.76vw !important;/s)
+  assert.match(html, /\.certificado-a5-page\s*{[^}]*padding:\s*5mm !important;/s)
   assert.match(html, /body\.certificate-print\s*{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s)
   assert.match(html, /\.certificado-a5-page\s*{[^}]*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;[^}]*overflow:\s*hidden;/s)
   assert.match(html, /\.certificate-company-title,\s*\.certificate-client-field\s*{\s*white-space:\s*nowrap;/s)
