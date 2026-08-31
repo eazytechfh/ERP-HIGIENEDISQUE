@@ -105,7 +105,7 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   * { box-sizing: border-box; }
   html, body { width: 100%; height: 100%; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-  body.certificate-print { display: flex; align-items: center; justify-content: center; transform: translate(3mm, 4mm); }
+  body.certificate-print { display: flex; align-items: center; justify-content: center; transform: translate(3mm, 3.5mm); }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
   .certificado-a5-page { ${certificateDimensions} margin: 0 auto; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
   .certificate-company-title, .certificate-client-field { white-space: nowrap; }
