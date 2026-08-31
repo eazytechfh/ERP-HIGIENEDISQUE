@@ -210,6 +210,44 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
 
 CertificadoGarantia.displayName = "CertificadoGarantia"
 
+const VETORES_POR_PAGINA = 3
+
+// A folha A5 do certificado tem altura fixa (148mm); alem de 3 linhas a
+// tabela nao cabe e o overflow:hidden do CSS de impressao corta o resto
+// silenciosamente. Em vez de truncar dados de um documento com valor legal,
+// dividimos em varias folhas (uma pra cada 3 vetores), repetindo cabecalho,
+// dados do cliente e assinatura em cada uma.
+function chunkVetores(
+  vetores: CertificadoGarantiaVetor[],
+  tamanho: number = VETORES_POR_PAGINA,
+): CertificadoGarantiaVetor[][] {
+  if (vetores.length === 0) return [[]]
+  const paginas: CertificadoGarantiaVetor[][] = []
+  for (let i = 0; i < vetores.length; i += tamanho) {
+    paginas.push(vetores.slice(i, i + tamanho))
+  }
+  return paginas
+}
+
+export const CertificadoGarantiaPaginado = forwardRef<HTMLDivElement, CertificadoGarantiaProps>(
+  ({ data, pageBreakBefore = false }, ref) => {
+    const paginas = chunkVetores(data.vetores)
+    return (
+      <div ref={ref}>
+        {paginas.map((vetoresPagina, index) => (
+          <CertificadoGarantia
+            key={index}
+            data={{ ...data, vetores: vetoresPagina }}
+            pageBreakBefore={index === 0 ? pageBreakBefore : true}
+          />
+        ))}
+      </div>
+    )
+  },
+)
+
+CertificadoGarantiaPaginado.displayName = "CertificadoGarantiaPaginado"
+
 const sheetTableStyle = {
   width: "100%",
   height: "100%",

@@ -8,7 +8,7 @@ import type { OSStatus } from "./os-header-card"
 import { OSDocumentVetores } from "./os-document-vetores"
 import { OSDocumentLimpeza } from "./os-document-limpeza"
 import { OSDocumentDesentupimento } from "./os-document-desentupimento"
-import { CertificadoGarantia, type CertificadoGarantiaData } from "./certificado-garantia"
+import { CertificadoGarantiaPaginado, type CertificadoGarantiaData } from "./certificado-garantia"
 import type { DadosTecnicosVetores } from "./vetores-form"
 import type { DadosTecnicosLimpeza } from "./limpeza-form"
 import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
@@ -92,7 +92,10 @@ export function PdfPreviewMock({
 
   const handlePrintCertificado = () => {
     if (!certificadoRef.current || !certificadoData) return
-    openPrintWindow(certificadoRef.current.outerHTML, `Certificado ${osNumber}`, {
+    // certificadoRef aponta para o wrapper do CertificadoGarantiaPaginado, que
+    // pode conter mais de uma folha .certificado-a5-page (uma por grupo de 3
+    // vetores). innerHTML pega todas as folhas sem embrulhar num <div> extra.
+    openPrintWindow(certificadoRef.current.innerHTML, `Certificado ${osNumber}`, {
       page: "certificate",
     })
   }
@@ -214,7 +217,7 @@ export function PdfPreviewMock({
                 )}
               </div>
               {incluirCertificado && certificadoData ? (
-                <CertificadoGarantia
+                <CertificadoGarantiaPaginado
                   ref={certificadoRef}
                   data={certificadoData}
                   pageBreakBefore
@@ -223,7 +226,7 @@ export function PdfPreviewMock({
             </div>
             {!incluirCertificado && certificadoData ? (
               <div className="hidden">
-                <CertificadoGarantia ref={certificadoRef} data={certificadoData} />
+                <CertificadoGarantiaPaginado ref={certificadoRef} data={certificadoData} />
               </div>
             ) : null}
           </div>
