@@ -48,7 +48,7 @@ test("moves only the certificate away from the top and left printer edges", () =
 
   assert.match(
     certificateHtml,
-    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*3mm\);/s,
+    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*15mm\);/s,
   )
   assert.doesNotMatch(serviceOrderHtml, /<body class="certificate-print">/)
 })
