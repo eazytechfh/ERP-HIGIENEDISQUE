@@ -96,7 +96,7 @@ export function PdfPreviewMock({
     // pode conter mais de uma folha .certificado-a5-page (uma por grupo de 3
     // vetores). innerHTML pega todas as folhas sem embrulhar num <div> extra.
     openPrintWindow(certificadoRef.current.innerHTML, `Certificado ${osNumber}`, {
-      page: "certificate",
+      page: "certificate-half-letter",
     })
   }
 
