@@ -35,6 +35,49 @@ type PrintOptions = {
   extraStyle?: string
 }
 
+type PrintImage = {
+  complete: boolean
+  addEventListener: (type: "load" | "error", listener: () => void, options?: { once?: boolean }) => void
+  removeEventListener: (type: "load" | "error", listener: () => void) => void
+}
+
+export function waitForPrintImages(images: Iterable<PrintImage>, timeoutMs = 3_000): Promise<void> {
+  const pending = Array.from(images).filter((image) => !image.complete)
+  if (pending.length === 0) return Promise.resolve()
+
+  return new Promise((resolve) => {
+    let remaining = pending.length
+    let finished = false
+    const listeners = new Map<PrintImage, () => void>()
+
+    const finish = () => {
+      if (finished) return
+      finished = true
+      clearTimeout(timeout)
+      for (const [image, listener] of listeners) {
+        image.removeEventListener("load", listener)
+        image.removeEventListener("error", listener)
+      }
+      resolve()
+    }
+
+    const timeout = setTimeout(finish, timeoutMs)
+    for (const image of pending) {
+      let imageReady = false
+      const onReady = () => {
+        if (imageReady) return
+        imageReady = true
+        remaining -= 1
+        if (remaining === 0) finish()
+      }
+      listeners.set(image, onReady)
+      image.addEventListener("load", onReady, { once: true })
+      image.addEventListener("error", onReady, { once: true })
+      if (image.complete) onReady()
+    }
+  })
+}
+
 function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   const pageSize = page === "certificate" ? "A5 landscape" : "A4"
   // margin: 0 pede pagina sem nenhuma borda (impressao "sangrada"). O driver
@@ -44,7 +87,7 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   // foi isso que cortou o topo/esquerda do certificado impresso. Uma margem
   // pequena e nao-zero fica dentro do que praticamente qualquer impressora
   // consegue imprimir de verdade.
-  const pageMargin = page === "certificate" ? "4mm" : "5mm"
+  const pageMargin = page === "certificate" ? "1mm 4mm 4mm 4mm" : "5mm"
   // vw/vh nao tem um viewport consistente entre motores de impressao: alguns
   // resolvem contra a pagina @page (210mm x 148mm), outros contra a janela de
   // tela do browser que abriu o print (muito maior). Esse descompasso fazia
@@ -98,9 +141,10 @@ export function openPrintWindow(bodyHtml: string, title: string, options: PrintO
   if (!printWindow) return
 
   let printed = false
-  const triggerPrint = () => {
+  const triggerPrint = async () => {
     if (printed) return
     printed = true
+    await waitForPrintImages(Array.from(printWindow.document.images))
     printWindow.focus()
     printWindow.print()
   }
@@ -108,8 +152,8 @@ export function openPrintWindow(bodyHtml: string, title: string, options: PrintO
   printWindow.document.write(buildPrintDocument(bodyHtml, title, options))
   printWindow.document.close()
 
-  // As folhas de estilo (<link>) carregam de forma assincrona; espera o
-  // evento load antes de imprimir, com um fallback por seguranca.
+  // Espera a janela carregar e, dentro de triggerPrint, aguarda tambem logos
+  // e QR codes. O fallback evita travar se algum recurso nao responder.
   if (printWindow.document.readyState === "complete") {
     triggerPrint()
   } else {

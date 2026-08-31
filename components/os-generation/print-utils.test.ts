@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { buildPrintDocument } from "./print-utils.ts"
+import { buildPrintDocument, waitForPrintImages } from "./print-utils.ts"
 
 test("keeps service orders on A4 by default", () => {
   const html = buildPrintDocument('<div class="os-a4-page">OS</div>', "OS")
@@ -18,7 +18,7 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
 
   assert.match(
     html,
-    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*4mm;/,
+    /@page\s*{\s*size:\s*A5 landscape;\s*margin:\s*2mm 4mm 4mm 4mm;/,
   )
   assert.match(
     html,
@@ -51,4 +51,27 @@ test("moves only the certificate away from the top and left printer edges", () =
     /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*15mm\);/s,
   )
   assert.doesNotMatch(serviceOrderHtml, /<body class="certificate-print">/)
+})
+
+test("waits for a pending logo before allowing the print dialog", async () => {
+  let notifyLoaded: (() => void) | undefined
+  const logo = {
+    complete: false,
+    addEventListener(type: "load" | "error", listener: () => void) {
+      if (type === "load") notifyLoaded = listener
+    },
+    removeEventListener() {},
+  }
+  let ready = false
+
+  const waiting = waitForPrintImages([logo], 1_000).then(() => {
+    ready = true
+  })
+  await Promise.resolve()
+
+  assert.equal(ready, false)
+  assert.ok(notifyLoaded)
+  notifyLoaded()
+  await waiting
+  assert.equal(ready, true)
 })
