@@ -3,6 +3,7 @@
 import { forwardRef } from "react"
 import type { DadosTecnicosVetores, PragaAlvo } from "./vetores-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
+import { getVetoresPrintDensityClass } from "./vetores-print-density"
 
 // Empresa Info (mock - pode vir de configuraÃ§Ãµes do sistema)
 const empresaInfo = {
@@ -146,14 +147,48 @@ const osVetoresA4Styles = `
   .os-a4-page .h-16 {
     height: 48px !important;
   }
+  .os-a4-page.os-vetores-dense {
+    font-size: 12px;
+    line-height: 1.16;
+  }
+  .os-a4-page.os-vetores-dense.p-6 {
+    padding: 12px !important;
+  }
+  .os-a4-page.os-vetores-dense .mb-4 {
+    margin-bottom: 2px !important;
+  }
+  .os-a4-page.os-vetores-dense .p-2 {
+    padding: 2px !important;
+  }
+  .os-a4-page.os-vetores-dense .os-vetores-products th,
+  .os-a4-page.os-vetores-dense .os-vetores-products td {
+    font-size: 9px !important;
+    line-height: 1.08 !important;
+    padding: 1px !important;
+  }
+  .os-a4-page.os-vetores-dense .os-vetores-consumer {
+    font-size: 8.5px !important;
+    line-height: 1.08 !important;
+  }
+  .os-a4-page .os-vetores-signatures {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .os-a4-page.os-vetores-dense .os-vetores-signature-space-primary {
+    margin-top: 10px !important;
+  }
+  .os-a4-page.os-vetores-dense .os-vetores-signature-space-secondary {
+    margin-top: 8px !important;
+  }
 `
 
 export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresProps>(
   ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico, consumos = [], veiculo, showDeclaracaoCupim = false }, ref) => {
+    const densityClass = getVetoresPrintDensityClass(dadosTecnicos.produtos.length)
     return (
       <>
       <style>{osVetoresA4Styles}</style>
-      <div ref={ref} className="os-a4-page bg-white text-black p-6 mx-auto text-[13px] print:text-[13px]" style={{ fontFamily: 'Arial, sans-serif' }}>
+      <div ref={ref} className={`os-a4-page ${densityClass} bg-white text-black p-6 mx-auto text-[13px] print:text-[13px]`} style={{ fontFamily: 'Arial, sans-serif' }}>
         {/* Header */}
         <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-4">
           <div className="flex items-center gap-4">
@@ -318,7 +353,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
           <div className="bg-gray-200 px-2 py-1 font-bold border-b border-black text-[9px]">
             PRODUTOS QUIMICOS E EQUIPAMENTOS EMPREGADOS (INSTRUCOES NO VERSO)
           </div>
-          <table className="w-full text-[9px]">
+          <table className="os-vetores-products w-full text-[9px]">
             <thead>
               <tr className="bg-gray-100">
                 <th className="border-r border-b border-black p-1 text-left">Codigo INEA</th>
@@ -363,7 +398,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
           <div className="bg-gray-200 px-2 py-1 font-bold border-b border-black">
             INFORMACOES AO CONSUMIDOR
           </div>
-          <div className="p-2 text-[9px] leading-tight">
+          <div className="os-vetores-consumer p-2 text-[9px] leading-tight">
             <p>
               A GARANTIA DE ASSISTENCIA TECNICA (GAT) e uma expressao utilizada pelas empresas de
               controle de pragas para definir o prazo de compromisso com o cliente pelos servicos prestados.
@@ -454,16 +489,16 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
           </div>
         )}
         {/* Assinaturas */}
-        <div className="border border-black">
+        <div className="os-vetores-signatures border border-black">
           <div className="grid grid-cols-4 text-[10px]">
             <div className="border-r border-black p-2 text-center">
               <p className="font-bold mb-8">CLIENTE</p>
               <div className="border-t border-black pt-1">
                 <p>Recebi a presente ordem de servico e a relacao</p>
                 <p>de medidas preventivas necessarias em anexo.</p>
-                <div className="border-b border-black" style={{ marginTop: 22 }} />
+                <div className="os-vetores-signature-space-primary border-b border-black" style={{ marginTop: 22 }} />
                 <p className="text-[9px]">Assinatura</p>
-                <div className="border-b border-black" style={{ marginTop: 18 }} />
+                <div className="os-vetores-signature-space-secondary border-b border-black" style={{ marginTop: 18 }} />
                 <p className="text-[9px]">Nome Legivel</p>
               </div>
             </div>
@@ -474,7 +509,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
             </div>
             <div className="border-r border-black p-2 text-center">
               <p className="font-bold mb-2">TECNICO RESPONSAVEL</p>
-              <div className="border-b border-black" style={{ marginTop: 20 }} />
+              <div className="os-vetores-signature-space-primary border-b border-black" style={{ marginTop: 20 }} />
               <p className="mt-1">{tecnicoResponsavel || dadosTecnicos.tecnicoResponsavel || "-"}</p>
               <p className="text-[9px] mt-2">N CRBio - {registroTecnico || dadosTecnicos.registroTecnico || "-"}</p>
             </div>
