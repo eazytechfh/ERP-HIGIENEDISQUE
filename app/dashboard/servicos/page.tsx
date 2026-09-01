@@ -1549,7 +1549,7 @@ export default function ServicosPage() {
     descricaoServico: "",
     produtos: [],
     medidasPreventivas: "",
-    aplicador: "FERNANDO",
+    aplicador: "",
     tecnicoResponsavel: "",
     registroTecnico: ""
   })
@@ -1827,17 +1827,26 @@ export default function ServicosPage() {
   }
 
   const handleToggleResponsavel = (teamId: string) => {
-    setServiceRequest((prev) => {
-      const alreadySelected = prev.schedule.teamIds.includes(teamId)
-      const nextTeamIds = alreadySelected
-        ? prev.schedule.teamIds.filter((id) => id !== teamId)
-        : [...prev.schedule.teamIds, teamId]
+    const alreadySelected = serviceRequest.schedule.teamIds.includes(teamId)
+    const nextTeamIds = alreadySelected
+      ? serviceRequest.schedule.teamIds.filter((id) => id !== teamId)
+      : [...serviceRequest.schedule.teamIds, teamId]
 
-      return {
-        ...prev,
-        schedule: { ...prev.schedule, teamIds: nextTeamIds },
-      }
-    })
+    setServiceRequest((prev) => ({
+      ...prev,
+      schedule: { ...prev.schedule, teamIds: nextTeamIds },
+    }))
+
+    if (isTipoPragas(serviceRequest.serviceType)) {
+      const primeiroResponsavel = nextTeamIds
+        .map((id) => equipesData.find((equipe) => equipe.id === id)?.nome)
+        .find((nome): nome is string => Boolean(nome))
+
+      setDadosTecnicosVetores((dados) => ({
+        ...dados,
+        aplicador: primeiroResponsavel || "",
+      }))
+    }
 
     if (errors["schedule.teamIds"]) {
       setErrors((prev) => ({ ...prev, ["schedule.teamIds"]: "" }))
@@ -3453,8 +3462,7 @@ const handleConfirmarAgendamentoFinal = async () => {
 
                       {isBillingDireto(serviceRequest.billing.mode) && (
                         <>
-                          <button
-                            type="button"
+                          <div
                             onClick={() => handleBillingChange("registerRevenueInCashFlow", !serviceRequest.billing.registerRevenueInCashFlow)}
                             className={`w-full rounded-lg border-2 p-4 space-y-4 text-left transition-colors ${
                               serviceRequest.billing.registerRevenueInCashFlow
@@ -3483,7 +3491,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                             </div>
 
                             {serviceRequest.billing.registerRevenueInCashFlow ? (
-                              <>
+                              <div onClick={(event) => event.stopPropagation()}>
                                 <div className="space-y-2">
                                   <Label>Categoria de receita</Label>
                                   <Select
@@ -3504,13 +3512,12 @@ const handleConfirmarAgendamentoFinal = async () => {
                                   </Select>
                                 </div>
 
-                              </>
+                              </div>
                             ) : null}
-                          </button>
+                          </div>
 
                           {serviceRequest.billing.billingDocument === "recibo" && (
-                            <button
-                              type="button"
+                            <div
                               onClick={() => handleBillingChange("issueReceipt", !serviceRequest.billing.issueReceipt)}
                               className={`w-full rounded-lg border-2 p-4 space-y-1 text-left transition-colors ${
                                 serviceRequest.billing.issueReceipt
@@ -3537,7 +3544,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                                   className={serviceRequest.billing.issueReceipt ? "border-green-500 data-[state=checked]:bg-green-500" : ""}
                                 />
                               </div>
-                            </button>
+                            </div>
                           )}
 
                           {serviceRequest.billing.mode === "adicional" && (

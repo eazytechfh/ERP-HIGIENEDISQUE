@@ -315,13 +315,13 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
           {/* Assinaturas */}
           <div>
-            <div className="grid text-[9px] border-b border-black text-center font-bold" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
+            <div className="grid text-[9px] border-b border-black text-center font-bold" style={{ gridTemplateColumns: "17% 26% 46% 11%" }}>
               <div className="border-r border-black p-1">APLICADOR</div>
               <div className="border-r border-black p-1">TÉCNICO RESPONSÁVEL</div>
               <div className="border-r border-black p-1">CLIENTE</div>
               <div className="p-1">DATA SERVIÇO</div>
             </div>
-            <div className="grid text-[9px] min-h-[85px]" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
+            <div className="grid text-[9px] min-h-[85px]" style={{ gridTemplateColumns: "17% 26% 46% 11%" }}>
               <div className="border-r border-black px-2 text-center flex flex-col">
                 <div className="flex-[3]"></div>
                 <div>
@@ -339,17 +339,17 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
                 </div>
                 <div className="flex-[2]"></div>
               </div>
-              <div className="border-r border-black flex flex-col">
-                <p className="text-[8px] text-center px-2 pt-2">
-                  Recebi a presente ordem de serviço e a relação de medidas preventivas necessárias em anexo.
+              <div className=" border-black flex flex-col">
+                <p className="text-[8px] text-center px-0 pt-2">
+                  Recebi a presente ordem de serviço e a relação de medidas preventivas<br /> necessárias em anexo.
                 </p>
-                <div className="grid grid-cols-2 border-t border-black mt-auto">
-                  <div className="border-r border-black text-center text-[8px] py-1">Nome Legível</div>
-                  <div className="text-center text-[8px] py-1">Assinatura</div>
+                <div className="grid grid-cols-2 border-t border-black  mt-auto  ml-[-1px] mr-[-80px]">
+                  <div className="border-r border-black text-center text-[8px] py-2">Nome Legível</div>
+                  <div className="text-center text-[8px] py-2">Assinatura</div>
                 </div>
               </div>
-              <div className="p-2 text-center flex items-center justify-center">
-                <p className="font-bold text-[14px]">{dataServico}</p>
+              <div className="text-center flex items-start justify-center">
+                <p className="w-full border-b border-l border-black py-1 font-bold text-[12px]">{dataServico}</p>
               </div>
             </div>
           </div>

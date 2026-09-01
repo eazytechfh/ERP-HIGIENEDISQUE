@@ -515,7 +515,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
               </div>
               <div className="p-2 text-center">
                 <p className="font-bold mb-2">APLICADOR</p>
-                <p className="mt-4">{dadosTecnicos.aplicador || "FERNANDO"}</p>
+                <p className="mt-4">{dadosTecnicos.aplicador || "-"}</p>
               </div>
             </div>
           </div>
