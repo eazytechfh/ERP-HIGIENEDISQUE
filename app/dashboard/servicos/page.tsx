@@ -62,7 +62,7 @@ import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
 import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabase/equipe-repo"
 import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
 import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
-import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
+import { listServicosSupabase, reserveNextOsNumberSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 
@@ -1536,7 +1536,9 @@ export default function ServicosPage() {
 
   // Estados para etapa 3 - Geração da OS
   const [osStatus, setOsStatus] = useState<OSStatus>("a_gerar")
-  const [osNumber] = useState("OS-2026-000123")
+  const [osNumber, setOsNumber] = useState("")
+  const reservedOsNumberRef = useRef("")
+  const osNumberReservationRef = useRef<Promise<string> | null>(null)
   const [dataGeracao, setDataGeracao] = useState<string | null>(null)
   const [dadosTecnicosVetores, setDadosTecnicosVetores] = useState<DadosTecnicosVetores>({
     pragasAlvo: ["baratas"],
@@ -1971,12 +1973,34 @@ export default function ServicosPage() {
   }
 
   // Handlers da etapa 3 - OS
-  const handleGerarOS = () => {
-    setOsStatus("gerada")
-    setDataGeracao(new Date().toLocaleDateString('pt-BR'))
-    setToastMessage("OS gerada com sucesso!")
-    setShowToast(true)
-    setTimeout(() => setShowToast(false), 3000)
+  const handleGerarOS = async (): Promise<boolean> => {
+    try {
+      let reservedNumber = reservedOsNumberRef.current
+      if (!reservedNumber) {
+        if (!osNumberReservationRef.current) {
+          osNumberReservationRef.current = reserveNextOsNumberSupabase()
+        }
+        reservedNumber = await osNumberReservationRef.current
+        reservedOsNumberRef.current = reservedNumber
+        setOsNumber(reservedNumber)
+      }
+
+      setOsStatus("gerada")
+      setDataGeracao(new Date().toLocaleDateString('pt-BR'))
+      setToastMessage(`OS ${reservedNumber} gerada com sucesso!`)
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return true
+    } catch (error) {
+      console.error("Falha ao reservar numero da OS", error)
+      setPageError(getErrorMessage(error))
+      setToastMessage("Nao foi possivel reservar o numero da OS.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return false
+    } finally {
+      osNumberReservationRef.current = null
+    }
   }
 
   const handleVisualizarPDF = () => {
@@ -2480,15 +2504,6 @@ export default function ServicosPage() {
     }
   }
 
-  const gerarProximoNumeroOS = () => {
-    const maiorNumero = servicosAgendados.reduce((acc, item) => {
-      const match = item.osNumber.match(/(\d+)$/)
-      const numeroAtual = match ? Number.parseInt(match[1], 10) : 0
-      return Math.max(acc, numeroAtual)
-    }, 0)
-    return `OS-2026-${String(maiorNumero + 1).padStart(6, "0")}`
-  }
-
   const gerarFingerprintAgendamento = () => {
     const clienteId = clienteSelecionado?.id || ""
     const servico = (serviceRequest.serviceName || "").trim().toLowerCase()
@@ -2500,9 +2515,29 @@ export default function ServicosPage() {
     return [clienteId, servico, tipo, data, inicio, fim, localId].join("|")
   }
 
+  const concluirFluxoAgendamento = () => {
+    reservedOsNumberRef.current = ""
+    osNumberReservationRef.current = null
+    setOsNumber("")
+    setOsStatus("a_gerar")
+    setDataGeracao(null)
+    setOsDocumentoHtmlSnapshot("")
+    setCertificadoGerado(false)
+    setCurrentStep(1)
+    setActiveTab("agendados")
+  }
+
 const handleConfirmarAgendamentoFinal = async () => {
     if (isFinalizandoAgendamento) return
     setIsFinalizandoAgendamento(true)
+
+    if (!osNumber) {
+      setToastMessage("A OS ainda nao possui um numero reservado. Gere a OS novamente.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 2500)
+      setIsFinalizandoAgendamento(false)
+      return
+    }
 
     if (!osDocumentoHtmlSnapshot) {
       setToastMessage("A OS ainda esta carregando. Aguarde 1 segundo e clique novamente.")
@@ -2543,14 +2578,14 @@ const handleConfirmarAgendamentoFinal = async () => {
       setShowToast(true)
       setTimeout(() => {
         setShowToast(false)
-        setActiveTab("agendados")
+        concluirFluxoAgendamento()
       }, 2000)
       setIsFinalizandoAgendamento(false)
       return
     }
     const novoServico: ServicoAgendado = {
       id: "",
-      osNumber: gerarProximoNumeroOS(),
+      osNumber,
       cliente: clienteSelecionado?.nome || "Cliente nao informado",
       clienteId: clienteSelecionado?.id,
       servico: serviceRequest.serviceName || "Servico sem nome",
@@ -2610,7 +2645,7 @@ const handleConfirmarAgendamentoFinal = async () => {
         setPageError(`Serviço salvo! Mas a receita NÃO foi registrada no financeiro: ${financeiroErro}`)
         setToastMessage("Serviço salvo. Verifique o aviso sobre o financeiro acima.")
         setShowToast(true)
-        setTimeout(() => { setShowToast(false); setActiveTab("agendados") }, 4000)
+        setTimeout(() => { setShowToast(false); concluirFluxoAgendamento() }, 4000)
       } else if (isTipoPragas(serviceRequest.serviceType) && consumos.length === 0) {
         setToastMessage("Aviso: Voce ainda nao informou produtos utilizados. Isso pode ser preenchido apos a execucao.")
         setShowToast(true)
@@ -2620,7 +2655,7 @@ const handleConfirmarAgendamentoFinal = async () => {
           setShowToast(true)
           setTimeout(() => {
             setShowToast(false)
-            setActiveTab("agendados")
+            concluirFluxoAgendamento()
           }, 2000)
         }, 3000)
       } else {
@@ -2628,7 +2663,7 @@ const handleConfirmarAgendamentoFinal = async () => {
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
-          setActiveTab("agendados")
+          concluirFluxoAgendamento()
         }, 2000)
       }
     } catch (error) {
@@ -2826,7 +2861,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     }
   }, [podeGerarCertificado])
 
-  const handleGerarCertificado = () => {
+  const handleGerarCertificado = async () => {
     if (!certificadoGarantiaData) {
       setToastMessage("Preencha cliente, local e dados do servico antes de gerar o certificado.")
       setShowToast(true)
@@ -2835,8 +2870,8 @@ const handleConfirmarAgendamentoFinal = async () => {
     }
 
     if (osStatus === "a_gerar") {
-      setOsStatus("gerada")
-      setDataGeracao(new Date().toLocaleDateString("pt-BR"))
+      const generated = await handleGerarOS()
+      if (!generated) return
     }
 
     setCertificadoGerado(true)
@@ -4614,10 +4649,10 @@ const handleConfirmarAgendamentoFinal = async () => {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : currentStep === 2 ? (
-              <Button onClick={() => {
-                setCurrentStep(3)
+              <Button onClick={async () => {
                 // Auto-gerar OS ao avançar para etapa 3
-                handleGerarOS()
+                const generated = await handleGerarOS()
+                if (generated) setCurrentStep(3)
               }} className="gap-2">
                 Confirmar Agendamento
                 <ArrowRight className="h-4 w-4" />

@@ -3,6 +3,7 @@
 import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
+import { parseReservedOsNumber } from "@/lib/os-number"
 
 export type ServicoSupabaseItem = {
   id: string
@@ -183,6 +184,16 @@ export async function listServicosSupabase(): Promise<ServicoSupabaseItem[]> {
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToServico)
+}
+
+export async function reserveNextOsNumberSupabase(year = new Date().getFullYear()): Promise<string> {
+  await assertPermissionSupabase("servicos.create", "Voce nao possui permissao para gerar uma OS.")
+
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("reserve_next_os_number", { p_year: year })
+
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
+  return parseReservedOsNumber(data, year)
 }
 
 export async function upsertServicoSupabase(input: ServicoSupabaseInput): Promise<ServicoSupabaseItem> {
