@@ -315,13 +315,13 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
 
           {/* Assinaturas */}
           <div>
-            <div className="grid text-[9px] border-b border-black text-center font-bold" style={{ gridTemplateColumns: "17% 26% 46% 11%" }}>
+            <div className="grid text-[9px] border-b border-black text-center font-bold" style={{ gridTemplateColumns: "13% 26% 46% 15%" }}>
               <div className="border-r border-black p-1">APLICADOR</div>
               <div className="border-r border-black p-1">TÉCNICO RESPONSÁVEL</div>
               <div className="border-r border-black p-1">CLIENTE</div>
               <div className="p-1">DATA SERVIÇO</div>
             </div>
-            <div className="grid text-[9px] min-h-[85px]" style={{ gridTemplateColumns: "17% 26% 46% 11%" }}>
+            <div className="grid text-[9px] min-h-[85px]" style={{ gridTemplateColumns: "13% 26% 46% 15%" }}>
               <div className="border-r border-black px-2 text-center flex flex-col">
                 <div className="flex-[3]"></div>
                 <div>
@@ -343,8 +343,8 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
                 <p className="text-[8px] text-center px-0 pt-2">
                   Recebi a presente ordem de serviço e a relação de medidas preventivas<br /> necessárias em anexo.
                 </p>
-                <div className="grid grid-cols-2 border-t border-black  mt-auto mb-2  ml-[-1px] mr-[-80px]">
-                  <div className="border-r mb-[-9px] border-black text-center text-[8px] py-2">Nome Legível</div>
+                <div className="grid grid-cols-2 border-t border-black  mt-auto mb-2  ml-[-1px] mr-[-108px]">
+                  <div className="border-r mb-[-9px] -mr-[-5px] border-black text-center text-[8px] py-2">Nome Legível</div>
                   <div className="text-center text-[8px] py-2">Assinatura</div>
                 </div>
               </div>
