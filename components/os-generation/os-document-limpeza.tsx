@@ -122,9 +122,9 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
         <div className="border border-black">
           {/* Cabecalho - logo + dados da empresa */}
           <div className="flex items-start justify-between p-1.5 border-b border-black">
-            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="w-28 h-16 object-contain" />
-            <div className="text-[9px] text-right">
-              <p className="font-bold">{empresaInfo.nome}</p>
+            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="w-60 h-28 object-contain" />
+            <div className="text-[11px] text-right">
+              <p className="font-bold text-[18px]">{empresaInfo.nome}</p>
               <p>{empresaInfo.endereco}</p>
               <p>{empresaInfo.cidadeUf}</p>
               <p>Telefones.: {empresaInfo.telefones}</p>
@@ -136,12 +136,12 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
           {/* Titulo do comprovante + numero da OS */}
           <div className="flex items-stretch justify-between border-b border-black">
             <div className="p-1.5">
-              <p className="font-bold text-[14px] leading-tight">COMPROVANTE DE EXECUÇÃO DE SERVIÇOS /</p>
-              <p className="font-bold text-[12px] leading-tight">Limpeza e Higienização de Reservatórios de Água</p>
+              <p className="font-bold text-[19px] leading-tight">COMPROVANTE DE EXECUÇÃO DE SERVIÇOS /</p>
+              <p className="font-bold text-[17px] leading-tight">Limpeza e Higienização de Reservatórios de Água</p>
             </div>
             <div className="border-l border-black p-1.5 text-center min-w-[90px] flex items-center justify-center gap-1">
-              <span className="font-bold text-[11px]">Nº</span>
-              <span className="text-[26px] font-bold leading-none">{osNumber}</span>
+              <span className="font-bold text-[21px] ">Nº</span>
+              <span className="text-[21px] font-bold leading-none">{osNumber}</span>
             </div>
           </div>
 
@@ -176,183 +176,183 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
               INFORMAÇÕES DO CLIENTE
             </div>
             <div className="text-[9px]">
-            <div className="border-b border-black flex">
-              <div className="flex-1 p-1">
-                <span className="font-bold">Razão Social : </span>
-                <span>{cliente.nome}</span>
+              <div className="border-b border-black flex">
+                <div className="flex-1 p-1">
+                  <span className="font-bold">Razão Social : </span>
+                  <span>{cliente.nome}</span>
+                </div>
               </div>
-            </div>
-            <div className="border-b border-black flex">
-              <div className="flex-1 p-1">
-                <span className="font-bold">Nome Fantasia : </span>
-                <span>{cliente.nomeFantasia || "-"}</span>
+              <div className="border-b border-black flex">
+                <div className="flex-1 p-1">
+                  <span className="font-bold">Nome Fantasia : </span>
+                  <span>{cliente.nomeFantasia || "-"}</span>
+                </div>
               </div>
-            </div>
-            <div className="border-b border-black flex">
-              <div className="flex-1 border-r border-black p-1">
-                <span className="font-bold">Tipo Atividade : </span>
-                <span>{cliente.tipoAtividade || "CONDOMINIO"}</span>
+              <div className="border-b border-black flex">
+                <div className="flex-1 border-r border-black p-1">
+                  <span className="font-bold">Tipo Atividade : </span>
+                  <span>{cliente.tipoAtividade || "CONDOMINIO"}</span>
+                </div>
+                <div className="flex-1 p-1">
+                  <span className="font-bold">{getDocumentoLabel(cliente.cpfCnpj)} : </span>
+                  <span>{cliente.cpfCnpj}</span>
+                </div>
               </div>
-              <div className="flex-1 p-1">
-                <span className="font-bold">{getDocumentoLabel(cliente.cpfCnpj)} : </span>
-                <span>{cliente.cpfCnpj}</span>
+              <div className="border-b border-black flex">
+                <div className="flex-1 p-1">
+                  <span className="font-bold">Endereço : </span>
+                  <span>{local.endereco}</span>
+                </div>
               </div>
-            </div>
-            <div className="border-b border-black flex">
-              <div className="flex-1 p-1">
-                <span className="font-bold">Endereço : </span>
-                <span>{local.endereco}</span>
+              <div className="border-b border-black flex">
+                <div className="flex-1 border-r border-black p-1">
+                  <span className="font-bold">Bairro : </span>
+                  <span>{local.bairro}</span>
+                </div>
+                <div className="flex-1 border-r border-black p-1">
+                  <span className="font-bold">Cidade / UF : </span>
+                  <span>{local.cidade}</span>
+                </div>
+                <div className="flex-1 p-1">
+                  <span className="font-bold">C.E.P : </span>
+                  <span>{local.cep}</span>
+                </div>
               </div>
-            </div>
-            <div className="border-b border-black flex">
-              <div className="flex-1 border-r border-black p-1">
-                <span className="font-bold">Bairro : </span>
-                <span>{local.bairro}</span>
+              <div className="border-b border-black flex">
+                <div className="flex-1 border-r border-black p-1">
+                  <span className="font-bold">Telefones : </span>
+                  <span>{cliente.telefone}</span>
+                </div>
+                <div className="flex-1 p-1">
+                  <span className="font-bold">E-Mail : </span>
+                  <span>{cliente.email}</span>
+                </div>
               </div>
-              <div className="flex-1 border-r border-black p-1">
-                <span className="font-bold">Cidade / UF : </span>
-                <span>{local.cidade}</span>
-              </div>
-              <div className="flex-1 p-1">
-                <span className="font-bold">C.E.P : </span>
-                <span>{local.cep}</span>
-              </div>
-            </div>
-            <div className="border-b border-black flex">
-              <div className="flex-1 border-r border-black p-1">
-                <span className="font-bold">Telefones : </span>
-                <span>{cliente.telefone}</span>
-              </div>
-              <div className="flex-1 p-1">
-                <span className="font-bold">E-Mail : </span>
-                <span>{cliente.email}</span>
-              </div>
-            </div>
-            <div className="flex">
-              <div className="flex-1 border-r border-black p-1">
-                <span className="font-bold">Contatos : </span>
-                <span>{cliente.contato || "-"}</span>
-              </div>
-              <div className="flex-1 p-1">
-                <span className="font-bold">Função : </span>
-                <span>{cliente.funcaoContato || "-"}</span>
+              <div className="flex">
+                <div className="flex-1 border-r border-black p-1">
+                  <span className="font-bold">Contatos : </span>
+                  <span>{cliente.contato || "-"}</span>
+                </div>
+                <div className="flex-1 p-1">
+                  <span className="font-bold">Função : </span>
+                  <span>{cliente.funcaoContato || "-"}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Descrição dos Serviços - Tabela de Reservatórios */}
-        <div className="border-b border-black">
-          <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
-            DESCRIÇÃO DOS SERVIÇOS
+          {/* Descrição dos Serviços - Tabela de Reservatórios */}
+          <div className="border-b border-black">
+            <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
+              DESCRIÇÃO DOS SERVIÇOS
+            </div>
+            <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
+              CONDIÇÕES DOS RESERVATÓRIOS DE ÁGUA
+            </div>
+
+            <table className="w-full table-fixed text-[8px] border-collapse">
+              <colgroup>
+                <col style={{ width: "13%" }} />
+                <col style={{ width: "14%" }} />
+                {[1, 2, 3, 4, 5].map(n => <col key={`cc${n}`} style={{ width: "3.93%" }} />)}
+                <col style={{ width: "14%" }} />
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <col key={`xc${n}`} style={{ width: "3.93%" }} />)}
+              </colgroup>
+              <thead>
+                <tr>
+                  <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Tipos Reservatório</th>
+                  <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Cisternas</th>
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <th key={`c${n}`} className="border-r border-b-2 border-black p-0.5 text-center font-bold">{n}</th>
+                  ))}
+                  <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Caixas D' Água</th>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n, i) => (
+                    <th key={`x${n}`} className={`border-b-2 border-black p-0.5 text-center font-bold ${i < 9 ? "border-r" : ""}`}>{n}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Volume (M3) - valor numerico, sem checkbox */}
+                <tr>
+                  <td className="border-r border-b border-black p-0.5 font-bold">Volume (M3)</td>
+                  <td className="border-r border-b border-black p-0.5"></td>
+                  {cisternasPadded.map((r, i) => (
+                    <td key={`cv${i}`} className="border-r border-b border-black p-0.5 text-center">
+                      {r?.volumeM3 || ""}
+                    </td>
+                  ))}
+                  <td className="border-r border-b border-black p-0.5"></td>
+                  {caixasPadded.map((r, i) => (
+                    <td key={`xv${i}`} className={`border-b border-black p-0.5 text-center ${i < caixasPadded.length - 1 ? "border-r" : ""}`}>
+                      {r?.volumeM3 || ""}
+                    </td>
+                  ))}
+                </tr>
+
+                {renderGroupRows("Tipo de Material", materialOptions, (r) => r.tipoMaterial)}
+                {renderGroupRows("Situação em relação ao solo", situacaoOptions, (r) => r.situacaoSolo)}
+                {renderGroupRows("Condições da Cobertura", coberturaOptions, (r) => r.condicaoCobertura)}
+                {renderGroupRows("Presença de Detritos", simNaoOptions, (r) => r.presencaDetritos)}
+                {renderGroupRows("Presença de vetores e outros animais nocivos", simNaoOptions, (r) => r.presencaVetores)}
+                {renderGroupRows("Proximidades de fossas ou rede de esgoto", simNaoOptions, (r) => r.proximidadeFossaEsgoto)}
+                {renderGroupRows("Ocorrência de fendas ou rachaduras", simNaoOptions, (r) => r.ocorrenciaFendasRachaduras)}
+              </tbody>
+            </table>
           </div>
-          <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
-            CONDIÇÕES DOS RESERVATÓRIOS DE ÁGUA
+
+          {/* Aviso Legal */}
+          <div className="border-b border-black p-2 text-[8px] leading-tight text-center">
+            <p>
+              Ficam os estabelecimentos obrigados à execução SEMESTRAL da limpeza e higienização dos reservatórios de água
+              destinados ao consumo humano bem como à realização de análise bacteriológica da água imediatamente após a limpeza.
+            </p>
+            <p>
+              Artigo 3º, Decreto RJ nº 20356, de 17 de agosto de 1994, que regulamenta a Lei RJ nº 1893, de 20 de novembro de 1991, que
+              estabelece obrigatoriedade da limpeza e higienização dos reservatórios de água para fins de manutenção dos padrões de
+              potabilidade.
+            </p>
           </div>
 
-          <table className="w-full table-fixed text-[8px] border-collapse">
-            <colgroup>
-              <col style={{ width: "13%" }} />
-              <col style={{ width: "14%" }} />
-              {[1, 2, 3, 4, 5].map(n => <col key={`cc${n}`} style={{ width: "3.93%" }} />)}
-              <col style={{ width: "14%" }} />
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <col key={`xc${n}`} style={{ width: "3.93%" }} />)}
-            </colgroup>
-            <thead>
-              <tr>
-                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Tipos Reservatório</th>
-                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Cisternas</th>
-                {[1, 2, 3, 4, 5].map(n => (
-                  <th key={`c${n}`} className="border-r border-b-2 border-black p-0.5 text-center font-bold">{n}</th>
-                ))}
-                <th className="border-r border-b-2 border-black p-0.5 text-left font-bold whitespace-nowrap">Caixas D' Água</th>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n, i) => (
-                  <th key={`x${n}`} className={`border-b-2 border-black p-0.5 text-center font-bold ${i < 9 ? "border-r" : ""}`}>{n}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Volume (M3) - valor numerico, sem checkbox */}
-              <tr>
-                <td className="border-r border-b border-black p-0.5 font-bold">Volume (M3)</td>
-                <td className="border-r border-b border-black p-0.5"></td>
-                {cisternasPadded.map((r, i) => (
-                  <td key={`cv${i}`} className="border-r border-b border-black p-0.5 text-center">
-                    {r?.volumeM3 || ""}
-                  </td>
-                ))}
-                <td className="border-r border-b border-black p-0.5"></td>
-                {caixasPadded.map((r, i) => (
-                  <td key={`xv${i}`} className={`border-b border-black p-0.5 text-center ${i < caixasPadded.length - 1 ? "border-r" : ""}`}>
-                    {r?.volumeM3 || ""}
-                  </td>
-                ))}
-              </tr>
-
-              {renderGroupRows("Tipo de Material", materialOptions, (r) => r.tipoMaterial)}
-              {renderGroupRows("Situação em relação ao solo", situacaoOptions, (r) => r.situacaoSolo)}
-              {renderGroupRows("Condições da Cobertura", coberturaOptions, (r) => r.condicaoCobertura)}
-              {renderGroupRows("Presença de Detritos", simNaoOptions, (r) => r.presencaDetritos)}
-              {renderGroupRows("Presença de vetores e outros animais nocivos", simNaoOptions, (r) => r.presencaVetores)}
-              {renderGroupRows("Proximidades de fossas ou rede de esgoto", simNaoOptions, (r) => r.proximidadeFossaEsgoto)}
-              {renderGroupRows("Ocorrência de fendas ou rachaduras", simNaoOptions, (r) => r.ocorrenciaFendasRachaduras)}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Aviso Legal */}
-        <div className="border-b border-black p-2 text-[8px] leading-tight text-center">
-          <p>
-            Ficam os estabelecimentos obrigados à execução SEMESTRAL da limpeza e higienização dos reservatórios de água
-            destinados ao consumo humano bem como à realização de análise bacteriológica da água imediatamente após a limpeza.
-          </p>
-          <p>
-            Artigo 3º, Decreto RJ nº 20356, de 17 de agosto de 1994, que regulamenta a Lei RJ nº 1893, de 20 de novembro de 1991, que
-            estabelece obrigatoriedade da limpeza e higienização dos reservatórios de água para fins de manutenção dos padrões de
-            potabilidade.
-          </p>
-        </div>
-
-        {/* Assinaturas */}
-        <div>
-          <div className="grid text-[9px] border-b border-black text-center font-bold" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
-            <div className="border-r border-black p-1">APLICADOR</div>
-            <div className="border-r border-black p-1">TÉCNICO RESPONSÁVEL</div>
-            <div className="border-r border-black p-1">CLIENTE</div>
-            <div className="p-1">DATA SERVIÇO</div>
-          </div>
-          <div className="grid text-[9px] min-h-[85px]" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
-            <div className="border-r border-black px-2 text-center flex flex-col">
-              <div className="flex-[3]"></div>
-              <div>
-                <div className="border-t border-black w-4/5 mx-auto"></div>
-                <p className="italic mt-0.5">{dadosTecnicos.aplicador || "Eryck Guimaraes"}</p>
+          {/* Assinaturas */}
+          <div>
+            <div className="grid text-[9px] border-b border-black text-center font-bold" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
+              <div className="border-r border-black p-1">APLICADOR</div>
+              <div className="border-r border-black p-1">TÉCNICO RESPONSÁVEL</div>
+              <div className="border-r border-black p-1">CLIENTE</div>
+              <div className="p-1">DATA SERVIÇO</div>
+            </div>
+            <div className="grid text-[9px] min-h-[85px]" style={{ gridTemplateColumns: "17% 29% 41% 13%" }}>
+              <div className="border-r border-black px-2 text-center flex flex-col">
+                <div className="flex-[3]"></div>
+                <div>
+                  <div className="border-t border-black w-4/5 mx-auto"></div>
+                  <p className="italic mt-0.5">{dadosTecnicos.aplicador || "Eryck Guimaraes"}</p>
+                </div>
+                <div className="flex-[2]"></div>
               </div>
-              <div className="flex-[2]"></div>
-            </div>
-            <div className="border-r border-black px-2 text-center flex flex-col">
-              <div className="flex-[3]"></div>
-              <div>
-                <div className="border-t border-black w-4/5 mx-auto"></div>
-                <p className="italic mt-0.5">{dadosTecnicos.tecnicoResponsavel || "-"}</p>
-                <p className="text-[8px]">Nº CRBio - {dadosTecnicos.registroTecnico || "-"}</p>
+              <div className="border-r border-black px-2 text-center flex flex-col">
+                <div className="flex-[3]"></div>
+                <div>
+                  <div className="border-t border-black w-4/5 mx-auto"></div>
+                  <p className="italic mt-0.5">{dadosTecnicos.tecnicoResponsavel || "-"}</p>
+                  <p className="text-[8px]">Nº CRBio - {dadosTecnicos.registroTecnico || "-"}</p>
+                </div>
+                <div className="flex-[2]"></div>
               </div>
-              <div className="flex-[2]"></div>
-            </div>
-            <div className="border-r border-black flex flex-col">
-              <p className="text-[8px] text-center px-2 pt-2">
-                Recebi a presente ordem de serviço e a relação de medidas preventivas necessárias em anexo.
-              </p>
-              <div className="grid grid-cols-2 border-t border-black mt-auto">
-                <div className="border-r border-black text-center text-[8px] py-1">Nome Legível</div>
-                <div className="text-center text-[8px] py-1">Assinatura</div>
+              <div className="border-r border-black flex flex-col">
+                <p className="text-[8px] text-center px-2 pt-2">
+                  Recebi a presente ordem de serviço e a relação de medidas preventivas necessárias em anexo.
+                </p>
+                <div className="grid grid-cols-2 border-t border-black mt-auto">
+                  <div className="border-r border-black text-center text-[8px] py-1">Nome Legível</div>
+                  <div className="text-center text-[8px] py-1">Assinatura</div>
+                </div>
               </div>
-            </div>
-            <div className="p-2 text-center flex items-center justify-center">
-              <p className="font-bold">{dataServico}</p>
+              <div className="p-2 text-center flex items-center justify-center">
+                <p className="font-bold text-[14px]">{dataServico}</p>
+              </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
     )
