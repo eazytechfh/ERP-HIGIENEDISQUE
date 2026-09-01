@@ -491,8 +491,8 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
           {/* Assinaturas */}
           <div className="os-vetores-signatures border border-black">
             <div className="grid grid-cols-4 text-[10px]">
-              <div className="border-r border-black p-2 text-center">
-                <p className="font-bold mb-8">CLIENTE</p>
+              <div className=" border-black  p-2 text-center">
+                <p className="font-bold border-black ">CLIENTE</p>
                 <div className="border-t border-black pt-1">
                   <p>Recebi a presente ordem de servico e a relacao</p>
                   <p>de medidas preventivas necessarias em anexo.</p>
@@ -503,9 +503,8 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
                 </div>
               </div>
               <div className="border-r border-black p-2 text-center">
-                <p className="font-bold mb-2">DATA</p>
-                <p className="font-bold mb-2">SERVICO</p>
-                <p className="text-lg font-bold">{dataServico}</p>
+                <p className="font-bold mb-2 border-l border-black ">DATA SERVICO</p>
+                <p className="text-lg font-bold border-black border-b border-l " >{dataServico}</p>
               </div>
               <div className="border-r border-black p-2 text-center">
                 <p className="font-bold mb-2">TECNICO RESPONSAVEL</p>

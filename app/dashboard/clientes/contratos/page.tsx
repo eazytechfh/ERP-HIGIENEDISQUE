@@ -175,12 +175,11 @@ export default function NovoContratoPage() {
   const tiposServico = [
     "Controle de Pragas",
     "Limpeza de Caixa d'Água",
+    "Limpeza de Cisterna",
     "Desentupimento",
-    "Sanitização",
     "Desratização",
     "Descupinização",
-    "Limpeza de Fossa",
-    "Higienização de Ar-Condicionado"
+    "Limpeza de Fossa"
   ]
 
   const frequencias = [
