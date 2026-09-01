@@ -343,8 +343,8 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
                 <p className="text-[8px] text-center px-0 pt-2">
                   Recebi a presente ordem de serviço e a relação de medidas preventivas<br /> necessárias em anexo.
                 </p>
-                <div className="grid grid-cols-2 border-t border-black  mt-auto  ml-[-1px] mr-[-80px]">
-                  <div className="border-r border-black text-center text-[8px] py-2">Nome Legível</div>
+                <div className="grid grid-cols-2 border-t border-black  mt-auto mb-2  ml-[-1px] mr-[-80px]">
+                  <div className="border-r mb-[-9px] border-black text-center text-[8px] py-2">Nome Legível</div>
                   <div className="text-center text-[8px] py-2">Assinatura</div>
                 </div>
               </div>
