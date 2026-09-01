@@ -490,31 +490,29 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
           )}
           {/* Assinaturas */}
           <div className="os-vetores-signatures border border-black">
-            <div className="grid grid-cols-4 text-[10px]">
-              <div className=" border-black  p-2 text-center">
+            <div className="grid grid-cols-3 text-[10px]">
+              <div className="border-r -mr-20 border-black p-2 text-center">
                 <p className="font-bold border-black ">CLIENTE</p>
                 <div className="border-t border-black pt-1">
-                  <p>Recebi a presente ordem de servico e a relacao</p>
-                  <p>de medidas preventivas necessarias em anexo.</p>
+                  <p>Recebi a presente ordem de serviço e a relação de medidas preventivas necessárias em anexo.</p>
                   <div className="os-vetores-signature-space-primary border-b border-black" style={{ marginTop: 22 }} />
                   <p className="text-[9px]">Assinatura</p>
                   <div className="os-vetores-signature-space-secondary border-b border-black" style={{ marginTop: 18 }} />
                   <p className="text-[9px]">Nome Legivel</p>
                 </div>
               </div>
-              <div className="border-r border-black p-2 text-center">
-                <p className="font-bold mb-2 border-l border-black ">DATA SERVICO</p>
-                <p className="text-lg font-bold border-black border-b border-l " >{dataServico}</p>
+              <div className=" border-black p-2 text-center">
+                <p className="font-bold mb-2 -mr-26 ml-19">TECNICO RESPONSAVEL</p>
+                <div className="os-vetores-signature-space-primary border-b -mr-26 ml-19 border-black" style={{ marginTop: 10 }} />
+                <p className="mt-1 -mr-26 ml-19">{tecnicoResponsavel || dadosTecnicos.tecnicoResponsavel || "-"}</p>
+                <p className="text-[9px] mt-2 ml-19 -mr-26">N CRBio - {registroTecnico || dadosTecnicos.registroTecnico || "-"}</p>
+                <div className="border-t border-black ml-19 -mr-26 mt-7">
+                  <p className="font-bold mt-[10px] text-[17px] whitespace-nowrap">DATA SERVIÇO: {dataServico}</p>
+                </div>
               </div>
-              <div className="border-r border-black p-2 text-center">
-                <p className="font-bold mb-2">TECNICO RESPONSAVEL</p>
-                <div className="os-vetores-signature-space-primary border-b border-black" style={{ marginTop: 20 }} />
-                <p className="mt-1">{tecnicoResponsavel || dadosTecnicos.tecnicoResponsavel || "-"}</p>
-                <p className="text-[9px] mt-2">N CRBio - {registroTecnico || dadosTecnicos.registroTecnico || "-"}</p>
-              </div>
-              <div className="p-2 text-center">
-                <p className="font-bold mb-2">APLICADOR</p>
-                <p className="mt-4">{dadosTecnicos.aplicador || "-"}</p>
+              <div className="p-2 border-l border-black ml-25  text-center">
+                <p className="font-bold mb-2 ">APLICADOR</p>
+                <p className="mt-4 ">{dadosTecnicos.aplicador || "-"}</p>
               </div>
             </div>
           </div>
