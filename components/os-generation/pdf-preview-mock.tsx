@@ -50,6 +50,7 @@ type PdfPreviewMockProps = {
   consumos?: ConsumoItem[]
   veiculo?: string
   mostrarDeclaracaoCupim?: boolean
+  semGarantia?: boolean
   certificadoData?: CertificadoGarantiaData
   incluirCertificado?: boolean
   onCaptureHtml?: (html: string) => void
@@ -68,6 +69,7 @@ export function PdfPreviewMock({
   consumos = [],
   veiculo,
   mostrarDeclaracaoCupim = false,
+  semGarantia = false,
   certificadoData,
   incluirCertificado = false,
   onCaptureHtml,
@@ -203,6 +205,7 @@ export function PdfPreviewMock({
                     dadosTecnicos={defaultDadosTecnicosDesentupimento}
                     dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
                     veiculo={veiculo}
+                    semGarantia={semGarantia}
                   />
                 ) : (
                   <OSDocumentVetores

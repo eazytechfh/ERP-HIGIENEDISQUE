@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react"
 import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
+import { AVISO_SERVICO_SEM_GARANTIA } from "./tipo-os"
 
 // Empresa Info (mock - pode vir de configuracoes do sistema)
 const empresaInfo = {
@@ -41,6 +42,7 @@ type OSDocumentDesentupimentoProps = {
   dadosTecnicos: DadosTecnicosDesentupimento
   dataServico: string
   veiculo?: string
+  semGarantia?: boolean
 }
 
 function getDocumentoLabel(cpfCnpj: string): string {
@@ -62,7 +64,7 @@ function formatarReal(valor: number): string {
 }
 
 export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDesentupimentoProps>(
-  ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo }, ref) => {
+  ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo, semGarantia = false }, ref) => {
     const totalServicos = dadosTecnicos.servicos.reduce((acc, s) => acc + parseValorMonetario(s.valorServico), 0)
     const desconto = parseValorMonetario(dadosTecnicos.desconto)
     const totalPedido = Math.max(0, totalServicos - desconto)
@@ -220,6 +222,12 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
         </table>
 
         <div style={{ fontWeight: 700, marginTop: "2mm", fontSize: "10.5px" }}>Condição de Pagamento : {dadosTecnicos.condicaoPagamento || ""}</div>
+
+        {semGarantia ? (
+          <div style={{ textAlign: "center", fontWeight: 700, marginTop: "4mm", fontSize: "10.5px" }}>
+            {AVISO_SERVICO_SEM_GARANTIA}
+          </div>
+        ) : null}
 
         <div style={{ textAlign: "center", fontWeight: 700, marginTop: "6mm", fontSize: "10.5px" }}>
           Atesto que o técnico esteve neste local, no horário de ______ às ______ horas, executando os serviços descriminados acima

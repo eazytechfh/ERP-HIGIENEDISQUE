@@ -2,6 +2,7 @@
 
 import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { appendLocalClientIds, buildClienteTextSearchFilter, buildLocalAddressSearchFilter } from "./clientes-search"
 import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
 export type ClienteLocalInput = {
@@ -204,10 +205,23 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
 
   const supabase = getSupabaseBrowserClient()
   const selectColumns = params?.columns ?? "*"
-    const countMode = params?.search ? "planned" : "estimated"
-      let query = supabase
+  const countMode = params?.search ? "planned" : "estimated"
+  let localClientIds: string[] = []
+
+  if (params?.search) {
+    const { data: locais, error: locaisError } = await supabase
+      .from("cliente_locais")
+      .select("cliente_id")
+      .or(buildLocalAddressSearchFilter(params.search))
+      .limit(1000)
+
+    if (locaisError) throw new Error(locaisError.message || JSON.stringify(locaisError))
+    localClientIds = (locais || []).map((local: any) => String(local.cliente_id)).filter(Boolean)
+  }
+
+  let query = supabase
     .from("clientes")
-        .select(selectColumns, { count: countMode })
+    .select(selectColumns, { count: countMode })
     .is("deleted_at", null)
     .order("nome", { ascending: true })
     .range(from, to)
@@ -218,9 +232,9 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
     // OR em 4 colunas simultaneamente impede o uso eficiente dos índices trigram.
     const isNumeric = /^[\d\s\-\.\(\)\/]+$/.test(params.search)
     if (isNumeric) {
-      query = query.or(`telefone.ilike.%${term}%,cpf.ilike.%${term}%,cnpj.ilike.%${term}%`)
+      query = query.or(appendLocalClientIds(`telefone.ilike.%${term}%,cpf.ilike.%${term}%,cnpj.ilike.%${term}%`, localClientIds))
     } else {
-      query = query.ilike("nome", `%${term}%`)
+      query = query.or(buildClienteTextSearchFilter(params.search, localClientIds))
     }
   }
 

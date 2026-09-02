@@ -47,6 +47,7 @@ import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/compon
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { DesentupimentoForm, type DadosTecnicosDesentupimento } from "@/components/os-generation/desentupimento-form"
 import { preencherDadosDesentupimento } from "@/components/os-generation/desentupimento-defaults"
+import { classificarTipoOS, servicoSemGarantia } from "@/components/os-generation/tipo-os"
 import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "@/components/os-generation/responsavel-tecnica"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
@@ -1576,7 +1577,9 @@ export default function ServicosPage() {
   })
 
   useEffect(() => {
-    if (currentStep !== 3 || (!isTipoDesentupimento(serviceRequest.serviceType) && !isTipoGordura(serviceRequest.serviceType))) {
+    const tipoAtual = tiposServico.find((tipo) => tipo.id === serviceRequest.serviceType)
+    const tipoOSAtual = classificarTipoOS(tipoAtual?.nome || serviceRequest.serviceName, tipoAtual?.categoria || "outro")
+    if (currentStep !== 3 || tipoOSAtual !== "desentupimento") {
       return
     }
 
@@ -1760,13 +1763,8 @@ export default function ServicosPage() {
   }
 
   const getTipoOS = (): TipoOS => {
-    if (isTipoReservatorioPotavel(serviceRequest.serviceType) || isTipoHigienizacao(serviceRequest.serviceType)) {
-      return "limpeza"
-    }
-    if (isTipoDesentupimento(serviceRequest.serviceType) || isTipoGordura(serviceRequest.serviceType)) {
-      return "desentupimento"
-    }
-    return "vetores"
+    const tipo = getTipoServicoAtual(serviceRequest.serviceType)
+    return classificarTipoOS(tipo?.nome || serviceRequest.serviceName, tipo?.categoria || "outro")
   }
 
   const getWarrantyLabel = () => {
@@ -2722,8 +2720,11 @@ const handleConfirmarAgendamentoFinal = async () => {
 
   const podeGerarCertificado =
     isTipoPragas(serviceRequest.serviceType) ||
-    isTipoHigienizacao(serviceRequest.serviceType) ||
-    isTipoGordura(serviceRequest.serviceType)
+    isTipoHigienizacao(serviceRequest.serviceType)
+
+  const semGarantia = servicoSemGarantia(
+    getTipoServicoAtual(serviceRequest.serviceType)?.nome || serviceRequest.serviceName,
+  )
 
   const certificadoGarantiaData = useMemo<CertificadoGarantiaData | undefined>(() => {
     if (!podeGerarCertificado || !clienteSelecionado) return undefined
@@ -3815,7 +3816,7 @@ const handleConfirmarAgendamentoFinal = async () => {
             {/* CARD 1 - Identificação e Status da OS */}
 <OSHeaderCard
   osNumber={osNumber}
-  osType={getTipoOS() === "limpeza" ? "Limpeza de Reservatorios" : "Vetores (Dedetizacao)"}
+  osType={getTipoOS() === "limpeza" ? "Limpeza de Reservatorios" : getTipoOS() === "desentupimento" ? "Pedido de Servico" : "Vetores (Dedetizacao)"}
   status={osStatus}
               dataGeracao={dataGeracao}
               onGerarOS={handleGerarOS}
@@ -3833,7 +3834,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   Certificado de Garantia
                 </CardTitle>
                 <CardDescription>
-                  Disponivel para servicos de controle de vetores, higienizacao de reservatorios e limpeza de caixa de gordura.
+                  Disponivel para servicos de controle de vetores e higienizacao de reservatorios.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -4005,7 +4006,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                 dados={dadosTecnicosLimpeza}
                 onChange={setDadosTecnicosLimpeza}
               />
-            ) : (isTipoDesentupimento(serviceRequest.serviceType) || isTipoGordura(serviceRequest.serviceType)) ? (
+            ) : getTipoOS() === "desentupimento" ? (
               <DesentupimentoForm
                 dados={dadosTecnicosDesentupimento}
                 onChange={setDadosTecnicosDesentupimento}
@@ -4106,6 +4107,7 @@ const handleConfirmarAgendamentoFinal = async () => {
               consumos={getTipoOS() === "vetores" ? consumos : []}
               veiculo={veiculoSelecionado ? `${veiculoSelecionado.placa} - ${veiculoSelecionado.modelo}` : undefined}
               mostrarDeclaracaoCupim={isServicoCupim}
+              semGarantia={semGarantia}
               certificadoData={certificadoGerado ? certificadoGarantiaData : undefined}
               incluirCertificado={certificadoGerado && salvarCertificadoAgendado}
               onCaptureHtml={setOsDocumentoHtmlSnapshot}
