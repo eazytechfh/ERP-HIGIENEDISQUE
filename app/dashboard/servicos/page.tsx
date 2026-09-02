@@ -47,7 +47,7 @@ import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/compon
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { DesentupimentoForm, type DadosTecnicosDesentupimento } from "@/components/os-generation/desentupimento-form"
 import { preencherDadosDesentupimento } from "@/components/os-generation/desentupimento-defaults"
-import { selecionarTecnicoResponsavel } from "@/components/os-generation/tecnico-responsavel"
+import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "@/components/os-generation/responsavel-tecnica"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
 import { buildPrintDocument, openPrintWindow } from "@/components/os-generation/print-utils"
@@ -1550,25 +1550,15 @@ export default function ServicosPage() {
     produtos: [],
     medidasPreventivas: "",
     aplicador: "",
-    tecnicoResponsavel: "",
-    registroTecnico: ""
+    tecnicoResponsavel: RESPONSAVEL_TECNICA_NOME,
+    registroTecnico: RESPONSAVEL_TECNICA_REGISTRO
   })
   const [dadosTecnicosLimpeza, setDadosTecnicosLimpeza] = useState<DadosTecnicosLimpeza>({
     reservatorios: [],
     aplicador: "Eryck Guimaraes",
-    tecnicoResponsavel: "",
-    registroTecnico: ""
+    tecnicoResponsavel: RESPONSAVEL_TECNICA_NOME,
+    registroTecnico: RESPONSAVEL_TECNICA_REGISTRO
   })
-  const tecnicoResponsavelEquipe = useMemo(
-    () => selecionarTecnicoResponsavel(equipeMembrosData),
-    [equipeMembrosData],
-  )
-
-  useEffect(() => {
-    if (!tecnicoResponsavelEquipe) return
-    setDadosTecnicosVetores((dados) => ({ ...dados, tecnicoResponsavel: tecnicoResponsavelEquipe.nome }))
-    setDadosTecnicosLimpeza((dados) => ({ ...dados, tecnicoResponsavel: tecnicoResponsavelEquipe.nome }))
-  }, [tecnicoResponsavelEquipe])
   const [dadosTecnicosDesentupimento, setDadosTecnicosDesentupimento] = useState<DadosTecnicosDesentupimento>({
     horaServico: "",
     atendente: "",

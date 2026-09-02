@@ -7,26 +7,9 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Droplets, Plus, Trash2 } from "lucide-react"
+import { criarReservatorio, type Reservatorio, type TipoReservatorio } from "./limpeza-defaults"
 
-export type TipoReservatorio = "cisterna" | "caixa_dagua"
-export type TipoMaterial = "concreto" | "polietileno" | "outros"
-export type SituacaoSolo = "elevada" | "apoiada" | "enterrada" | "semi_enterrada"
-export type CondicaoCobertura = "totalmente_coberta" | "parcialmente_coberta"
-export type SimNao = "sim" | "nao"
-
-export type Reservatorio = {
-  id: string
-  tipo: TipoReservatorio
-  numero: number
-  volumeM3: string
-  tipoMaterial: TipoMaterial
-  situacaoSolo: SituacaoSolo
-  condicaoCobertura: CondicaoCobertura
-  presencaDetritos: SimNao
-  presencaVetores: SimNao
-  proximidadeFossaEsgoto: SimNao
-  ocorrenciaFendasRachaduras: SimNao
-}
+export type { Reservatorio, TipoReservatorio } from "./limpeza-defaults"
 
 export type DadosTecnicosLimpeza = {
   reservatorios: Reservatorio[]
@@ -43,19 +26,7 @@ type LimpezaFormProps = {
 export function LimpezaForm({ dados, onChange }: LimpezaFormProps) {
   const handleAddReservatorio = (tipo: TipoReservatorio) => {
     const existentes = dados.reservatorios.filter(r => r.tipo === tipo)
-    const novoReservatorio: Reservatorio = {
-      id: `res-${Date.now()}`,
-      tipo,
-      numero: existentes.length + 1,
-      volumeM3: "",
-      tipoMaterial: "polietileno",
-      situacaoSolo: "elevada",
-      condicaoCobertura: "totalmente_coberta",
-      presencaDetritos: "nao",
-      presencaVetores: "nao",
-      proximidadeFossaEsgoto: "nao",
-      ocorrenciaFendasRachaduras: "nao",
-    }
+    const novoReservatorio = criarReservatorio(tipo, existentes.length + 1, `res-${Date.now()}`)
     onChange({ ...dados, reservatorios: [...dados.reservatorios, novoReservatorio] })
   }
 
@@ -168,21 +139,19 @@ export function LimpezaForm({ dados, onChange }: LimpezaFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tecnicoResponsavel">Tecnico Responsavel</Label>
+              <Label htmlFor="tecnicoResponsavel">Tecnica Responsavel</Label>
               <Input
                 id="tecnicoResponsavel"
                 value={dados.tecnicoResponsavel}
-                onChange={(e) => onChange({ ...dados, tecnicoResponsavel: e.target.value })}
-                placeholder="Nome do tecnico"
+                readOnly
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="registroTecnico">Registro CRBio</Label>
+              <Label htmlFor="registroTecnico">Registro CRMV</Label>
               <Input
                 id="registroTecnico"
                 value={dados.registroTecnico}
-                onChange={(e) => onChange({ ...dados, registroTecnico: e.target.value })}
-                placeholder="Ex: 55953/02 RJ"
+                readOnly
               />
             </div>
           </div>
@@ -223,10 +192,14 @@ function ReservatorioCard({ reservatorio, index, onRemove, onChange }: Reservato
         </Button>
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        Os dados abaixo são opcionais e podem ser preenchidos após a verificação no local.
+      </p>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Volume */}
         <div className="space-y-2">
-          <Label>Volume (M3)</Label>
+          <Label>Volume (m³) — opcional</Label>
           <Input
             value={reservatorio.volumeM3}
             onChange={(e) => onChange("volumeM3", e.target.value)}
@@ -236,7 +209,7 @@ function ReservatorioCard({ reservatorio, index, onRemove, onChange }: Reservato
 
         {/* Tipo de Material */}
         <div className="space-y-2">
-          <Label>Tipo de Material</Label>
+          <Label>Tipo de Material — opcional</Label>
           <RadioGroup
             value={reservatorio.tipoMaterial}
             onValueChange={(value) => onChange("tipoMaterial", value)}
@@ -259,7 +232,7 @@ function ReservatorioCard({ reservatorio, index, onRemove, onChange }: Reservato
 
         {/* Situacao em relacao ao solo */}
         <div className="space-y-2">
-          <Label>Situacao em relacao ao solo</Label>
+          <Label>Situacao em relacao ao solo — opcional</Label>
           <RadioGroup
             value={reservatorio.situacaoSolo}
             onValueChange={(value) => onChange("situacaoSolo", value)}

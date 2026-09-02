@@ -14,6 +14,7 @@ import type { DadosTecnicosLimpeza } from "./limpeza-form"
 import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
 import { openPrintWindow } from "./print-utils"
+import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "./responsavel-tecnica"
 
 type ClienteInfo = {
   nome: string
@@ -107,15 +108,15 @@ export function PdfPreviewMock({
     produtos: [],
     medidasPreventivas: "",
     aplicador: "",
-    tecnicoResponsavel: "",
-    registroTecnico: "",
+    tecnicoResponsavel: RESPONSAVEL_TECNICA_NOME,
+    registroTecnico: RESPONSAVEL_TECNICA_REGISTRO,
   }
 
   const defaultDadosTecnicosLimpeza: DadosTecnicosLimpeza = dadosTecnicosLimpeza || {
     reservatorios: [],
     aplicador: "Eryck Guimaraes",
-    tecnicoResponsavel: "",
-    registroTecnico: "",
+    tecnicoResponsavel: RESPONSAVEL_TECNICA_NOME,
+    registroTecnico: RESPONSAVEL_TECNICA_REGISTRO,
   }
 
   const defaultDadosTecnicosDesentupimento: DadosTecnicosDesentupimento = dadosTecnicosDesentupimento || {

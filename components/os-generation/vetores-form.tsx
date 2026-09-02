@@ -415,21 +415,19 @@ export function VetoresForm({ dados, onChange, produtosDisponiveis = [] }: Vetor
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tecnicoResponsavel">Tecnico Responsavel</Label>
+              <Label htmlFor="tecnicoResponsavel">Tecnica Responsavel</Label>
               <Input
                 id="tecnicoResponsavel"
                 value={dados.tecnicoResponsavel}
-                onChange={(e) => onChange({ ...dados, tecnicoResponsavel: e.target.value })}
-                placeholder="Nome do tecnico"
+                readOnly
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="registroTecnico">Registro/Identificacao</Label>
+              <Label htmlFor="registroTecnico">Registro CRMV</Label>
               <Input
                 id="registroTecnico"
                 value={dados.registroTecnico}
-                onChange={(e) => onChange({ ...dados, registroTecnico: e.target.value })}
-                placeholder="Ex: CRQ-123456"
+                readOnly
               />
             </div>
           </div>
