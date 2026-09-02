@@ -5,6 +5,7 @@ import React from "react"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ErpHeader } from "@/components/erp-header"
+import { TIPOS_SERVICO_CONTRATO } from "@/lib/cadastro-options"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -171,16 +172,6 @@ export default function NovoContratoPage() {
   const [servicosContrato, setServicosContrato] = useState<ServicoContrato[]>([
     { id: "1", tipoServico: "", frequencia: "", limites: "" }
   ])
-
-  const tiposServico = [
-    "Controle de Pragas",
-    "Limpeza de Caixa d'Água",
-    "Limpeza de Cisterna",
-    "Desentupimento",
-    "Desratização",
-    "Descupinização",
-    "Limpeza de Fossa"
-  ]
 
   const frequencias = [
     { value: "mensal", label: "Mensal" },
@@ -946,7 +937,7 @@ export default function NovoContratoPage() {
                             <SelectValue placeholder="Selecione o serviço" />
                           </SelectTrigger>
                           <SelectContent>
-                            {tiposServico.map(tipo => (
+                            {TIPOS_SERVICO_CONTRATO.map(tipo => (
                               <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
                             ))}
                           </SelectContent>

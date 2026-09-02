@@ -1,6 +1,7 @@
 "use client"
 
 import { ErpHeader } from "@/components/erp-header"
+import { TIPOS_AMBIENTE_CLIENTE } from "@/lib/cadastro-options"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1432,12 +1433,9 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                             <SelectValue placeholder="Selecione" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Residencial">Residencial</SelectItem>
-                            <SelectItem value="Condomínio">Condomínio</SelectItem>
-                            <SelectItem value="Empresa">Empresa</SelectItem>
-                            <SelectItem value="Indústria">Indústria</SelectItem>
-                            <SelectItem value="Restaurante">Restaurante</SelectItem>
-                            <SelectItem value="Outro">Outro</SelectItem>
+                            {TIPOS_AMBIENTE_CLIENTE.map((tipo) => (
+                              <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
