@@ -43,6 +43,7 @@ type OSDocumentLimpezaProps = {
   dadosTecnicos: DadosTecnicosLimpeza
   dataServico: string
   veiculo?: string
+  descricaoServico?: string
 }
 
 function getDocumentoLabel(cpfCnpj: string): string {
@@ -75,7 +76,7 @@ const simNaoOptions: { value: string; label: string }[] = [
 ]
 
 export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaProps>(
-  ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo }, ref) => {
+  ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo, descricaoServico = "" }, ref) => {
     const cisternas = dadosTecnicos.reservatorios.filter(r => r.tipo === "cisterna")
     const caixasDagua = dadosTecnicos.reservatorios.filter(r => r.tipo === "caixa_dagua")
 
@@ -246,6 +247,11 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
             <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
               DESCRIÇÃO DOS SERVIÇOS
             </div>
+            {descricaoServico.trim() ? (
+              <div className="border-b border-black px-2 py-1 text-[9px] whitespace-pre-wrap">
+                {descricaoServico.trim()}
+              </div>
+            ) : null}
             <div className="px-2 py-0.5 font-bold border-b border-black text-[9px] text-center">
               CONDIÇÕES DOS RESERVATÓRIOS DE ÁGUA
             </div>

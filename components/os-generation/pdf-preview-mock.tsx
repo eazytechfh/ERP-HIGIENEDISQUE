@@ -49,6 +49,7 @@ type PdfPreviewMockProps = {
   dataServico?: string
   consumos?: ConsumoItem[]
   veiculo?: string
+  descricaoServico?: string
   mostrarDeclaracaoCupim?: boolean
   semGarantia?: boolean
   certificadoData?: CertificadoGarantiaData
@@ -68,6 +69,7 @@ export function PdfPreviewMock({
   dataServico,
   consumos = [],
   veiculo,
+  descricaoServico = "",
   mostrarDeclaracaoCupim = false,
   semGarantia = false,
   certificadoData,
@@ -82,7 +84,7 @@ export function PdfPreviewMock({
   useEffect(() => {
     if (!onCaptureHtml || !isGenerated || !printRef.current) return
     onCaptureHtml(printRef.current.innerHTML)
-  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dadosTecnicosDesentupimento, dataServico, consumos, veiculo, mostrarDeclaracaoCupim, certificadoData, incluirCertificado])
+  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dadosTecnicosDesentupimento, dataServico, consumos, veiculo, descricaoServico, mostrarDeclaracaoCupim, certificadoData, incluirCertificado])
 
   const handlePrint = () => {
     // Imprime somente a OS (sem o certificado, que tem orientacao landscape
@@ -196,6 +198,7 @@ export function PdfPreviewMock({
                     dadosTecnicos={defaultDadosTecnicosLimpeza}
                     dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
                     veiculo={veiculo}
+                    descricaoServico={descricaoServico}
                   />
                 ) : tipoOS === "desentupimento" ? (
                   <OSDocumentDesentupimento
@@ -206,6 +209,7 @@ export function PdfPreviewMock({
                     dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
                     veiculo={veiculo}
                     semGarantia={semGarantia}
+                    descricaoServico={descricaoServico}
                   />
                 ) : (
                   <OSDocumentVetores
@@ -217,6 +221,7 @@ export function PdfPreviewMock({
                     consumos={consumos}
                     veiculo={veiculo}
                     showDeclaracaoCupim={mostrarDeclaracaoCupim}
+                    descricaoServico={descricaoServico}
                   />
                 )}
               </div>

@@ -64,6 +64,7 @@ type OSDocumentVetoresProps = {
   consumos?: ConsumoItem[]
   veiculo?: string
   showDeclaracaoCupim?: boolean
+  descricaoServico?: string
 }
 
 const osVetoresA4Styles = `
@@ -183,7 +184,7 @@ const osVetoresA4Styles = `
 `
 
 export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresProps>(
-  ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico, consumos = [], veiculo, showDeclaracaoCupim = false }, ref) => {
+  ({ osNumber, cliente, local, dadosTecnicos, dataServico, tecnicoResponsavel, registroTecnico, consumos = [], veiculo, showDeclaracaoCupim = false, descricaoServico = "" }, ref) => {
     const densityClass = getVetoresPrintDensityClass(dadosTecnicos.produtos.length)
     return (
       <>
@@ -344,7 +345,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
               DESCRICAO DOS SERVICOS
             </div>
             <div className="p-2 min-h-[40px] text-[10px]">
-              {dadosTecnicos.descricaoServico || "-"}
+              {dadosTecnicos.descricaoServico.trim() || descricaoServico.trim() || "-"}
             </div>
           </div>
 

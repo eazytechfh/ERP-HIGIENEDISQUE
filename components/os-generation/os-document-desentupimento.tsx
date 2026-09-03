@@ -43,6 +43,7 @@ type OSDocumentDesentupimentoProps = {
   dataServico: string
   veiculo?: string
   semGarantia?: boolean
+  descricaoServico?: string
 }
 
 function getDocumentoLabel(cpfCnpj: string): string {
@@ -64,7 +65,7 @@ function formatarReal(valor: number): string {
 }
 
 export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDesentupimentoProps>(
-  ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo, semGarantia = false }, ref) => {
+  ({ osNumber, cliente, local, dadosTecnicos, dataServico, veiculo, semGarantia = false, descricaoServico = "" }, ref) => {
     const totalServicos = dadosTecnicos.servicos.reduce((acc, s) => acc + parseValorMonetario(s.valorServico), 0)
     const desconto = parseValorMonetario(dadosTecnicos.desconto)
     const totalPedido = Math.max(0, totalServicos - desconto)
@@ -156,7 +157,7 @@ export const OSDocumentDesentupimento = forwardRef<HTMLDivElement, OSDocumentDes
                     <Campo label="Origem" value={dadosTecnicos.origem} align="right" />
                   </Linha>
                   <Campo label="Referência" value={dadosTecnicos.referencia} />
-                  <Campo label="Observações" value={dadosTecnicos.observacoes} />
+                  <Campo label="Observações" value={dadosTecnicos.observacoes.trim() || descricaoServico.trim()} />
                   {veiculo && <Campo label="Veículo associado" value={veiculo} />}
                 </div>
               </td>
