@@ -4209,7 +4209,7 @@ const handleConfirmarAgendamentoFinal = async () => {
               dataServico={serviceRequest.schedule.date ? formatDateOnlyBR(serviceRequest.schedule.date) : undefined}
               consumos={getTipoOS() === "vetores" ? consumos : []}
               veiculo={veiculoSelecionado ? `${veiculoSelecionado.placa} - ${veiculoSelecionado.modelo}` : undefined}
-              descricaoServico={serviceRequest.notes}
+              descricaoServico={serviceRequest.notes.trim() || serviceRequest.serviceName.trim()}
               mostrarDeclaracaoCupim={isServicoCupim}
               semGarantia={semGarantia}
               certificadoData={certificadoGerado ? certificadoGarantiaData : undefined}
