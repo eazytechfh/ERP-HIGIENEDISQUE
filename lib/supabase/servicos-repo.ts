@@ -3,6 +3,7 @@
 import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
+import { parseReservedOsNumber } from "@/lib/os-number"
 
 export type ServicoSupabaseItem = {
   id: string
@@ -21,6 +22,7 @@ export type ServicoSupabaseItem = {
   baixaObservacao: string
   osFingerprint: string
   osDocumentoHtml: string
+  osFormData: Record<string, unknown> | null
   responsavelBaixa: string
   osAssinadaNome: string
   osAssinadaMimeType: string
@@ -54,6 +56,7 @@ export type ServicoSupabaseInput = {
   baixaObservacao?: string
   osFingerprint?: string
   osDocumentoHtml?: string
+  osFormData?: Record<string, unknown> | null
   responsavelBaixa?: string
   osAssinadaNome?: string
   osAssinadaMimeType?: string
@@ -88,6 +91,7 @@ function mapDbToServico(row: any): ServicoSupabaseItem {
     baixaObservacao: row.baixa_observacao || "",
     osFingerprint: row.os_fingerprint || "",
     osDocumentoHtml: row.os_documento_html || "",
+    osFormData: row.os_form_data && typeof row.os_form_data === "object" ? row.os_form_data : null,
     responsavelBaixa: row.responsavel_baixa || "",
     osAssinadaNome: row.os_assinada_nome || "",
     osAssinadaMimeType: row.os_assinada_mime_type || "",
@@ -123,6 +127,7 @@ function mapServicoToDb(input: ServicoSupabaseInput) {
     baixa_observacao: input.baixaObservacao || null,
     os_fingerprint: input.osFingerprint || null,
     os_documento_html: input.osDocumentoHtml || null,
+    os_form_data: input.osFormData || null,
     responsavel_baixa: input.responsavelBaixa || null,
     os_assinada_nome: input.osAssinadaNome || null,
     os_assinada_mime_type: input.osAssinadaMimeType || null,
@@ -183,6 +188,16 @@ export async function listServicosSupabase(): Promise<ServicoSupabaseItem[]> {
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToServico)
+}
+
+export async function reserveNextOsNumberSupabase(year = new Date().getFullYear()): Promise<string> {
+  await assertPermissionSupabase("servicos.create", "Voce nao possui permissao para gerar uma OS.")
+
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("reserve_next_os_number", { p_year: year })
+
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
+  return parseReservedOsNumber(data, year)
 }
 
 export async function upsertServicoSupabase(input: ServicoSupabaseInput): Promise<ServicoSupabaseItem> {

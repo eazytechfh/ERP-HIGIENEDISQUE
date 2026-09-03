@@ -2,11 +2,15 @@
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.6.0"
+  },
   "scripts": {
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types lib/date-only.test.ts lib/os-number.test.ts lib/cadastro-options.test.ts lib/supabase/clientes-search.test.ts components/os-generation/print-utils.test.ts components/os-generation/desentupimento-defaults.test.ts components/os-generation/tecnico-responsavel.test.ts components/os-generation/responsavel-tecnica.test.ts components/os-generation/limpeza-defaults.test.ts components/os-generation/tipo-os.test.ts components/os-generation/vetores-print-density.test.ts components/contratos/dias-vencimento.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -60,7 +64,7 @@
     "sonner": "^1.7.4",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
-    "vaul": "^0.9.9",
+    "vaul": "^1.1.2",
     "zod": "3.25.76"
   },
   "devDependencies": {

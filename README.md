@@ -134,6 +134,24 @@ O sistema usa permissões customizadas em `profiles.permissions` (array de strin
 
 ## Histórico de alterações
 
+### 2026-07-08 — Certificado de garantia na geração de OS
+
+**Problema identificado:** Serviços de controle de vetores precisavam emitir certificado de garantia separado da OS, com possibilidade de impressão imediata e registro junto aos serviços agendados.
+
+**Alterações realizadas:**
+
+| Arquivo | O que mudou |
+|---|---|
+| `components/os-generation/certificado-garantia.tsx` | Novo modelo visual do Certificado de Garantia em A4 paisagem, com logo/QR e dados extraídos do PDF de referência |
+| `components/os-generation/pdf-preview-mock.tsx` | Preview da OS agora pode anexar/imprimir certificado como documento adicional |
+| `public/images/higiene-disque-certificado-logo-qr.png` | Arte de cabeçalho do certificado com logo e QR Code |
+| `app/dashboard/servicos/page.tsx` | Fluxo de geração ganhou botão de certificado, switch para salvar em serviços agendados e cálculo de garantia/vencimento por vetor |
+
+**Cuidados para futuras alterações nesta área:**
+- O certificado é salvo junto ao HTML da OS quando a opção de salvar está ativa; não foi criada coluna nova no banco nesta etapa.
+- O modelo é aplicado apenas a serviços de controle de vetores (`serviceType === "pragas"`).
+- Se o certificado precisar de ciclo próprio de auditoria/arquivo, criar migration nova em vez de editar migrations antigas.
+
 ### 2026-06-16 — Auditoria e otimizações de performance (Fase 1 e 2)
 
 **Problema identificado:** Dashboard abria 7 queries paralelas carregando centenas de registros sem limite. Queries sequenciais desnecessárias. Métricas de clientes faziam 4 round-trips ao banco para retornar 4 números.

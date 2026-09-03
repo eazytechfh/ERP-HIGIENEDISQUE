@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { findLocalTestUser } from "@/lib/local-test-users"
-import { Eye, EyeOff, Shield } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 import { isApiMode } from "@/lib/runtime-config"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { withTimeout } from "@/lib/with-timeout"
@@ -79,8 +79,7 @@ export function LoginForm() {
     <div className="space-y-6">
       <div className="space-y-2 text-center lg:text-left">
         <div className="flex items-center gap-2 mb-4 justify-center lg:justify-start">
-          <Shield className="h-8 w-8 text-primary" />
-          <h1 className="text-2xl font-bold">HIGIENE DISQUE</h1>
+          <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="h-12 w-auto" />
         </div>
         <h2 className="text-3xl font-bold tracking-tight text-balance">Bem-vindo de volta</h2>
         <p className="text-muted-foreground">Acesse sua conta para gerenciar seus servicos</p>

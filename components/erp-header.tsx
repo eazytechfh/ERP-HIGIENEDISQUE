@@ -47,11 +47,8 @@ export function ErpHeader() {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <span className="text-lg font-bold text-primary-foreground">HD</span>
-            </div>
+            <img src="/images/higiene-disque-logo.png" alt="Higiene Disque" className="h-9 w-auto" />
             <div className="hidden md:block">
-              <h1 className="text-xl font-bold text-foreground">HIGIENE DISQUE</h1>
               <p className="text-xs text-muted-foreground">
                 Sistema ERP{profile ? ` | ${profile.nome || profile.role}` : ""}
               </p>

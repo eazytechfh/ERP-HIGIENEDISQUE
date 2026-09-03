@@ -2,14 +2,19 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, AlertCircle, Printer } from "lucide-react"
+import { Award, FileText, AlertCircle, Printer } from "lucide-react"
 import { useEffect, useRef } from "react"
 import type { OSStatus } from "./os-header-card"
 import { OSDocumentVetores } from "./os-document-vetores"
 import { OSDocumentLimpeza } from "./os-document-limpeza"
+import { OSDocumentDesentupimento } from "./os-document-desentupimento"
+import { CertificadoGarantiaPaginado, type CertificadoGarantiaData } from "./certificado-garantia"
 import type { DadosTecnicosVetores } from "./vetores-form"
 import type { DadosTecnicosLimpeza } from "./limpeza-form"
+import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
+import { openPrintWindow } from "./print-utils"
+import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "./responsavel-tecnica"
 
 type ClienteInfo = {
   nome: string
@@ -30,7 +35,7 @@ type LocalInfo = {
   cep: string
 }
 
-export type TipoOS = "vetores" | "limpeza"
+export type TipoOS = "vetores" | "limpeza" | "desentupimento"
 
 type PdfPreviewMockProps = {
   status: OSStatus
@@ -40,10 +45,15 @@ type PdfPreviewMockProps = {
   local?: LocalInfo
   dadosTecnicos?: DadosTecnicosVetores
   dadosTecnicosLimpeza?: DadosTecnicosLimpeza
+  dadosTecnicosDesentupimento?: DadosTecnicosDesentupimento
   dataServico?: string
   consumos?: ConsumoItem[]
   veiculo?: string
+  descricaoServico?: string
   mostrarDeclaracaoCupim?: boolean
+  semGarantia?: boolean
+  certificadoData?: CertificadoGarantiaData
+  incluirCertificado?: boolean
   onCaptureHtml?: (html: string) => void
 }
 
@@ -55,119 +65,44 @@ export function PdfPreviewMock({
   local,
   dadosTecnicos,
   dadosTecnicosLimpeza,
+  dadosTecnicosDesentupimento,
   dataServico,
   consumos = [],
   veiculo,
+  descricaoServico = "",
   mostrarDeclaracaoCupim = false,
+  semGarantia = false,
+  certificadoData,
+  incluirCertificado = false,
   onCaptureHtml,
 }: PdfPreviewMockProps) {
   const printRef = useRef<HTMLDivElement>(null)
+  const osOnlyRef = useRef<HTMLDivElement>(null)
+  const certificadoRef = useRef<HTMLDivElement>(null)
   const isGenerated = status !== "a_gerar"
 
   useEffect(() => {
     if (!onCaptureHtml || !isGenerated || !printRef.current) return
     onCaptureHtml(printRef.current.innerHTML)
-  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dataServico, consumos, veiculo, mostrarDeclaracaoCupim])
+  }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dadosTecnicosDesentupimento, dataServico, consumos, veiculo, descricaoServico, mostrarDeclaracaoCupim, certificadoData, incluirCertificado])
 
   const handlePrint = () => {
-    if (!printRef.current) return
+    // Imprime somente a OS (sem o certificado, que tem orientacao landscape
+    // e usa um perfil de pagina proprio). Misturar as duas no mesmo job faz
+    // o navegador aplicar uma unica orientacao a todas as paginas, deixando a
+    // OS deitada. O certificado tem seu proprio botao/print job separado.
+    if (!osOnlyRef.current) return
+    openPrintWindow(osOnlyRef.current.innerHTML, `OS ${osNumber}`)
+  }
 
-    const printContent = printRef.current.innerHTML
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) return
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>OS ${osNumber}</title>
-        <base href="${window.location.origin}/" />
-        <style>
-          @page { size: A4; margin: 5mm; }
-          body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 13px; }
-          * { box-sizing: border-box; }
-          .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; font-size: 13px; line-height: 1.24; }
-          .bg-green-600 { background-color: #16a34a; }
-          .bg-gray-200 { background-color: #e5e7eb; }
-          .bg-gray-100 { background-color: #f3f4f6; }
-          .bg-black { background-color: #000; }
-          .text-white { color: #fff; }
-          .text-green-700 { color: #15803d; }
-          .text-red-600 { color: #dc2626; }
-          .text-gray-500 { color: #6b7280; }
-          .font-bold { font-weight: bold; }
-          .text-xs { font-size: 12px; }
-          .text-lg { font-size: 20px; }
-          .text-sm { font-size: 13px; }
-          .text-\[8px\] { font-size: 10px; }
-          .text-\[9px\] { font-size: 11px; }
-          .text-\[10px\] { font-size: 12px; }
-          .text-\[11px\] { font-size: 13px; }
-          .text-\[13px\] { font-size: 13px; }
-          .border { border: 1px solid #000; }
-          .border-black { border-color: #000; }
-          .border-t { border-top: 1px solid #000; }
-          .border-r { border-right: 1px solid #000; }
-          .border-b { border-bottom: 1px solid #000; }
-          .border-2 { border-width: 2px; }
-          .rounded { border-radius: 0.25rem; }
-          .p-1 { padding: 0.15rem; }
-          .p-2 { padding: 0.25rem; }
-          .p-5 { padding: 0.75rem; }
-          .p-6 { padding: 1rem; }
-          .p-8 { padding: 1rem; }
-          .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-          .py-1 { padding-top: 0.1rem; padding-bottom: 0.1rem; }
-          .py-2 { padding-top: 0.15rem; padding-bottom: 0.15rem; }
-          .mb-4 { margin-bottom: 0.35rem; }
-          .mt-1 { margin-top: 0.15rem; }
-          .mt-2 { margin-top: 0.2rem; }
-          .mt-4 { margin-top: 0.3rem; }
-          .mb-2 { margin-bottom: 0.2rem; }
-          .mb-8 { margin-bottom: 0.4rem; }
-          .gap-2 { gap: 0.5rem; }
-          .gap-4 { gap: 1rem; }
-          .gap-8 { gap: 2rem; }
-          .flex { display: flex; }
-          .flex-wrap { flex-wrap: wrap; }
-          .grid { display: grid; }
-          .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
-          .grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
-          .items-center { align-items: center; }
-          .items-start { align-items: flex-start; }
-          .justify-center { justify-content: center; }
-          .justify-between { justify-content: space-between; }
-          .text-center { text-align: center; }
-          .text-left { text-align: left; }
-          .text-right { text-align: right; }
-          .w-full { width: 100%; }
-          .w-4 { width: 1rem; }
-          .w-24 { width: 5rem; }
-          .w-1\/4 { width: 25%; }
-          .h-4 { height: 1rem; }
-          .h-16 { height: 3rem; }
-          .min-h-\[40px\] { min-height: 18px; }
-          .min-h-\[60px\] { min-height: 24px; }
-          .inline-flex { display: inline-flex; }
-          .leading-tight { line-height: 1.15; }
-          .align-top { vertical-align: top; }
-          .space-y-1 > * + * { margin-top: 0.15rem; }
-          p { margin: 0; }
-          table { border-collapse: collapse; width: 100%; font-size: 11px; }
-          th, td { line-height: 1.22; }
-          @media print {
-            body { margin: 0; padding: 0; }
-            .no-print { display: none; }
-          }
-        </style>
-      </head>
-      <body>
-        ${printContent}
-      </body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.print()
+  const handlePrintCertificado = () => {
+    if (!certificadoRef.current || !certificadoData) return
+    // certificadoRef aponta para o wrapper do CertificadoGarantiaPaginado, que
+    // pode conter mais de uma folha .certificado-a5-page (uma por grupo de 3
+    // vetores). innerHTML pega todas as folhas sem embrulhar num <div> extra.
+    openPrintWindow(certificadoRef.current.innerHTML, `Certificado ${osNumber}`, {
+      page: "certificate",
+    })
   }
 
   const defaultDadosTecnicos: DadosTecnicosVetores = dadosTecnicos || {
@@ -177,15 +112,31 @@ export function PdfPreviewMock({
     produtos: [],
     medidasPreventivas: "",
     aplicador: "",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ",
+    tecnicoResponsavel: RESPONSAVEL_TECNICA_NOME,
+    registroTecnico: RESPONSAVEL_TECNICA_REGISTRO,
   }
 
   const defaultDadosTecnicosLimpeza: DadosTecnicosLimpeza = dadosTecnicosLimpeza || {
     reservatorios: [],
     aplicador: "Eryck Guimaraes",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ",
+    tecnicoResponsavel: RESPONSAVEL_TECNICA_NOME,
+    registroTecnico: RESPONSAVEL_TECNICA_REGISTRO,
+  }
+
+  const defaultDadosTecnicosDesentupimento: DadosTecnicosDesentupimento = dadosTecnicosDesentupimento || {
+    horaServico: "",
+    atendente: "",
+    tecnico: "",
+    vendedor: "",
+    inscricao: "",
+    homePage: "",
+    contatos: "",
+    origem: "",
+    referencia: "",
+    observacoes: "",
+    servicos: [],
+    desconto: "",
+    condicaoPagamento: "",
   }
 
   const defaultCliente: ClienteInfo = cliente || {
@@ -203,7 +154,12 @@ export function PdfPreviewMock({
     cep: "",
   }
 
-  const tipoOSLabel = tipoOS === "limpeza" ? "Limpeza de Reservatorios" : "Vetores (Dedetizacao)"
+  const tipoOSLabel =
+    tipoOS === "limpeza"
+      ? "Limpeza de Reservatorios"
+      : tipoOS === "desentupimento"
+        ? "Desentupimento"
+        : "Vetores (Dedetizacao)"
 
   return (
     <Card>
@@ -215,6 +171,12 @@ export function PdfPreviewMock({
           </CardTitle>
           {isGenerated && (
             <div className="flex gap-2">
+              {certificadoData && (
+                <Button variant="outline" size="sm" onClick={handlePrintCertificado} className="gap-2 bg-transparent">
+                  <Award className="h-4 w-4" />
+                  Imprimir certificado
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2 bg-transparent">
                 <Printer className="h-4 w-4" />
                 Imprimir
@@ -227,28 +189,55 @@ export function PdfPreviewMock({
         {isGenerated ? (
           <div className="border rounded-lg overflow-auto max-h-[800px] bg-gray-100 p-4">
             <div ref={printRef}>
-              {tipoOS === "limpeza" ? (
-                <OSDocumentLimpeza
-                  osNumber={osNumber}
-                  cliente={defaultCliente}
-                  local={defaultLocal}
-                  dadosTecnicos={defaultDadosTecnicosLimpeza}
-                  dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
-                  veiculo={veiculo}
+              <div ref={osOnlyRef}>
+                {tipoOS === "limpeza" ? (
+                  <OSDocumentLimpeza
+                    osNumber={osNumber}
+                    cliente={defaultCliente}
+                    local={defaultLocal}
+                    dadosTecnicos={defaultDadosTecnicosLimpeza}
+                    dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
+                    veiculo={veiculo}
+                    descricaoServico={descricaoServico}
+                  />
+                ) : tipoOS === "desentupimento" ? (
+                  <OSDocumentDesentupimento
+                    osNumber={osNumber}
+                    cliente={defaultCliente}
+                    local={defaultLocal}
+                    dadosTecnicos={defaultDadosTecnicosDesentupimento}
+                    dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
+                    veiculo={veiculo}
+                    semGarantia={semGarantia}
+                    descricaoServico={descricaoServico}
+                  />
+                ) : (
+                  <OSDocumentVetores
+                    osNumber={osNumber}
+                    cliente={defaultCliente}
+                    local={defaultLocal}
+                    dadosTecnicos={defaultDadosTecnicos}
+                    dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
+                    consumos={consumos}
+                    veiculo={veiculo}
+                    showDeclaracaoCupim={mostrarDeclaracaoCupim}
+                    descricaoServico={descricaoServico}
+                  />
+                )}
+              </div>
+              {incluirCertificado && certificadoData ? (
+                <CertificadoGarantiaPaginado
+                  ref={certificadoRef}
+                  data={certificadoData}
+                  pageBreakBefore
                 />
-              ) : (
-                <OSDocumentVetores
-                  osNumber={osNumber}
-                  cliente={defaultCliente}
-                  local={defaultLocal}
-                  dadosTecnicos={defaultDadosTecnicos}
-                  dataServico={dataServico || new Date().toLocaleDateString("pt-BR")}
-                  consumos={consumos}
-                  veiculo={veiculo}
-                  showDeclaracaoCupim={mostrarDeclaracaoCupim}
-                />
-              )}
+              ) : null}
             </div>
+            {!incluirCertificado && certificadoData ? (
+              <div className="hidden">
+                <CertificadoGarantiaPaginado ref={certificadoRef} data={certificadoData} />
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="border-2 border-dashed rounded-lg min-h-[400px] flex flex-col items-center justify-center p-8 border-muted-foreground/30 bg-muted/30">
@@ -261,7 +250,9 @@ export function PdfPreviewMock({
             <p className="text-xs text-muted-foreground mt-4 text-center max-w-md">
               {tipoOS === "limpeza"
                 ? 'Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Limpeza e Higienizacao de Reservatorios de Agua, pronto para impressao e assinatura presencial do cliente.'
-                : 'Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Controle de Vetores / Dedetizacao, pronto para impressao e assinatura presencial do cliente.'}
+                : tipoOS === "desentupimento"
+                  ? 'Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Desentupimento, pronto para impressao e assinatura presencial do cliente.'
+                  : 'Apos clicar em "Gerar OS", o documento sera criado no formato padrao para Controle de Vetores / Dedetizacao, pronto para impressao e assinatura presencial do cliente.'}
             </p>
           </div>
         )}

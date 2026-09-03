@@ -409,7 +409,7 @@ export default function HistoricoPage() {
         </div>
 
         <Dialog open={showOSDialog} onOpenChange={setShowOSDialog}>
-          <DialogContent className="max-w-5xl">
+          <DialogContent className="max-h-[95vh] w-[96vw] overflow-y-auto sm:max-w-[1200px]">
             <DialogHeader>
               <DialogTitle>Preview da OS</DialogTitle>
               <DialogDescription>Visualizacao do documento salvo da ordem de servico.</DialogDescription>
@@ -436,7 +436,7 @@ export default function HistoricoPage() {
                     <iframe
                       title={`preview-${selectedServico.osNumber}`}
                       srcDoc={buildOSDocumentHtml(selectedServico.osDocumentoHtml, selectedServico.osNumber)}
-                      className="h-[65vh] w-full"
+                      className="h-[58vh] w-full min-h-[520px]"
                     />
                   </div>
                 ) : (

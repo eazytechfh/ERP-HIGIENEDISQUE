@@ -1,0 +1,2 @@
+export const RESPONSAVEL_TECNICA_NOME = "Mirela Lauria Delia"
+export const RESPONSAVEL_TECNICA_REGISTRO = "CRMV - RJ 17439VP"

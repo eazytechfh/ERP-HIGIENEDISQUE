@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Bug, Plus, Trash2 } from "lucide-react"
 
-export type PragaAlvo = "baratas" | "formigas" | "ratos" | "mosquitos" | "cupins" | "pulgas_carrapatos" | "outros"
+export type PragaAlvo = "baratas" | "formigas" | "ratos" | "mosquitos" | "cupins" | "lacraias" | "pulgas_carrapatos" | "outros"
 export type TipoAtividade = "quimico" | "nao_quimico"
 
 export type ProdutoUtilizado = {
@@ -27,6 +27,7 @@ export type ProdutoUtilizado = {
 
 export type DadosTecnicosVetores = {
   pragasAlvo: PragaAlvo[]
+  garantiasPorPraga?: Partial<Record<PragaAlvo, { quantidade: string; unidade: "dias" | "meses" | "anos" }>>
   tipoAtividade: TipoAtividade
   descricaoServico: string
   produtos: ProdutoUtilizado[]
@@ -48,6 +49,7 @@ const pragasOptions: { value: PragaAlvo; label: string }[] = [
   { value: "ratos", label: "Ratos" },
   { value: "mosquitos", label: "Mosquitos" },
   { value: "cupins", label: "Cupins" },
+  { value: "lacraias", label: "Lacraias" },
   { value: "pulgas_carrapatos", label: "Pulgas/Carrapatos" },
   { value: "outros", label: "Outros" },
 ]
@@ -65,7 +67,39 @@ export function VetoresForm({ dados, onChange, produtosDisponiveis = [] }: Vetor
     const newPragas = checked
       ? [...dados.pragasAlvo, praga]
       : dados.pragasAlvo.filter(p => p !== praga)
-    onChange({ ...dados, pragasAlvo: newPragas })
+    const garantiasPorPraga = { ...(dados.garantiasPorPraga || {}) } as DadosTecnicosVetores["garantiasPorPraga"]
+    if (checked && garantiasPorPraga && !garantiasPorPraga[praga]) {
+      garantiasPorPraga[praga] = {
+        quantidade: praga === "cupins" ? "24" : "3",
+        unidade: "meses",
+      }
+    }
+    if (!checked && garantiasPorPraga) {
+      delete garantiasPorPraga[praga]
+    }
+    onChange({ ...dados, pragasAlvo: newPragas, garantiasPorPraga })
+  }
+
+  const handleGarantiaChange = (
+    praga: PragaAlvo,
+    field: "quantidade" | "unidade",
+    value: string,
+  ) => {
+    const atual = dados.garantiasPorPraga?.[praga] || {
+      quantidade: praga === "cupins" ? "24" : "3",
+      unidade: "meses" as const,
+    }
+
+    onChange({
+      ...dados,
+      garantiasPorPraga: {
+        ...(dados.garantiasPorPraga || {}),
+        [praga]: {
+          ...atual,
+          [field]: value,
+        },
+      },
+    })
   }
 
   const handleAddProduto = () => {
@@ -124,6 +158,60 @@ export function VetoresForm({ dados, onChange, produtosDisponiveis = [] }: Vetor
         </div>
 
         <Separator />
+
+        {dados.pragasAlvo.length > 0 && (
+          <>
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Garantia por Praga</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {dados.pragasAlvo.map((praga) => {
+                  const garantia = dados.garantiasPorPraga?.[praga] || {
+                    quantidade: praga === "cupins" ? "24" : "3",
+                    unidade: "meses" as const,
+                  }
+                  const label = pragasOptions.find((item) => item.value === praga)?.label || praga
+
+                  return (
+                    <div key={praga} className="grid grid-cols-[1fr_96px_130px] gap-2 items-end rounded-lg border bg-muted/30 p-3">
+                      <div>
+                        <Label className="text-sm text-muted-foreground">Praga</Label>
+                        <p className="font-medium">{label}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm">Tempo</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={garantia.quantidade}
+                          onChange={(e) => handleGarantiaChange(praga, "quantidade", e.target.value)}
+                          placeholder="3"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm">Unidade</Label>
+                        <Select
+                          value={garantia.unidade}
+                          onValueChange={(value) => handleGarantiaChange(praga, "unidade", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="dias">Dias</SelectItem>
+                            <SelectItem value="meses">Meses</SelectItem>
+                            <SelectItem value="anos">Anos</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <Separator />
+          </>
+        )}
 
         {/* Tipo de Atividade */}
         <div className="space-y-3">
@@ -327,21 +415,19 @@ export function VetoresForm({ dados, onChange, produtosDisponiveis = [] }: Vetor
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tecnicoResponsavel">Tecnico Responsavel</Label>
+              <Label htmlFor="tecnicoResponsavel">Tecnica Responsavel</Label>
               <Input
                 id="tecnicoResponsavel"
                 value={dados.tecnicoResponsavel}
-                onChange={(e) => onChange({ ...dados, tecnicoResponsavel: e.target.value })}
-                placeholder="Nome do tecnico"
+                readOnly
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="registroTecnico">Registro/Identificacao</Label>
+              <Label htmlFor="registroTecnico">Registro CRMV</Label>
               <Input
                 id="registroTecnico"
                 value={dados.registroTecnico}
-                onChange={(e) => onChange({ ...dados, registroTecnico: e.target.value })}
-                placeholder="Ex: CRQ-123456"
+                readOnly
               />
             </div>
           </div>

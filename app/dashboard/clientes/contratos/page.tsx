@@ -5,6 +5,7 @@ import React from "react"
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ErpHeader } from "@/components/erp-header"
+import { TIPOS_SERVICO_CONTRATO } from "@/lib/cadastro-options"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,7 +32,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog"
-import { listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
+import { DIAS_VENCIMENTO_CONTRATO } from "@/components/contratos/dias-vencimento"
+import { listClientesSupabase, upsertClienteSupabase, getClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { mapClienteToResumoView } from "@/lib/supabase/clientes-view"
 import { upsertFlowContrato, type FlowContrato } from "@/lib/flow-store"
 import { addClienteArquivoContratoSupabase, listContratosSupabase, upsertContratoSupabase } from "@/lib/supabase/contratos-repo"
@@ -100,40 +102,56 @@ export default function NovoContratoPage() {
 
   useEffect(() => {
     let mounted = true
-
-    const loadClientes = async () => {
-      try {
-        const result = await listClientesSupabase({ pageSize: 9999 })
-        const rows = result.data
-        if (!mounted) return
-        setClientesCompletos(rows)
-        setClientesDisponiveis(rows.map(mapClienteToResumoView))
-      } catch (error) {
-        console.error("Falha ao carregar clientes para contratos", error)
-        if (mounted) {
-          setClientesCompletos([])
-          setClientesDisponiveis([])
+    const timeoutId = setTimeout(() => {
+      const loadClientes = async () => {
+        try {
+          const result = await listClientesSupabase({
+            pageSize: 50,
+            search: searchTerm || undefined,
+          })
+          const rows = result.data
+          if (!mounted) return
+          setClientesCompletos(rows)
+          setClientesDisponiveis(rows.map(mapClienteToResumoView))
+        } catch (error) {
+          console.error("Falha ao carregar clientes para contratos", error)
+          if (mounted) {
+            setClientesCompletos([])
+            setClientesDisponiveis([])
+          }
         }
       }
-    }
 
-    void loadClientes()
+      void loadClientes()
+    }, 300)
+
     return () => {
       mounted = false
+      clearTimeout(timeoutId)
     }
-  }, [])
+  }, [searchTerm])
 
   useEffect(() => {
     if (!clienteIdParam) return
-    const selected = clientesDisponiveis.find((c) => c.id === clienteIdParam) || null
-    setClienteSelecionado(selected)
-  }, [clienteIdParam, clientesDisponiveis])
+    let mounted = true
 
-  const clientesFiltrados = clientesDisponiveis.filter(cliente =>
-    cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.cpfCnpj.includes(searchTerm) ||
-    cliente.telefone.includes(searchTerm)
-  )
+    const loadCliente = async () => {
+      try {
+        const cliente = await getClienteSupabase(clienteIdParam)
+        if (mounted) setClienteSelecionado(mapClienteToResumoView(cliente))
+      } catch (error) {
+        console.error("Falha ao carregar cliente selecionado", error)
+        if (mounted) setClienteSelecionado(null)
+      }
+    }
+
+    void loadCliente()
+    return () => {
+      mounted = false
+    }
+  }, [clienteIdParam])
+
+  const clientesFiltrados = clientesDisponiveis
 
   // Estado do formulário
   const [tipoContrato, setTipoContrato] = useState("recorrente")
@@ -155,21 +173,11 @@ export default function NovoContratoPage() {
     { id: "1", tipoServico: "", frequencia: "", limites: "" }
   ])
 
-  const tiposServico = [
-    "Controle de Pragas",
-    "Limpeza de Caixa d'Água",
-    "Desentupimento",
-    "Sanitização",
-    "Desratização",
-    "Descupinização",
-    "Limpeza de Fossa",
-    "Higienização de Ar-Condicionado"
-  ]
-
   const frequencias = [
     { value: "mensal", label: "Mensal" },
     { value: "bimestral", label: "Bimestral" },
     { value: "trimestral", label: "Trimestral" },
+    { value: "quadrimestral", label: "Quadrimestral" },
     { value: "semestral", label: "Semestral" },
     { value: "anual", label: "Anual" }
   ]
@@ -376,9 +384,7 @@ export default function NovoContratoPage() {
     const sequencial = String(contratosExistentes.length + 1).padStart(3, "0")
 
     const clienteCompleto = clientesCompletos.find((cliente) => String(cliente.id) === clienteSelecionado.id)
-    if (!clienteCompleto) {
-      throw new Error("Cliente selecionado nao foi encontrado para salvar o contrato.")
-    }
+      ?? await getClienteSupabase(clienteSelecionado.id)
 
     const contratoPayload = {
       clienteId: clienteSelecionado.id,
@@ -847,7 +853,7 @@ export default function NovoContratoPage() {
                       <SelectValue placeholder="Selecione o dia" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.from({ length: 28 }, (_, i) => i + 1).map(dia => (
+                      {DIAS_VENCIMENTO_CONTRATO.map(dia => (
                         <SelectItem key={dia} value={dia.toString()}>Dia {dia}</SelectItem>
                       ))}
                     </SelectContent>
@@ -931,7 +937,7 @@ export default function NovoContratoPage() {
                             <SelectValue placeholder="Selecione o serviço" />
                           </SelectTrigger>
                           <SelectContent>
-                            {tiposServico.map(tipo => (
+                            {TIPOS_SERVICO_CONTRATO.map(tipo => (
                               <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
                             ))}
                           </SelectContent>

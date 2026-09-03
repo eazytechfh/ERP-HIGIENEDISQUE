@@ -38,24 +38,33 @@ import {
   Truck,
   Printer,
   Eye,
+  Award,
   Settings,
-  Receipt
+  Receipt,
+  Pencil
 } from 'lucide-react'
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
-import { VetoresForm, type DadosTecnicosVetores } from "@/components/os-generation/vetores-form"
+import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/components/os-generation/vetores-form"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
+import { DesentupimentoForm, type DadosTecnicosDesentupimento } from "@/components/os-generation/desentupimento-form"
+import { preencherDadosDesentupimento } from "@/components/os-generation/desentupimento-defaults"
+import { classificarTipoOS, servicoSemGarantia } from "@/components/os-generation/tipo-os"
+import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "@/components/os-generation/responsavel-tecnica"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
+import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
+import { buildPrintDocument, openPrintWindow } from "@/components/os-generation/print-utils"
 import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CLIENTE_COLUMNS_SELETOR, getClienteSupabase, listClientesSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { buildLocaisPorCliente, mapClienteToServicoView } from "@/lib/supabase/clientes-view"
 import { setFlowServicos, toIsoDate, type FlowServico } from "@/lib/flow-store"
+import { formatDateOnlyBR, parseDateOnlyLocal } from "@/lib/date-only"
 import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
-import { listEquipeMembrosSupabase } from "@/lib/supabase/equipe-repo"
+import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabase/equipe-repo"
 import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
 import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
-import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
+import { listServicosSupabase, reserveNextOsNumberSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 
@@ -135,6 +144,15 @@ type ServiceRequest = {
   attachments: File[]
 }
 
+type OSFormData = {
+  serviceRequest: Omit<ServiceRequest, "attachments">
+  observacoesAcesso: string
+  dadosTecnicosVetores: DadosTecnicosVetores
+  dadosTecnicosLimpeza: DadosTecnicosLimpeza
+  dadosTecnicosDesentupimento: DadosTecnicosDesentupimento
+  consumos: ConsumoItem[]
+}
+
 // Mock Data
 const clientesMock: Cliente[] = [
   { id: "1", nome: "João Silva", telefone: "(11) 98765-4321", email: "joao@email.com", empresa: "Silva & Cia", cpfCnpj: "123.456.789-00" },
@@ -195,7 +213,13 @@ type ServicoAgendado = {
   osStatus: StatusOSVisual
   osFingerprint?: string
   osDocumentoHtml?: string
+  osFormData?: OSFormData | null
   osFoiAssinada?: boolean
+  osAssinadaNome?: string
+  osAssinadaMimeType?: string
+  osAssinadaStorageBucket?: string
+  osAssinadaStoragePath?: string
+  osAssinadaTamanho?: number
   responsavelBaixa?: string
   billingMode?: BillingMode
   contractId?: string
@@ -365,7 +389,13 @@ function mapServicoSupabaseToAgendado(servico: ServicoSupabaseItem): ServicoAgen
     osStatus: (servico.osStatus as StatusOSVisual) || "gerada",
     osFingerprint: servico.osFingerprint || undefined,
     osDocumentoHtml: servico.osDocumentoHtml || undefined,
+    osFormData: servico.osFormData as OSFormData | null,
     osFoiAssinada: servico.osAssinada,
+    osAssinadaNome: servico.osAssinadaNome || undefined,
+    osAssinadaMimeType: servico.osAssinadaMimeType || undefined,
+    osAssinadaStorageBucket: servico.osAssinadaStorageBucket || undefined,
+    osAssinadaStoragePath: servico.osAssinadaStoragePath || undefined,
+    osAssinadaTamanho: servico.osAssinadaTamanho || undefined,
     responsavelBaixa: servico.responsavelBaixa || servico.baixaObservacao || undefined,
     billingMode: servico.cobrancaModo,
     contractId: servico.contratoId || undefined,
@@ -387,6 +417,48 @@ function getBillingModeLabel(mode: BillingMode) {
   if (mode === "contrato") return "Incluso em contrato"
   if (mode === "avulso") return "Pagamento avulso"
   return "Adicional"
+}
+
+const certificadoPragaLabels: Record<string, string> = {
+  baratas: "Barata",
+  formigas: "FORMIGA",
+  ratos: "Rato",
+  mosquitos: "Mosquito",
+  cupins: "Cupim",
+  lacraias: "Lacraia",
+  pulgas_carrapatos: "Pulgas/Carrapatos",
+  outros: "Outros",
+}
+
+const reservatorioTipoLabels: Record<string, string> = {
+  cisterna: "Cisterna",
+  caixa_dagua: "Caixa D'Água",
+}
+
+function addWarrantyToDate(baseDate: Date, amount: number, unit: ServiceRequest["warrantyUnit"]) {
+  const next = new Date(baseDate)
+  if (unit === "anos") {
+    next.setFullYear(next.getFullYear() + amount)
+    return next
+  }
+  if (unit === "meses") {
+    next.setMonth(next.getMonth() + amount)
+    return next
+  }
+  next.setDate(next.getDate() + amount)
+  return next
+}
+
+function formatDateBR(date: Date) {
+  return date.toLocaleDateString("pt-BR")
+}
+
+function formatDateLongBR(date: Date) {
+  const meses = [
+    "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  ]
+  return `${date.getDate()} de ${meses[date.getMonth()]} de ${date.getFullYear()}`
 }
 
 const EXTENSO_UNIDADES = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"]
@@ -968,6 +1040,8 @@ function ServicosAgendadosContent({
   servicos,
   onVerOS,
   onImprimirOS,
+  onEditarOS,
+  canEditOS,
   onVerRecibo,
   onAtualizarStatus,
   onSolicitarBaixa,
@@ -977,6 +1051,8 @@ function ServicosAgendadosContent({
   servicos: ServicoAgendado[]
   onVerOS: (servico: ServicoAgendado) => void
   onImprimirOS: (servico: ServicoAgendado) => void
+  onEditarOS: (servico: ServicoAgendado) => void
+  canEditOS: boolean
   onVerRecibo: (servico: ServicoAgendado) => void
   onAtualizarStatus: (id: string, status: StatusAgendado) => void
   onSolicitarBaixa: (id: string) => void
@@ -1189,6 +1265,12 @@ function ServicosAgendadosContent({
                       <Printer className="h-4 w-4" />
                       Imprimir
                     </Button>
+                    {canEditOS && servico.osDocumentoHtml ? (
+                      <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onEditarOS(servico)}>
+                        <Pencil className="h-4 w-4" />
+                        Editar OS
+                      </Button>
+                    ) : null}
                     {servico.billingDocument === "recibo" && (
                       <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onVerRecibo(servico)}>
                         <Receipt className="h-4 w-4" />
@@ -1247,7 +1329,7 @@ export default function ServicosPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const clienteIdParam = searchParams.get("clienteId")
-  const { can } = useAccess()
+  const { can, profile } = useAccess()
 
   // Estados principais
   const [activeTab, setActiveTab] = useState("nova-solicitacao")
@@ -1263,6 +1345,7 @@ export default function ServicosPage() {
   const clientesRequestIdRef = useRef(0)
   const [contratosSupabase, setContratosSupabase] = useState<Contrato[]>([])
   const [equipesData, setEquipesData] = useState<Equipe[]>([])
+  const [equipeMembrosData, setEquipeMembrosData] = useState<EquipeMembroInput[]>([])
   const [veiculosData, setVeiculosData] = useState<Veiculo[]>([])
   const [produtosData, setProdutosData] = useState<any[]>([])
   const [categoriasFinanceirasReceita, setCategoriasFinanceirasReceita] = useState<FinanceiroCategoriaItem[]>([])
@@ -1351,6 +1434,7 @@ export default function ServicosPage() {
               tipo: mapEquipeTipo(`${membro.cargo} ${membro.nome} ${membro.perfilAcesso}`),
             })),
         )
+        setEquipeMembrosData(equipeRows)
         setVeiculosData(
           veiculosRows
             .filter((veiculo) => veiculo.ativo)
@@ -1370,6 +1454,7 @@ export default function ServicosPage() {
         if (mounted) {
           setContratosSupabase([])
           setEquipesData([])
+          setEquipeMembrosData([])
           setVeiculosData([])
           setProdutosData([])
           setCategoriasFinanceirasReceita([])
@@ -1484,24 +1569,73 @@ export default function ServicosPage() {
 
   // Estados para etapa 3 - Geração da OS
   const [osStatus, setOsStatus] = useState<OSStatus>("a_gerar")
-  const [osNumber] = useState("OS-2026-000123")
+  const [osNumber, setOsNumber] = useState("")
+  const reservedOsNumberRef = useRef("")
+  const osNumberReservationRef = useRef<Promise<string> | null>(null)
   const [dataGeracao, setDataGeracao] = useState<string | null>(null)
   const [dadosTecnicosVetores, setDadosTecnicosVetores] = useState<DadosTecnicosVetores>({
     pragasAlvo: ["baratas"],
+    garantiasPorPraga: {
+      baratas: { quantidade: "3", unidade: "meses" },
+    },
     tipoAtividade: "quimico",
     descricaoServico: "",
     produtos: [],
     medidasPreventivas: "",
-    aplicador: "FERNANDO",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ"
+    aplicador: "",
+    tecnicoResponsavel: RESPONSAVEL_TECNICA_NOME,
+    registroTecnico: RESPONSAVEL_TECNICA_REGISTRO
   })
   const [dadosTecnicosLimpeza, setDadosTecnicosLimpeza] = useState<DadosTecnicosLimpeza>({
     reservatorios: [],
     aplicador: "Eryck Guimaraes",
-    tecnicoResponsavel: "Renato Luiz Leal Gomes",
-    registroTecnico: "55953/02 RJ"
+    tecnicoResponsavel: RESPONSAVEL_TECNICA_NOME,
+    registroTecnico: RESPONSAVEL_TECNICA_REGISTRO
   })
+  const [dadosTecnicosDesentupimento, setDadosTecnicosDesentupimento] = useState<DadosTecnicosDesentupimento>({
+    horaServico: "",
+    atendente: "",
+    tecnico: "",
+    vendedor: "",
+    inscricao: "",
+    homePage: "",
+    contatos: "",
+    origem: "",
+    referencia: "",
+    observacoes: "",
+    servicos: [],
+    desconto: "",
+    condicaoPagamento: ""
+  })
+
+  useEffect(() => {
+    const tipoAtual = tiposServico.find((tipo) => tipo.id === serviceRequest.serviceType)
+    const tipoOSAtual = classificarTipoOS(tipoAtual?.nome || serviceRequest.serviceName, tipoAtual?.categoria || "outro")
+    if (currentStep !== 3 || tipoOSAtual !== "desentupimento") {
+      return
+    }
+
+    setDadosTecnicosDesentupimento((dadosAtuais) => preencherDadosDesentupimento(dadosAtuais, {
+      usuario: profile?.nome || "",
+      inicio: serviceRequest.schedule.startTime,
+      fim: serviceRequest.schedule.endTime,
+      servico: serviceRequest.serviceName || getTipoServicoAtual(serviceRequest.serviceType)?.nome || "",
+      modoCobranca: serviceRequest.billing.mode,
+      valor: serviceRequest.billing.price || "",
+      formaPagamento: serviceRequest.billing.paymentMethod || "",
+    }))
+  }, [
+    currentStep,
+    profile?.nome,
+    serviceRequest.serviceType,
+    serviceRequest.serviceName,
+    serviceRequest.schedule.startTime,
+    serviceRequest.schedule.endTime,
+    serviceRequest.billing.mode,
+    serviceRequest.billing.price,
+    serviceRequest.billing.paymentMethod,
+    tiposServico,
+  ])
   const [arquivoAssinado, setArquivoAssinado] = useState<File | null>(null)
 
   // Estados derivados dos produtos utilizados na OS Vetores.
@@ -1516,8 +1650,11 @@ export default function ServicosPage() {
   const [servicosHydrated, setServicosHydrated] = useState(false)
   const [showOSViewerModal, setShowOSViewerModal] = useState(false)
   const [selectedAgendadaOS, setSelectedAgendadaOS] = useState<OSViewerData | null>(null)
+  const [servicoEmEdicaoId, setServicoEmEdicaoId] = useState<string | null>(null)
   const [isFinalizandoAgendamento, setIsFinalizandoAgendamento] = useState(false)
   const [osDocumentoHtmlSnapshot, setOsDocumentoHtmlSnapshot] = useState("")
+  const [certificadoGerado, setCertificadoGerado] = useState(false)
+  const [salvarCertificadoAgendado, setSalvarCertificadoAgendado] = useState(true)
   const [showBaixaAgendadaModal, setShowBaixaAgendadaModal] = useState(false)
   const [servicoBaixaPendenteId, setServicoBaixaPendenteId] = useState<string | null>(null)
   const [baixaAgendadaAssinada, setBaixaAgendadaAssinada] = useState<"sim" | "nao">("sim")
@@ -1624,11 +1761,43 @@ export default function ServicosPage() {
   }, [servicosAgendados, servicosHydrated])
 
   // Determinar tipo de OS baseado no tipo de servico
+  // serviceType e sempre o id do registro em tiposServico (ver SelectItem do dropdown de Tipo de Servico)
+  const getTipoServicoAtual = (serviceType: string): TipoServico | undefined =>
+    tiposServico.find((t) => t.id === serviceType)
+
+  const nomeTipoNormalizado = (tipo: TipoServico): string =>
+    tipo.nome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+
+  const isTipoPragas = (serviceType: string): boolean =>
+    getTipoServicoAtual(serviceType)?.categoria === "pragas"
+
+  const isTipoReservatorioPotavel = (serviceType: string): boolean =>
+    getTipoServicoAtual(serviceType)?.categoria === "reservatorio_potavel"
+
+  const isTipoDesentupimento = (serviceType: string): boolean => {
+    const tipo = getTipoServicoAtual(serviceType)
+    if (!tipo) return false
+    return nomeTipoNormalizado(tipo).includes("desentup")
+  }
+
+  const isTipoHigienizacao = (serviceType: string): boolean => {
+    const tipo = getTipoServicoAtual(serviceType)
+    if (!tipo) return false
+    return nomeTipoNormalizado(tipo).includes("higien")
+  }
+
+  const isTipoGordura = (serviceType: string): boolean => {
+    const tipo = getTipoServicoAtual(serviceType)
+    if (!tipo) return false
+    return nomeTipoNormalizado(tipo).includes("gordura")
+  }
+
   const getTipoOS = (): TipoOS => {
-    if (serviceRequest.serviceType === "reservatorio_potavel") {
-      return "limpeza"
-    }
-    return "vetores"
+    const tipo = getTipoServicoAtual(serviceRequest.serviceType)
+    return classificarTipoOS(tipo?.nome || serviceRequest.serviceName, tipo?.categoria || "outro")
   }
 
   const getWarrantyLabel = () => {
@@ -1679,17 +1848,26 @@ export default function ServicosPage() {
   }
 
   const handleToggleResponsavel = (teamId: string) => {
-    setServiceRequest((prev) => {
-      const alreadySelected = prev.schedule.teamIds.includes(teamId)
-      const nextTeamIds = alreadySelected
-        ? prev.schedule.teamIds.filter((id) => id !== teamId)
-        : [...prev.schedule.teamIds, teamId]
+    const alreadySelected = serviceRequest.schedule.teamIds.includes(teamId)
+    const nextTeamIds = alreadySelected
+      ? serviceRequest.schedule.teamIds.filter((id) => id !== teamId)
+      : [...serviceRequest.schedule.teamIds, teamId]
 
-      return {
-        ...prev,
-        schedule: { ...prev.schedule, teamIds: nextTeamIds },
-      }
-    })
+    setServiceRequest((prev) => ({
+      ...prev,
+      schedule: { ...prev.schedule, teamIds: nextTeamIds },
+    }))
+
+    if (isTipoPragas(serviceRequest.serviceType)) {
+      const primeiroResponsavel = nextTeamIds
+        .map((id) => equipesData.find((equipe) => equipe.id === id)?.nome)
+        .find((nome): nome is string => Boolean(nome))
+
+      setDadosTecnicosVetores((dados) => ({
+        ...dados,
+        aplicador: primeiroResponsavel || "",
+      }))
+    }
 
     if (errors["schedule.teamIds"]) {
       setErrors((prev) => ({ ...prev, ["schedule.teamIds"]: "" }))
@@ -1819,18 +1997,46 @@ export default function ServicosPage() {
   const handleVoltar = () => {
     if (currentStep > 1) {
       setCurrentStep(prev => (prev - 1) as 1 | 2 | 3)
+    } else if (servicoEmEdicaoId) {
+      setServicoEmEdicaoId(null)
+      reservedOsNumberRef.current = ""
+      setOsNumber("")
+      setOsStatus("a_gerar")
+      setActiveTab("agendados")
     } else {
       router.push("/dashboard")
     }
   }
 
   // Handlers da etapa 3 - OS
-  const handleGerarOS = () => {
-    setOsStatus("gerada")
-    setDataGeracao(new Date().toLocaleDateString('pt-BR'))
-    setToastMessage("OS gerada com sucesso!")
-    setShowToast(true)
-    setTimeout(() => setShowToast(false), 3000)
+  const handleGerarOS = async (): Promise<boolean> => {
+    try {
+      let reservedNumber = reservedOsNumberRef.current
+      if (!reservedNumber) {
+        if (!osNumberReservationRef.current) {
+          osNumberReservationRef.current = reserveNextOsNumberSupabase()
+        }
+        reservedNumber = await osNumberReservationRef.current
+        reservedOsNumberRef.current = reservedNumber
+        setOsNumber(reservedNumber)
+      }
+
+      setOsStatus("gerada")
+      setDataGeracao(new Date().toLocaleDateString('pt-BR'))
+      setToastMessage(`OS ${reservedNumber} gerada com sucesso!`)
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return true
+    } catch (error) {
+      console.error("Falha ao reservar numero da OS", error)
+      setPageError(getErrorMessage(error))
+      setToastMessage("Nao foi possivel reservar o numero da OS.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return false
+    } finally {
+      osNumberReservationRef.current = null
+    }
   }
 
   const handleVisualizarPDF = () => {
@@ -1840,103 +2046,12 @@ export default function ServicosPage() {
     setTimeout(() => setShowToast(false), 2000)
   }
 
-  const buildOSDocumentHtml = (contentHtml: string, osNumberValue: string) => `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>OS ${osNumberValue}</title>
-  <base href="${typeof window !== "undefined" ? window.location.origin : ""}/" />
-  <style>
-    @page { size: A4; margin: 5mm; }
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; font-size: 13px; }
-    * { box-sizing: border-box; }
-    .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; font-size: 13px; line-height: 1.24; }
-    .bg-green-600 { background-color: #16a34a; }
-    .bg-gray-200 { background-color: #e5e7eb; }
-    .bg-gray-100 { background-color: #f3f4f6; }
-    .bg-black { background-color: #000; }
-    .text-white { color: #fff; }
-    .text-green-700 { color: #15803d; }
-    .text-red-600 { color: #dc2626; }
-    .text-gray-500 { color: #6b7280; }
-    .font-bold { font-weight: bold; }
-    .text-xs { font-size: 12px; }
-    .text-lg { font-size: 20px; }
-    .text-sm { font-size: 13px; }
-    .text-\[8px\] { font-size: 10px; }
-    .text-\[9px\] { font-size: 11px; }
-    .text-\[10px\] { font-size: 12px; }
-    .text-\[11px\] { font-size: 13px; }
-    .text-\[13px\] { font-size: 13px; }
-    .border { border: 1px solid #000; }
-    .border-black { border-color: #000; }
-    .border-t { border-top: 1px solid #000; }
-    .border-r { border-right: 1px solid #000; }
-    .border-b { border-bottom: 1px solid #000; }
-    .border-2 { border-width: 2px; }
-    .rounded { border-radius: 0.25rem; }
-    .p-1 { padding: 0.15rem; }
-    .p-2 { padding: 0.25rem; }
-    .p-5 { padding: 0.75rem; }
-    .p-6 { padding: 1rem; }
-    .p-8 { padding: 1rem; }
-    .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-    .py-1 { padding-top: 0.1rem; padding-bottom: 0.1rem; }
-    .py-2 { padding-top: 0.15rem; padding-bottom: 0.15rem; }
-    .mb-4 { margin-bottom: 0.35rem; }
-    .mt-1 { margin-top: 0.15rem; }
-    .mt-2 { margin-top: 0.2rem; }
-    .mt-4 { margin-top: 0.3rem; }
-    .mb-2 { margin-bottom: 0.2rem; }
-    .mb-8 { margin-bottom: 0.4rem; }
-    .gap-2 { gap: 0.5rem; }
-    .gap-4 { gap: 1rem; }
-    .gap-8 { gap: 2rem; }
-    .flex { display: flex; }
-    .flex-wrap { flex-wrap: wrap; }
-    .grid { display: grid; }
-    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .items-center { align-items: center; }
-    .items-start { align-items: flex-start; }
-    .justify-center { justify-content: center; }
-    .justify-between { justify-content: space-between; }
-    .text-center { text-align: center; }
-    .text-left { text-align: left; }
-    .text-right { text-align: right; }
-    .w-full { width: 100%; }
-    .w-4 { width: 1rem; }
-    .w-24 { width: 5rem; }
-    .w-1\/4 { width: 25%; }
-    .h-4 { height: 1rem; }
-    .h-16 { height: 3rem; }
-    .min-h-\[40px\] { min-height: 18px; }
-    .min-h-\[60px\] { min-height: 24px; }
-    .inline-flex { display: inline-flex; }
-    .leading-tight { line-height: 1.15; }
-    .align-top { vertical-align: top; }
-    .space-y-1 > * + * { margin-top: 0.15rem; }
-    p { margin: 0; }
-    table { border-collapse: collapse; width: 100%; font-size: 11px; }
-    th, td { line-height: 1.22; }
-    @media print {
-      body { margin: 0; padding: 0; }
-      .no-print { display: none; }
-    }
-  </style>
-</head>
-<body>
-  ${contentHtml}
-</body>
-</html>`
+  const buildOSDocumentHtml = (contentHtml: string, osNumberValue: string) =>
+    buildPrintDocument(contentHtml, `OS ${osNumberValue}`)
 
   const openAndPrintSavedOS = (contentHtml: string, osNumberValue: string) => {
     if (!contentHtml) return false
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) return false
-    printWindow.document.write(buildOSDocumentHtml(contentHtml, osNumberValue))
-    printWindow.document.close()
-    printWindow.print()
+    openPrintWindow(contentHtml, `OS ${osNumberValue}`)
     return true
   }
 
@@ -2104,6 +2219,45 @@ export default function ServicosPage() {
     setShowOSViewerModal(true)
   }
 
+  const handleEditarOSAgendada = async (servico: ServicoAgendado) => {
+    if (!servico.osFormData) {
+      setToastMessage("Esta OS foi criada antes do suporte a edicao por formulario e nao possui os dados estruturados necessarios.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 4500)
+      return
+    }
+
+    try {
+      setPageError("")
+      const clienteRow = servico.clienteId ? await getClienteSupabase(servico.clienteId) : null
+      const cliente = clienteRow ? mapClienteToServicoView(clienteRow) : null
+      const locais = clienteRow ? (buildLocaisPorCliente([clienteRow])[clienteRow.id || ""] || []) : []
+      const formData = servico.osFormData
+
+      setClienteSelecionado(cliente)
+      setLocaisCliente(locais)
+      setServiceRequest({ ...formData.serviceRequest, attachments: [] })
+      setObservacoesAcesso(formData.observacoesAcesso || "")
+      setDadosTecnicosVetores(formData.dadosTecnicosVetores)
+      setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
+      setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
+      setConsumos(formData.consumos || [])
+      setServicoEmEdicaoId(servico.id)
+      setOsNumber(servico.osNumber)
+      reservedOsNumberRef.current = servico.osNumber
+      setOsStatus(servico.osStatus === "cancelada" ? "gerada" : servico.osStatus)
+      setDataGeracao(new Date().toLocaleDateString("pt-BR"))
+      setOsDocumentoHtmlSnapshot("")
+      setErrors({})
+      setCurrentStep(1)
+      setActiveTab("nova-solicitacao")
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (error) {
+      console.error("Falha ao carregar OS para edicao", error)
+      setPageError(getErrorMessage(error))
+    }
+  }
+
   const handleImprimirOSAgendada = async (servico: ServicoAgendado) => {
     const impresso = openAndPrintSavedOS(servico.osDocumentoHtml || "", servico.osNumber)
 
@@ -2171,6 +2325,7 @@ export default function ServicosPage() {
       baixaObservacao: servico.responsavelBaixa || "",
       osFingerprint: servico.osFingerprint || "",
       osDocumentoHtml: servico.osDocumentoHtml || "",
+      osFormData: servico.osFormData as unknown as Record<string, unknown> | null,
       responsavelBaixa: servico.responsavelBaixa || "",
       osAssinadaNome: servico.osAssinadaNome || "",
       osAssinadaMimeType: servico.osAssinadaMimeType || "",
@@ -2425,15 +2580,6 @@ export default function ServicosPage() {
     }
   }
 
-  const gerarProximoNumeroOS = () => {
-    const maiorNumero = servicosAgendados.reduce((acc, item) => {
-      const match = item.osNumber.match(/(\d+)$/)
-      const numeroAtual = match ? Number.parseInt(match[1], 10) : 0
-      return Math.max(acc, numeroAtual)
-    }, 0)
-    return `OS-2026-${String(maiorNumero + 1).padStart(6, "0")}`
-  }
-
   const gerarFingerprintAgendamento = () => {
     const clienteId = clienteSelecionado?.id || ""
     const servico = (serviceRequest.serviceName || "").trim().toLowerCase()
@@ -2445,9 +2591,42 @@ export default function ServicosPage() {
     return [clienteId, servico, tipo, data, inicio, fim, localId].join("|")
   }
 
+  const criarOSFormData = (): OSFormData => {
+    const { attachments: _attachments, ...requestSemAnexos } = serviceRequest
+    return {
+      serviceRequest: requestSemAnexos,
+      observacoesAcesso,
+      dadosTecnicosVetores,
+      dadosTecnicosLimpeza,
+      dadosTecnicosDesentupimento,
+      consumos,
+    }
+  }
+
+  const concluirFluxoAgendamento = () => {
+    reservedOsNumberRef.current = ""
+    osNumberReservationRef.current = null
+    setOsNumber("")
+    setOsStatus("a_gerar")
+    setDataGeracao(null)
+    setOsDocumentoHtmlSnapshot("")
+    setCertificadoGerado(false)
+    setServicoEmEdicaoId(null)
+    setCurrentStep(1)
+    setActiveTab("agendados")
+  }
+
 const handleConfirmarAgendamentoFinal = async () => {
     if (isFinalizandoAgendamento) return
     setIsFinalizandoAgendamento(true)
+
+    if (!osNumber) {
+      setToastMessage("A OS ainda nao possui um numero reservado. Gere a OS novamente.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 2500)
+      setIsFinalizandoAgendamento(false)
+      return
+    }
 
     if (!osDocumentoHtmlSnapshot) {
       setToastMessage("A OS ainda esta carregando. Aguarde 1 segundo e clique novamente.")
@@ -2462,11 +2641,12 @@ const handleConfirmarAgendamentoFinal = async () => {
       ? `${localSelecionado.nome} - ${localSelecionado.endereco}, ${localSelecionado.numero}`
       : "Local nao informado"
     const dataFormatada = serviceRequest.schedule.date
-      ? new Date(`${serviceRequest.schedule.date}T00:00:00`).toLocaleDateString("pt-BR")
+      ? formatDateOnlyBR(serviceRequest.schedule.date)
       : "-"
     const horarioFormatado = `${serviceRequest.schedule.startTime || "--:--"} - ${serviceRequest.schedule.endTime || "--:--"}`
 
     const osExistente = servicosAgendados.find((item) => {
+      if (item.id === servicoEmEdicaoId) return false
       if (item.osFingerprint && item.osFingerprint === osFingerprint) return true
 
       if (!item.osFingerprint) {
@@ -2488,14 +2668,18 @@ const handleConfirmarAgendamentoFinal = async () => {
       setShowToast(true)
       setTimeout(() => {
         setShowToast(false)
-        setActiveTab("agendados")
+        concluirFluxoAgendamento()
       }, 2000)
       setIsFinalizandoAgendamento(false)
       return
     }
+    const servicoOriginal = servicoEmEdicaoId
+      ? servicosAgendados.find((item) => item.id === servicoEmEdicaoId)
+      : undefined
     const novoServico: ServicoAgendado = {
-      id: "",
-      osNumber: gerarProximoNumeroOS(),
+      ...servicoOriginal,
+      id: servicoEmEdicaoId || "",
+      osNumber,
       cliente: clienteSelecionado?.nome || "Cliente nao informado",
       clienteId: clienteSelecionado?.id,
       servico: serviceRequest.serviceName || "Servico sem nome",
@@ -2504,10 +2688,11 @@ const handleConfirmarAgendamentoFinal = async () => {
       data: dataFormatada,
       horario: horarioFormatado,
       tecnico: nomesResponsaveisSelecionados.join(", ") || "Responsavel nao informado",
-      status: "agendado",
-      osStatus: "gerada",
+      status: servicoOriginal?.status || "agendado",
+      osStatus: servicoOriginal?.osStatus || "gerada",
       osFingerprint,
       osDocumentoHtml: osDocumentoHtmlSnapshot,
+      osFormData: criarOSFormData(),
       billingMode: serviceRequest.billing.mode,
       contractId: serviceRequest.billing.mode === "contrato" ? serviceRequest.billing.contractId : "",
       contractItemId: serviceRequest.billing.mode === "contrato" ? serviceRequest.billing.contractItemId : "",
@@ -2555,8 +2740,8 @@ const handleConfirmarAgendamentoFinal = async () => {
         setPageError(`Serviço salvo! Mas a receita NÃO foi registrada no financeiro: ${financeiroErro}`)
         setToastMessage("Serviço salvo. Verifique o aviso sobre o financeiro acima.")
         setShowToast(true)
-        setTimeout(() => { setShowToast(false); setActiveTab("agendados") }, 4000)
-      } else if (serviceRequest.serviceType === "pragas" && consumos.length === 0) {
+        setTimeout(() => { setShowToast(false); concluirFluxoAgendamento() }, 4000)
+      } else if (isTipoPragas(serviceRequest.serviceType) && consumos.length === 0) {
         setToastMessage("Aviso: Voce ainda nao informou produtos utilizados. Isso pode ser preenchido apos a execucao.")
         setShowToast(true)
         setTimeout(() => {
@@ -2565,15 +2750,15 @@ const handleConfirmarAgendamentoFinal = async () => {
           setShowToast(true)
           setTimeout(() => {
             setShowToast(false)
-            setActiveTab("agendados")
+            concluirFluxoAgendamento()
           }, 2000)
         }, 3000)
       } else {
-        setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+        setToastMessage(servicoEmEdicaoId ? "Alteracoes da OS salvas com sucesso." : "Agendamento confirmado. OS pronta para execucao em campo.")
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
-          setActiveTab("agendados")
+          concluirFluxoAgendamento()
         }, 2000)
       }
     } catch (error) {
@@ -2592,13 +2777,7 @@ const handleConfirmarAgendamentoFinal = async () => {
 
   const getTipoNome = (serviceType: string): string => {
     if (!serviceType) return "-"
-    if (serviceType.startsWith("outro_")) {
-      const id = serviceType.replace("outro_", "")
-      const tipo = tiposServico.find((t) => t.id === id)
-      return tipo?.nome || "Outro"
-    }
-    const tipo = tiposServico.find((t) => t.categoria === serviceType)
-    return tipo?.nome || serviceType
+    return getTipoServicoAtual(serviceType)?.nome || serviceType
   }
 
   const handleSalvarTipo = async () => {
@@ -2624,7 +2803,7 @@ const handleConfirmarAgendamentoFinal = async () => {
   const equipesSelecionadas = equipesData.filter((e) => serviceRequest.schedule.teamIds.includes(e.id))
   const nomesResponsaveisSelecionados = equipesSelecionadas.map((e) => e.nome)
   const veiculoSelecionado = veiculosData.find((v) => v.id === serviceRequest.schedule.vehicleId)
-  const isServicoCupim = serviceRequest.serviceType === "pragas" && (
+  const isServicoCupim = isTipoPragas(serviceRequest.serviceType) && (
     serviceRequest.serviceName.toLowerCase().includes("cupim") ||
     dadosTecnicosVetores.pragasAlvo.includes("cupins")
   )
@@ -2637,6 +2816,168 @@ const handleConfirmarAgendamentoFinal = async () => {
   // Obter contrato selecionado
   const contratoSelecionado = contratosDoCliente.find((c) => c.id === serviceRequest.billing.contractId)
 
+  const podeGerarCertificado =
+    isTipoPragas(serviceRequest.serviceType) ||
+    isTipoHigienizacao(serviceRequest.serviceType)
+
+  const semGarantia = servicoSemGarantia(
+    getTipoServicoAtual(serviceRequest.serviceType)?.nome || serviceRequest.serviceName,
+  )
+
+  const certificadoGarantiaData = useMemo<CertificadoGarantiaData | undefined>(() => {
+    if (!podeGerarCertificado || !clienteSelecionado) return undefined
+
+    const dataBase = serviceRequest.schedule.date
+      ? parseDateOnlyLocal(serviceRequest.schedule.date)
+      : new Date()
+    const garantiaInformada = Number.parseInt(serviceRequest.warrantyDays || "0", 10)
+    const temGarantiaInformada = Number.isFinite(garantiaInformada) && garantiaInformada > 0
+
+    const enderecoCompleto = localSelecionado
+      ? `${localSelecionado.endereco} ${localSelecionado.numero}`.trim()
+      : ""
+
+    let tipoServico: CertificadoGarantiaData["tipoServico"]
+    let vetores: CertificadoGarantiaData["vetores"]
+    let observacoes: string
+    let responsavel: string
+
+    if (isTipoHigienizacao(serviceRequest.serviceType)) {
+      tipoServico = "limpeza"
+      // Periodicidade legal (Decreto RJ 20356/94): limpeza e higienizacao SEMESTRAL, salvo garantia informada
+      const amount = temGarantiaInformada ? garantiaInformada : 6
+      const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
+      const proximaHigienizacao = formatDateBR(addWarrantyToDate(dataBase, amount, unit))
+
+      vetores = dadosTecnicosLimpeza.reservatorios.map((r) => ({
+        vetor: `${reservatorioTipoLabels[r.tipo] || r.tipo} ${r.numero}`,
+        garantia: r.volumeM3 ? `${r.volumeM3} m³` : "-",
+        vencimento: proximaHigienizacao,
+      }))
+      observacoes = serviceRequest.notes.trim()
+      responsavel = dadosTecnicosLimpeza.aplicador || nomesResponsaveisSelecionados[0] || ""
+    } else if (isTipoGordura(serviceRequest.serviceType)) {
+      tipoServico = "gordura"
+      const amount = temGarantiaInformada ? garantiaInformada : 3
+      const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
+      const vencimentoPadrao = formatDateBR(addWarrantyToDate(dataBase, amount, unit))
+      const servicosGordura = dadosTecnicosDesentupimento.servicos.length > 0
+        ? dadosTecnicosDesentupimento.servicos
+        : [{ id: "gordura-default", descricao: "Limpeza de Caixa de Gordura", garantia: "", valorServico: "" }]
+
+      vetores = servicosGordura.map((s) => ({
+        vetor: s.descricao || "Limpeza de Caixa de Gordura",
+        garantia: s.garantia?.trim() || "-",
+        vencimento: vencimentoPadrao,
+      }))
+      observacoes = [
+        serviceRequest.notes.trim(),
+        dadosTecnicosDesentupimento.observacoes.trim(),
+      ].filter(Boolean).join("\n")
+      responsavel = dadosTecnicosDesentupimento.tecnico || nomesResponsaveisSelecionados[0] || ""
+    } else {
+      tipoServico = "pragas"
+      const pragas: PragaAlvo[] = dadosTecnicosVetores.pragasAlvo.length > 0 ? dadosTecnicosVetores.pragasAlvo : ["outros"]
+
+      vetores = pragas.map((praga) => {
+        const fallbackMeses = praga === "cupins" ? 24 : 3
+        const garantiaPorPraga = dadosTecnicosVetores.garantiasPorPraga?.[praga]
+        const garantiaPorPragaQuantidade = Number.parseInt(garantiaPorPraga?.quantidade || "0", 10)
+        const temGarantiaPorPraga = Number.isFinite(garantiaPorPragaQuantidade) && garantiaPorPragaQuantidade > 0
+        const amount = temGarantiaPorPraga
+          ? garantiaPorPragaQuantidade
+          : temGarantiaInformada
+            ? garantiaInformada
+            : fallbackMeses
+        const unit = temGarantiaPorPraga
+          ? garantiaPorPraga?.unidade || "meses"
+          : temGarantiaInformada
+            ? serviceRequest.warrantyUnit
+            : "meses"
+        const vencimento = addWarrantyToDate(dataBase, amount, unit)
+        const unitLabel = unit === "anos" ? "Ano(s)" : unit === "meses" ? "Mes(es)" : "Dia(s)"
+
+        return {
+          vetor: certificadoPragaLabels[praga] || praga,
+          garantia: `${String(amount).padStart(2, "0")} ${unitLabel}`,
+          vencimento: formatDateBR(vencimento),
+        }
+      })
+      observacoes = [
+        serviceRequest.notes.trim(),
+        dadosTecnicosVetores.descricaoServico.trim(),
+      ].filter(Boolean).join("\n")
+      responsavel = dadosTecnicosVetores.aplicador || nomesResponsaveisSelecionados[0] || ""
+    }
+
+    return {
+      tipoServico,
+      osNumber,
+      dataServico: formatDateBR(dataBase),
+      validadeCrv: "09/08/2027",
+      cliente: clienteSelecionado.nome,
+      pedido: contratoSelecionado?.numero || "",
+      endereco: enderecoCompleto,
+      bairro: localSelecionado?.bairro || "",
+      cidade: localSelecionado?.cidade || "",
+      estado: localSelecionado?.estado || "",
+      cep: localSelecionado?.cep || "",
+      cpfCnpj: clienteSelecionado.cpfCnpj,
+      vetores,
+      localEmissao: localSelecionado?.cidade || "Niteroi",
+      dataEmissaoExtenso: formatDateLongBR(dataBase),
+      responsavel,
+      observacoes,
+    }
+  }, [
+    podeGerarCertificado,
+    clienteSelecionado,
+    contratoSelecionado,
+    serviceRequest.schedule.date,
+    serviceRequest.warrantyDays,
+    serviceRequest.warrantyUnit,
+    serviceRequest.notes,
+    serviceRequest.serviceType,
+    dadosTecnicosVetores.pragasAlvo,
+    dadosTecnicosVetores.garantiasPorPraga,
+    dadosTecnicosVetores.descricaoServico,
+    dadosTecnicosVetores.aplicador,
+    dadosTecnicosLimpeza.reservatorios,
+    dadosTecnicosLimpeza.aplicador,
+    dadosTecnicosDesentupimento.servicos,
+    dadosTecnicosDesentupimento.observacoes,
+    dadosTecnicosDesentupimento.tecnico,
+    localSelecionado,
+    osNumber,
+    nomesResponsaveisSelecionados,
+    tiposServico,
+  ])
+
+  useEffect(() => {
+    if (!podeGerarCertificado) {
+      setCertificadoGerado(false)
+    }
+  }, [podeGerarCertificado])
+
+  const handleGerarCertificado = async () => {
+    if (!certificadoGarantiaData) {
+      setToastMessage("Preencha cliente, local e dados do servico antes de gerar o certificado.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 2500)
+      return
+    }
+
+    if (osStatus === "a_gerar") {
+      const generated = await handleGerarOS()
+      if (!generated) return
+    }
+
+    setCertificadoGerado(true)
+    setToastMessage("Certificado gerado com sucesso.")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 2500)
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       <ErpHeader />
@@ -2646,6 +2987,11 @@ const handleConfirmarAgendamentoFinal = async () => {
           <h1 className="text-3xl font-bold text-foreground mb-2">Servicos</h1>
           <p className="text-muted-foreground">Gerencie solicitacoes, agendamentos e ordens de servico.</p>
         </div>
+        {servicoEmEdicaoId ? (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Editando a OS <strong>{osNumber}</strong>. O mesmo numero sera mantido ao salvar.
+          </div>
+        ) : null}
         {pageError ? (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {pageError}
@@ -2820,7 +3166,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                         </SelectTrigger>
                         <SelectContent>
                           {tiposServico.map((tipo) => (
-                            <SelectItem key={tipo.id} value={tipo.categoria === "outro" ? `outro_${tipo.id}` : tipo.categoria}>
+                            <SelectItem key={tipo.id} value={tipo.id}>
                               {tipo.nome}
                             </SelectItem>
                           ))}
@@ -3210,8 +3556,7 @@ const handleConfirmarAgendamentoFinal = async () => {
 
                       {isBillingDireto(serviceRequest.billing.mode) && (
                         <>
-                          <button
-                            type="button"
+                          <div
                             onClick={() => handleBillingChange("registerRevenueInCashFlow", !serviceRequest.billing.registerRevenueInCashFlow)}
                             className={`w-full rounded-lg border-2 p-4 space-y-4 text-left transition-colors ${
                               serviceRequest.billing.registerRevenueInCashFlow
@@ -3240,7 +3585,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                             </div>
 
                             {serviceRequest.billing.registerRevenueInCashFlow ? (
-                              <>
+                              <div onClick={(event) => event.stopPropagation()}>
                                 <div className="space-y-2">
                                   <Label>Categoria de receita</Label>
                                   <Select
@@ -3261,13 +3606,12 @@ const handleConfirmarAgendamentoFinal = async () => {
                                   </Select>
                                 </div>
 
-                              </>
+                              </div>
                             ) : null}
-                          </button>
+                          </div>
 
                           {serviceRequest.billing.billingDocument === "recibo" && (
-                            <button
-                              type="button"
+                            <div
                               onClick={() => handleBillingChange("issueReceipt", !serviceRequest.billing.issueReceipt)}
                               className={`w-full rounded-lg border-2 p-4 space-y-1 text-left transition-colors ${
                                 serviceRequest.billing.issueReceipt
@@ -3294,7 +3638,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                                   className={serviceRequest.billing.issueReceipt ? "border-green-500 data-[state=checked]:bg-green-500" : ""}
                                 />
                               </div>
-                            </button>
+                            </div>
                           )}
 
                           {serviceRequest.billing.mode === "adicional" && (
@@ -3445,7 +3789,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                       <p className="text-muted-foreground">Data/Horário</p>
                       <p className="font-medium">
                         {serviceRequest.schedule.date
-                          ? `${new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR')} ${serviceRequest.schedule.startTime} - ${serviceRequest.schedule.endTime}`
+                          ? `${formatDateOnlyBR(serviceRequest.schedule.date)} ${serviceRequest.schedule.startTime} - ${serviceRequest.schedule.endTime}`
                           : "-"}
                       </p>
                     </div>
@@ -3512,7 +3856,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                     Agendamento
                   </h3>
                   <div className="space-y-2 text-sm p-4 bg-muted/50 rounded-lg">
-                    <p><span className="text-muted-foreground">Data:</span> {new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR')}</p>
+                    <p><span className="text-muted-foreground">Data:</span> {formatDateOnlyBR(serviceRequest.schedule.date)}</p>
                     <p><span className="text-muted-foreground">Horário:</span> {serviceRequest.schedule.startTime} às {serviceRequest.schedule.endTime}</p>
                     <p><span className="text-muted-foreground">Responsável:</span> {nomesResponsaveisSelecionados.join(", ") || "-"}</p>
                     {serviceRequest.schedule.vehicleId && (
@@ -3575,7 +3919,7 @@ const handleConfirmarAgendamentoFinal = async () => {
             {/* CARD 1 - Identificação e Status da OS */}
 <OSHeaderCard
   osNumber={osNumber}
-  osType={getTipoOS() === "limpeza" ? "Limpeza de Reservatorios" : "Vetores (Dedetizacao)"}
+  osType={getTipoOS() === "limpeza" ? "Limpeza de Reservatorios" : getTipoOS() === "desentupimento" ? "Pedido de Servico" : "Vetores (Dedetizacao)"}
   status={osStatus}
               dataGeracao={dataGeracao}
               onGerarOS={handleGerarOS}
@@ -3585,6 +3929,51 @@ const handleConfirmarAgendamentoFinal = async () => {
               clienteSelecionado={!!clienteSelecionado}
               agendamentoCompleto={!!serviceRequest.schedule.date && serviceRequest.schedule.teamIds.length > 0}
             />
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Award className="h-4 w-4 text-primary" />
+                  Certificado de Garantia
+                </CardTitle>
+                <CardDescription>
+                  Disponivel para servicos de controle de vetores e higienizacao de reservatorios.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={certificadoGerado ? "default" : "secondary"}>
+                      {certificadoGerado ? "Certificado gerado" : podeGerarCertificado ? "Pronto para gerar" : "Nao aplicavel"}
+                    </Badge>
+                    {certificadoGerado && salvarCertificadoAgendado ? (
+                      <Badge variant="outline">Sera salvo com a OS</Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="salvar-certificado-agendado"
+                      checked={salvarCertificadoAgendado}
+                      onCheckedChange={setSalvarCertificadoAgendado}
+                      disabled={!certificadoGerado}
+                    />
+                    <Label htmlFor="salvar-certificado-agendado" className="text-sm">
+                      Salvar em servicos agendados
+                    </Label>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant={certificadoGerado ? "outline" : "default"}
+                  onClick={handleGerarCertificado}
+                  disabled={!podeGerarCertificado}
+                  className="gap-2"
+                >
+                  <Award className="h-4 w-4" />
+                  {certificadoGerado ? "Atualizar certificado" : "Gerar certificado"}
+                </Button>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader className="pb-3">
@@ -3709,16 +4098,21 @@ const handleConfirmarAgendamentoFinal = async () => {
             </div>
 
             {/* CARD 4 - Dados Técnicos da OS (editável) */}
-            {serviceRequest.serviceType === "pragas" ? (
+            {isTipoPragas(serviceRequest.serviceType) ? (
               <VetoresForm
                 dados={dadosTecnicosVetores}
                 onChange={setDadosTecnicosVetores}
                 produtosDisponiveis={opcoesProdutoEstoque}
               />
-            ) : serviceRequest.serviceType === "reservatorio_potavel" ? (
+            ) : (isTipoReservatorioPotavel(serviceRequest.serviceType) || isTipoHigienizacao(serviceRequest.serviceType)) ? (
               <LimpezaForm
                 dados={dadosTecnicosLimpeza}
                 onChange={setDadosTecnicosLimpeza}
+              />
+            ) : getTipoOS() === "desentupimento" ? (
+              <DesentupimentoForm
+                dados={dadosTecnicosDesentupimento}
+                onChange={setDadosTecnicosDesentupimento}
               />
             ) : (
               <Card>
@@ -3811,10 +4205,15 @@ const handleConfirmarAgendamentoFinal = async () => {
               } : undefined}
               dadosTecnicos={getTipoOS() === "vetores" ? dadosTecnicosVetores : undefined}
               dadosTecnicosLimpeza={getTipoOS() === "limpeza" ? dadosTecnicosLimpeza : undefined}
-              dataServico={serviceRequest.schedule.date ? new Date(serviceRequest.schedule.date).toLocaleDateString('pt-BR') : undefined}
+              dadosTecnicosDesentupimento={getTipoOS() === "desentupimento" ? dadosTecnicosDesentupimento : undefined}
+              dataServico={serviceRequest.schedule.date ? formatDateOnlyBR(serviceRequest.schedule.date) : undefined}
               consumos={getTipoOS() === "vetores" ? consumos : []}
               veiculo={veiculoSelecionado ? `${veiculoSelecionado.placa} - ${veiculoSelecionado.modelo}` : undefined}
+              descricaoServico={serviceRequest.notes.trim() || serviceRequest.serviceName.trim()}
               mostrarDeclaracaoCupim={isServicoCupim}
+              semGarantia={semGarantia}
+              certificadoData={certificadoGerado ? certificadoGarantiaData : undefined}
+              incluirCertificado={certificadoGerado && salvarCertificadoAgendado}
               onCaptureHtml={setOsDocumentoHtmlSnapshot}
             />
 
@@ -4048,6 +4447,8 @@ const handleConfirmarAgendamentoFinal = async () => {
               servicos={servicosAgendados}
               onVerOS={handleVerOSAgendada}
               onImprimirOS={handleImprimirOSAgendada}
+              onEditarOS={handleEditarOSAgendada}
+              canEditOS={can("servicos.edit")}
               onVerRecibo={handleVerReciboAgendado}
               onAtualizarStatus={handleAtualizarStatusAgendada}
               onSolicitarBaixa={handleSolicitarBaixaAgendada}
@@ -4072,7 +4473,7 @@ const handleConfirmarAgendamentoFinal = async () => {
       )}
 
       <Dialog open={showOSViewerModal} onOpenChange={setShowOSViewerModal}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-h-[95vh] w-[96vw] overflow-y-auto sm:max-w-[1200px]">
           <DialogHeader>
             <DialogTitle>Preview da OS</DialogTitle>
             <DialogDescription>
@@ -4105,7 +4506,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   <iframe
                     title={`preview-${selectedAgendadaOS.osNumber}`}
                     srcDoc={buildOSDocumentHtml(selectedAgendadaOS.osDocumentoHtml, selectedAgendadaOS.osNumber)}
-                    className="w-full h-[65vh]"
+                    className="h-[58vh] w-full min-h-[520px]"
                   />
                 </div>
               ) : (
@@ -4353,12 +4754,12 @@ const handleConfirmarAgendamentoFinal = async () => {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : currentStep === 2 ? (
-              <Button onClick={() => {
-                setCurrentStep(3)
+              <Button onClick={async () => {
                 // Auto-gerar OS ao avançar para etapa 3
-                handleGerarOS()
+                const generated = await handleGerarOS()
+                if (generated) setCurrentStep(3)
               }} className="gap-2">
-                Confirmar Agendamento
+              {servicoEmEdicaoId ? "Revisar alteracoes" : "Confirmar Agendamento"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
@@ -4367,7 +4768,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                 className="gap-2"
                 disabled={osStatus === "a_gerar" || isFinalizandoAgendamento}
               >
-                Finalizar e Confirmar
+                {servicoEmEdicaoId ? "Salvar alteracoes" : "Finalizar e Confirmar"}
                 <CheckCircle className="h-4 w-4" />
               </Button>
             )}

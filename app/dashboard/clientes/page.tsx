@@ -1,6 +1,7 @@
 "use client"
 
 import { ErpHeader } from "@/components/erp-header"
+import { TIPOS_AMBIENTE_CLIENTE } from "@/lib/cadastro-options"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -931,7 +932,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                 <div className="relative md:col-span-2">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Pesquisar por nome, telefone, CPF, CNPJ ou nº contrato..."
+                    placeholder="Pesquisar por nome, endereço, telefone, CPF, CNPJ ou nº contrato..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -965,13 +966,10 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                 </Select>
               </div>
 
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {apiMode
-                    ? `${totalCount.toLocaleString("pt-BR")} cliente(s) encontrado(s)`
-                    : `${filteredClientes.length} cliente(s) encontrado(s)`}
-                  {isLoadingPage && <span className="ml-2 text-muted-foreground/60">Carregando...</span>}
-                </p>
+              <div className="mb-3 flex justify-end">
+                {isLoadingPage && (
+                  <span className="mr-auto self-center text-sm text-muted-foreground/60">Carregando...</span>
+                )}
                 <Button type="button" variant="outline" className="gap-2" onClick={exportarClientesCsv}>
                   <Download className="h-4 w-4" />
                   Exportar CSV
@@ -1435,12 +1433,9 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                             <SelectValue placeholder="Selecione" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Residencial">Residencial</SelectItem>
-                            <SelectItem value="Condomínio">Condomínio</SelectItem>
-                            <SelectItem value="Empresa">Empresa</SelectItem>
-                            <SelectItem value="Indústria">Indústria</SelectItem>
-                            <SelectItem value="Restaurante">Restaurante</SelectItem>
-                            <SelectItem value="Outro">Outro</SelectItem>
+                            {TIPOS_AMBIENTE_CLIENTE.map((tipo) => (
+                              <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
