@@ -248,7 +248,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
               DESCRIÇÃO DOS SERVIÇOS
             </div>
             {descricaoServico.trim() ? (
-              <div className="border-b border-black px-2 py-1 text-center text-[9px] whitespace-pre-wrap">
+              <div className="border-b border-black px-2 py-1 text-center text-[9px] whitespace-pre-wrap break-all">
                 {descricaoServico.trim()}
               </div>
             ) : null}
