@@ -22,6 +22,7 @@ export type ServicoSupabaseItem = {
   baixaObservacao: string
   osFingerprint: string
   osDocumentoHtml: string
+  osFormData: Record<string, unknown> | null
   responsavelBaixa: string
   osAssinadaNome: string
   osAssinadaMimeType: string
@@ -55,6 +56,7 @@ export type ServicoSupabaseInput = {
   baixaObservacao?: string
   osFingerprint?: string
   osDocumentoHtml?: string
+  osFormData?: Record<string, unknown> | null
   responsavelBaixa?: string
   osAssinadaNome?: string
   osAssinadaMimeType?: string
@@ -89,6 +91,7 @@ function mapDbToServico(row: any): ServicoSupabaseItem {
     baixaObservacao: row.baixa_observacao || "",
     osFingerprint: row.os_fingerprint || "",
     osDocumentoHtml: row.os_documento_html || "",
+    osFormData: row.os_form_data && typeof row.os_form_data === "object" ? row.os_form_data : null,
     responsavelBaixa: row.responsavel_baixa || "",
     osAssinadaNome: row.os_assinada_nome || "",
     osAssinadaMimeType: row.os_assinada_mime_type || "",
@@ -124,6 +127,7 @@ function mapServicoToDb(input: ServicoSupabaseInput) {
     baixa_observacao: input.baixaObservacao || null,
     os_fingerprint: input.osFingerprint || null,
     os_documento_html: input.osDocumentoHtml || null,
+    os_form_data: input.osFormData || null,
     responsavel_baixa: input.responsavelBaixa || null,
     os_assinada_nome: input.osAssinadaNome || null,
     os_assinada_mime_type: input.osAssinadaMimeType || null,

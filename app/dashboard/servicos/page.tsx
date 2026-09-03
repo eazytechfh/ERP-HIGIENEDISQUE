@@ -40,7 +40,8 @@ import {
   Eye,
   Award,
   Settings,
-  Receipt
+  Receipt,
+  Pencil
 } from 'lucide-react'
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
 import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/components/os-generation/vetores-form"
@@ -143,6 +144,15 @@ type ServiceRequest = {
   attachments: File[]
 }
 
+type OSFormData = {
+  serviceRequest: Omit<ServiceRequest, "attachments">
+  observacoesAcesso: string
+  dadosTecnicosVetores: DadosTecnicosVetores
+  dadosTecnicosLimpeza: DadosTecnicosLimpeza
+  dadosTecnicosDesentupimento: DadosTecnicosDesentupimento
+  consumos: ConsumoItem[]
+}
+
 // Mock Data
 const clientesMock: Cliente[] = [
   { id: "1", nome: "João Silva", telefone: "(11) 98765-4321", email: "joao@email.com", empresa: "Silva & Cia", cpfCnpj: "123.456.789-00" },
@@ -203,7 +213,13 @@ type ServicoAgendado = {
   osStatus: StatusOSVisual
   osFingerprint?: string
   osDocumentoHtml?: string
+  osFormData?: OSFormData | null
   osFoiAssinada?: boolean
+  osAssinadaNome?: string
+  osAssinadaMimeType?: string
+  osAssinadaStorageBucket?: string
+  osAssinadaStoragePath?: string
+  osAssinadaTamanho?: number
   responsavelBaixa?: string
   billingMode?: BillingMode
   contractId?: string
@@ -373,7 +389,13 @@ function mapServicoSupabaseToAgendado(servico: ServicoSupabaseItem): ServicoAgen
     osStatus: (servico.osStatus as StatusOSVisual) || "gerada",
     osFingerprint: servico.osFingerprint || undefined,
     osDocumentoHtml: servico.osDocumentoHtml || undefined,
+    osFormData: servico.osFormData as OSFormData | null,
     osFoiAssinada: servico.osAssinada,
+    osAssinadaNome: servico.osAssinadaNome || undefined,
+    osAssinadaMimeType: servico.osAssinadaMimeType || undefined,
+    osAssinadaStorageBucket: servico.osAssinadaStorageBucket || undefined,
+    osAssinadaStoragePath: servico.osAssinadaStoragePath || undefined,
+    osAssinadaTamanho: servico.osAssinadaTamanho || undefined,
     responsavelBaixa: servico.responsavelBaixa || servico.baixaObservacao || undefined,
     billingMode: servico.cobrancaModo,
     contractId: servico.contratoId || undefined,
@@ -1018,6 +1040,8 @@ function ServicosAgendadosContent({
   servicos,
   onVerOS,
   onImprimirOS,
+  onEditarOS,
+  canEditOS,
   onVerRecibo,
   onAtualizarStatus,
   onSolicitarBaixa,
@@ -1027,6 +1051,8 @@ function ServicosAgendadosContent({
   servicos: ServicoAgendado[]
   onVerOS: (servico: ServicoAgendado) => void
   onImprimirOS: (servico: ServicoAgendado) => void
+  onEditarOS: (servico: ServicoAgendado) => void
+  canEditOS: boolean
   onVerRecibo: (servico: ServicoAgendado) => void
   onAtualizarStatus: (id: string, status: StatusAgendado) => void
   onSolicitarBaixa: (id: string) => void
@@ -1239,6 +1265,12 @@ function ServicosAgendadosContent({
                       <Printer className="h-4 w-4" />
                       Imprimir
                     </Button>
+                    {canEditOS && servico.osDocumentoHtml ? (
+                      <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onEditarOS(servico)}>
+                        <Pencil className="h-4 w-4" />
+                        Editar OS
+                      </Button>
+                    ) : null}
                     {servico.billingDocument === "recibo" && (
                       <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onVerRecibo(servico)}>
                         <Receipt className="h-4 w-4" />
@@ -1618,6 +1650,7 @@ export default function ServicosPage() {
   const [servicosHydrated, setServicosHydrated] = useState(false)
   const [showOSViewerModal, setShowOSViewerModal] = useState(false)
   const [selectedAgendadaOS, setSelectedAgendadaOS] = useState<OSViewerData | null>(null)
+  const [servicoEmEdicaoId, setServicoEmEdicaoId] = useState<string | null>(null)
   const [isFinalizandoAgendamento, setIsFinalizandoAgendamento] = useState(false)
   const [osDocumentoHtmlSnapshot, setOsDocumentoHtmlSnapshot] = useState("")
   const [certificadoGerado, setCertificadoGerado] = useState(false)
@@ -1964,6 +1997,12 @@ export default function ServicosPage() {
   const handleVoltar = () => {
     if (currentStep > 1) {
       setCurrentStep(prev => (prev - 1) as 1 | 2 | 3)
+    } else if (servicoEmEdicaoId) {
+      setServicoEmEdicaoId(null)
+      reservedOsNumberRef.current = ""
+      setOsNumber("")
+      setOsStatus("a_gerar")
+      setActiveTab("agendados")
     } else {
       router.push("/dashboard")
     }
@@ -2180,6 +2219,45 @@ export default function ServicosPage() {
     setShowOSViewerModal(true)
   }
 
+  const handleEditarOSAgendada = async (servico: ServicoAgendado) => {
+    if (!servico.osFormData) {
+      setToastMessage("Esta OS foi criada antes do suporte a edicao por formulario e nao possui os dados estruturados necessarios.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 4500)
+      return
+    }
+
+    try {
+      setPageError("")
+      const clienteRow = servico.clienteId ? await getClienteSupabase(servico.clienteId) : null
+      const cliente = clienteRow ? mapClienteToServicoView(clienteRow) : null
+      const locais = clienteRow ? (buildLocaisPorCliente([clienteRow])[clienteRow.id || ""] || []) : []
+      const formData = servico.osFormData
+
+      setClienteSelecionado(cliente)
+      setLocaisCliente(locais)
+      setServiceRequest({ ...formData.serviceRequest, attachments: [] })
+      setObservacoesAcesso(formData.observacoesAcesso || "")
+      setDadosTecnicosVetores(formData.dadosTecnicosVetores)
+      setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
+      setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
+      setConsumos(formData.consumos || [])
+      setServicoEmEdicaoId(servico.id)
+      setOsNumber(servico.osNumber)
+      reservedOsNumberRef.current = servico.osNumber
+      setOsStatus(servico.osStatus === "cancelada" ? "gerada" : servico.osStatus)
+      setDataGeracao(new Date().toLocaleDateString("pt-BR"))
+      setOsDocumentoHtmlSnapshot("")
+      setErrors({})
+      setCurrentStep(1)
+      setActiveTab("nova-solicitacao")
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (error) {
+      console.error("Falha ao carregar OS para edicao", error)
+      setPageError(getErrorMessage(error))
+    }
+  }
+
   const handleImprimirOSAgendada = async (servico: ServicoAgendado) => {
     const impresso = openAndPrintSavedOS(servico.osDocumentoHtml || "", servico.osNumber)
 
@@ -2247,6 +2325,7 @@ export default function ServicosPage() {
       baixaObservacao: servico.responsavelBaixa || "",
       osFingerprint: servico.osFingerprint || "",
       osDocumentoHtml: servico.osDocumentoHtml || "",
+      osFormData: servico.osFormData as unknown as Record<string, unknown> | null,
       responsavelBaixa: servico.responsavelBaixa || "",
       osAssinadaNome: servico.osAssinadaNome || "",
       osAssinadaMimeType: servico.osAssinadaMimeType || "",
@@ -2512,6 +2591,18 @@ export default function ServicosPage() {
     return [clienteId, servico, tipo, data, inicio, fim, localId].join("|")
   }
 
+  const criarOSFormData = (): OSFormData => {
+    const { attachments: _attachments, ...requestSemAnexos } = serviceRequest
+    return {
+      serviceRequest: requestSemAnexos,
+      observacoesAcesso,
+      dadosTecnicosVetores,
+      dadosTecnicosLimpeza,
+      dadosTecnicosDesentupimento,
+      consumos,
+    }
+  }
+
   const concluirFluxoAgendamento = () => {
     reservedOsNumberRef.current = ""
     osNumberReservationRef.current = null
@@ -2520,6 +2611,7 @@ export default function ServicosPage() {
     setDataGeracao(null)
     setOsDocumentoHtmlSnapshot("")
     setCertificadoGerado(false)
+    setServicoEmEdicaoId(null)
     setCurrentStep(1)
     setActiveTab("agendados")
   }
@@ -2554,6 +2646,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     const horarioFormatado = `${serviceRequest.schedule.startTime || "--:--"} - ${serviceRequest.schedule.endTime || "--:--"}`
 
     const osExistente = servicosAgendados.find((item) => {
+      if (item.id === servicoEmEdicaoId) return false
       if (item.osFingerprint && item.osFingerprint === osFingerprint) return true
 
       if (!item.osFingerprint) {
@@ -2580,8 +2673,12 @@ const handleConfirmarAgendamentoFinal = async () => {
       setIsFinalizandoAgendamento(false)
       return
     }
+    const servicoOriginal = servicoEmEdicaoId
+      ? servicosAgendados.find((item) => item.id === servicoEmEdicaoId)
+      : undefined
     const novoServico: ServicoAgendado = {
-      id: "",
+      ...servicoOriginal,
+      id: servicoEmEdicaoId || "",
       osNumber,
       cliente: clienteSelecionado?.nome || "Cliente nao informado",
       clienteId: clienteSelecionado?.id,
@@ -2591,10 +2688,11 @@ const handleConfirmarAgendamentoFinal = async () => {
       data: dataFormatada,
       horario: horarioFormatado,
       tecnico: nomesResponsaveisSelecionados.join(", ") || "Responsavel nao informado",
-      status: "agendado",
-      osStatus: "gerada",
+      status: servicoOriginal?.status || "agendado",
+      osStatus: servicoOriginal?.osStatus || "gerada",
       osFingerprint,
       osDocumentoHtml: osDocumentoHtmlSnapshot,
+      osFormData: criarOSFormData(),
       billingMode: serviceRequest.billing.mode,
       contractId: serviceRequest.billing.mode === "contrato" ? serviceRequest.billing.contractId : "",
       contractItemId: serviceRequest.billing.mode === "contrato" ? serviceRequest.billing.contractItemId : "",
@@ -2656,7 +2754,7 @@ const handleConfirmarAgendamentoFinal = async () => {
           }, 2000)
         }, 3000)
       } else {
-        setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+        setToastMessage(servicoEmEdicaoId ? "Alteracoes da OS salvas com sucesso." : "Agendamento confirmado. OS pronta para execucao em campo.")
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
@@ -2889,6 +2987,11 @@ const handleConfirmarAgendamentoFinal = async () => {
           <h1 className="text-3xl font-bold text-foreground mb-2">Servicos</h1>
           <p className="text-muted-foreground">Gerencie solicitacoes, agendamentos e ordens de servico.</p>
         </div>
+        {servicoEmEdicaoId ? (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Editando a OS <strong>{osNumber}</strong>. O mesmo numero sera mantido ao salvar.
+          </div>
+        ) : null}
         {pageError ? (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {pageError}
@@ -4343,6 +4446,8 @@ const handleConfirmarAgendamentoFinal = async () => {
               servicos={servicosAgendados}
               onVerOS={handleVerOSAgendada}
               onImprimirOS={handleImprimirOSAgendada}
+              onEditarOS={handleEditarOSAgendada}
+              canEditOS={can("servicos.edit")}
               onVerRecibo={handleVerReciboAgendado}
               onAtualizarStatus={handleAtualizarStatusAgendada}
               onSolicitarBaixa={handleSolicitarBaixaAgendada}
@@ -4367,7 +4472,7 @@ const handleConfirmarAgendamentoFinal = async () => {
       )}
 
       <Dialog open={showOSViewerModal} onOpenChange={setShowOSViewerModal}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="max-h-[95vh] w-[96vw] overflow-y-auto sm:max-w-[1200px]">
           <DialogHeader>
             <DialogTitle>Preview da OS</DialogTitle>
             <DialogDescription>
@@ -4400,7 +4505,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   <iframe
                     title={`preview-${selectedAgendadaOS.osNumber}`}
                     srcDoc={buildOSDocumentHtml(selectedAgendadaOS.osDocumentoHtml, selectedAgendadaOS.osNumber)}
-                    className="w-full h-[65vh]"
+                    className="h-[58vh] w-full min-h-[520px]"
                   />
                 </div>
               ) : (
@@ -4653,7 +4758,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                 const generated = await handleGerarOS()
                 if (generated) setCurrentStep(3)
               }} className="gap-2">
-                Confirmar Agendamento
+              {servicoEmEdicaoId ? "Revisar alteracoes" : "Confirmar Agendamento"}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
@@ -4662,7 +4767,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                 className="gap-2"
                 disabled={osStatus === "a_gerar" || isFinalizandoAgendamento}
               >
-                Finalizar e Confirmar
+                {servicoEmEdicaoId ? "Salvar alteracoes" : "Finalizar e Confirmar"}
                 <CheckCircle className="h-4 w-4" />
               </Button>
             )}
