@@ -97,9 +97,8 @@ export function PdfPreviewMock({
 
   const handlePrintCertificado = () => {
     if (!certificadoRef.current || !certificadoData) return
-    // certificadoRef aponta para o wrapper do CertificadoGarantiaPaginado, que
-    // pode conter mais de uma folha .certificado-a5-page (uma por grupo de 3
-    // vetores). innerHTML pega todas as folhas sem embrulhar num <div> extra.
+    // certificadoRef aponta para o wrapper do certificado. Os vetores sao
+    // compactados dentro da unica folha .certificado-a5-page.
     openPrintWindow(certificadoRef.current.innerHTML, `Certificado ${osNumber}`, {
       page: "certificate",
     })
