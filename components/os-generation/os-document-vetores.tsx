@@ -1,7 +1,8 @@
 ﻿"use client"
 
 import { forwardRef } from "react"
-import type { DadosTecnicosVetores, PragaAlvo } from "./vetores-form"
+import type { DadosTecnicosVetores } from "./vetores-form"
+import { DOCUMENTO_PRAGA_LABELS, type PragaAlvo } from "./pragas-vetores"
 import type { ConsumoItem } from "./consumo-estoque-card"
 import { getVetoresPrintDensityClass } from "./vetores-print-density"
 
@@ -25,16 +26,7 @@ function getDocumentoLabel(cpfCnpj: string): string {
   return digitos.length > 11 ? "CNPJ" : "CPF"
 }
 
-const pragaLabels: Record<PragaAlvo, string> = {
-  baratas: "BARATA",
-  formigas: "FORMIGA",
-  ratos: "RATO",
-  mosquitos: "MOSQUITO",
-  cupins: "Cupim",
-  lacraias: "Lacraia",
-  pulgas_carrapatos: "Pulgas/Carrapatos",
-  outros: "Outros",
-}
+const pragaLabels = DOCUMENTO_PRAGA_LABELS
 
 type ClienteInfo = {
   nome: string

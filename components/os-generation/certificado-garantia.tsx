@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import { getCertificadoVetoresDensity } from "./certificado-vetores-density"
 
 const empresaInfo = {
   nome: "Higiene Disque Higienizacoes Ltda",
@@ -70,7 +71,11 @@ function getDocumentoLabel(cpfCnpj: string): string {
 export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGarantiaProps>(
   ({ data, pageBreakBefore = false }, ref) => {
     const textos = certificadoTextos[data.tipoServico || "pragas"]
-    const vetoresTableDensity = getVetoresTableDensity(data.vetores.length)
+    const vetoresTableDensity = getCertificadoVetoresDensity(data.vetores.length)
+    const vetorRowStyle = {
+      height: `${vetoresTableDensity.rowHeightMm}mm`,
+      padding: `${vetoresTableDensity.paddingVerticalMm}mm 2mm`,
+    }
     return (
       <div
         ref={ref}
@@ -164,9 +169,9 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                   <tbody style={{ fontSize: `${vetoresTableDensity.fontSizeEm}em`, lineHeight: 1.05 }}>
                     {data.vetores.map((item, index) => (
                       <tr key={`${item.vetor}-${index}`}>
-                        <td style={{ ...innerTdStyle, ...vetoresTableDensity.rowStyle }}>{item.vetor}</td>
-                        <td style={{ ...innerTdStyle, ...vetoresTableDensity.rowStyle, textAlign: "center" }}>{item.garantia}</td>
-                        <td style={{ ...innerTdStyle, ...vetoresTableDensity.rowStyle, textAlign: "center", borderRight: 0 }}>{item.vencimento}</td>
+                        <td style={{ ...innerTdStyle, ...vetorRowStyle }}>{item.vetor}</td>
+                        <td style={{ ...innerTdStyle, ...vetorRowStyle, textAlign: "center" }}>{item.garantia}</td>
+                        <td style={{ ...innerTdStyle, ...vetorRowStyle, textAlign: "center", borderRight: 0 }}>{item.vencimento}</td>
                       </tr>
                     ))}
                     {Array.from({ length: Math.max(0, 3 - data.vetores.length) }).map((_, index) => (
@@ -210,22 +215,6 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
 )
 
 CertificadoGarantia.displayName = "CertificadoGarantia"
-
-function getVetoresTableDensity(vetoresCount: number) {
-  const extraRows = Math.max(0, vetoresCount - 3)
-
-  // Mantem o certificado em uma unica folha: acima de 3 vetores, somente as
-  // linhas desta tabela reduzem progressivamente fonte, altura e espacamento.
-  // O limite considera os 8 vetores disponiveis no formulario e preserva a
-  // legibilidade sem alterar o tamanho dos demais textos do certificado.
-  return {
-    fontSizeEm: Math.max(0.55, 1 - extraRows * 0.1),
-    rowStyle: {
-      height: `${Math.max(2.4, 4.5 - extraRows * 0.42)}mm`,
-      padding: `${Math.max(0.05, 0.6 - extraRows * 0.11)}mm 2mm`,
-    },
-  }
-}
 
 export const CertificadoGarantiaPaginado = forwardRef<HTMLDivElement, CertificadoGarantiaProps>(
   ({ data, pageBreakBefore = false }, ref) => {
