@@ -45,6 +45,7 @@ import {
 } from 'lucide-react'
 import { OSHeaderCard, type OSStatus } from "@/components/os-generation/os-header-card"
 import { VetoresForm, type DadosTecnicosVetores, type PragaAlvo } from "@/components/os-generation/vetores-form"
+import { DOCUMENTO_PRAGA_LABELS } from "@/components/os-generation/pragas-vetores"
 import { LimpezaForm, type DadosTecnicosLimpeza } from "@/components/os-generation/limpeza-form"
 import { DesentupimentoForm, type DadosTecnicosDesentupimento } from "@/components/os-generation/desentupimento-form"
 import { preencherDadosDesentupimento } from "@/components/os-generation/desentupimento-defaults"
@@ -419,16 +420,7 @@ function getBillingModeLabel(mode: BillingMode) {
   return "Adicional"
 }
 
-const certificadoPragaLabels: Record<string, string> = {
-  baratas: "Barata",
-  formigas: "FORMIGA",
-  ratos: "Rato",
-  mosquitos: "Mosquito",
-  cupins: "Cupim",
-  lacraias: "Lacraia",
-  pulgas_carrapatos: "Pulgas/Carrapatos",
-  outros: "Outros",
-}
+const certificadoPragaLabels: Record<string, string> = DOCUMENTO_PRAGA_LABELS
 
 const reservatorioTipoLabels: Record<string, string> = {
   cisterna: "Cisterna",

@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import { getCertificadoVetoresDensity } from "./certificado-vetores-density"
 
 const empresaInfo = {
   nome: "Higiene Disque Higienizacoes Ltda",
@@ -70,6 +71,11 @@ function getDocumentoLabel(cpfCnpj: string): string {
 export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGarantiaProps>(
   ({ data, pageBreakBefore = false }, ref) => {
     const textos = certificadoTextos[data.tipoServico || "pragas"]
+    const vetoresTableDensity = getCertificadoVetoresDensity(data.vetores.length)
+    const vetorRowStyle = {
+      height: `${vetoresTableDensity.rowHeightMm}mm`,
+      padding: `${vetoresTableDensity.paddingVerticalMm}mm 2mm`,
+    }
     return (
       <div
         ref={ref}
@@ -160,12 +166,12 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                       <th style={{ ...innerThStyle, width: "25%", borderRight: 0 }}>{textos.colunas[2]}</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody style={{ fontSize: `${vetoresTableDensity.fontSizeEm}em`, lineHeight: 1.05 }}>
                     {data.vetores.map((item, index) => (
                       <tr key={`${item.vetor}-${index}`}>
-                        <td style={innerTdStyle}>{item.vetor}</td>
-                        <td style={{ ...innerTdStyle, textAlign: "center" }}>{item.garantia}</td>
-                        <td style={{ ...innerTdStyle, textAlign: "center", borderRight: 0 }}>{item.vencimento}</td>
+                        <td style={{ ...innerTdStyle, ...vetorRowStyle }}>{item.vetor}</td>
+                        <td style={{ ...innerTdStyle, ...vetorRowStyle, textAlign: "center" }}>{item.garantia}</td>
+                        <td style={{ ...innerTdStyle, ...vetorRowStyle, textAlign: "center", borderRight: 0 }}>{item.vencimento}</td>
                       </tr>
                     ))}
                     {Array.from({ length: Math.max(0, 3 - data.vetores.length) }).map((_, index) => (
@@ -210,37 +216,13 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
 
 CertificadoGarantia.displayName = "CertificadoGarantia"
 
-const VETORES_POR_PAGINA = 3
-
-// A folha A5 do certificado tem altura fixa (148mm); alem de 3 linhas a
-// tabela nao cabe e o overflow:hidden do CSS de impressao corta o resto
-// silenciosamente. Em vez de truncar dados de um documento com valor legal,
-// dividimos em varias folhas (uma pra cada 3 vetores), repetindo cabecalho,
-// dados do cliente e assinatura em cada uma.
-function chunkVetores(
-  vetores: CertificadoGarantiaVetor[],
-  tamanho: number = VETORES_POR_PAGINA,
-): CertificadoGarantiaVetor[][] {
-  if (vetores.length === 0) return [[]]
-  const paginas: CertificadoGarantiaVetor[][] = []
-  for (let i = 0; i < vetores.length; i += tamanho) {
-    paginas.push(vetores.slice(i, i + tamanho))
-  }
-  return paginas
-}
-
 export const CertificadoGarantiaPaginado = forwardRef<HTMLDivElement, CertificadoGarantiaProps>(
   ({ data, pageBreakBefore = false }, ref) => {
-    const paginas = chunkVetores(data.vetores)
     return (
       <div ref={ref}>
-        {paginas.map((vetoresPagina, index) => (
-          <CertificadoGarantia
-            key={index}
-            data={{ ...data, vetores: vetoresPagina }}
-            pageBreakBefore={index === 0 ? pageBreakBefore : true}
-          />
-        ))}
+        {/* Mantemos o nome publico do componente para compatibilidade, mas o
+            certificado agora sempre recebe todos os vetores em uma folha. */}
+        <CertificadoGarantia data={data} pageBreakBefore={pageBreakBefore} />
       </div>
     )
   },

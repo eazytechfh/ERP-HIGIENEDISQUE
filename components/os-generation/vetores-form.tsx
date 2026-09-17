@@ -10,8 +10,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Bug, Plus, Trash2 } from "lucide-react"
+import { PRAGAS_VETORES_OPTIONS, getPragaVetorLabel, type PragaAlvo } from "./pragas-vetores"
 
-export type PragaAlvo = "baratas" | "formigas" | "ratos" | "mosquitos" | "cupins" | "lacraias" | "pulgas_carrapatos" | "outros"
+export type { PragaAlvo } from "./pragas-vetores"
 export type TipoAtividade = "quimico" | "nao_quimico"
 
 export type ProdutoUtilizado = {
@@ -42,17 +43,6 @@ type VetoresFormProps = {
   onChange: (dados: DadosTecnicosVetores) => void
   produtosDisponiveis?: string[]
 }
-
-const pragasOptions: { value: PragaAlvo; label: string }[] = [
-  { value: "baratas", label: "Baratas" },
-  { value: "formigas", label: "Formigas" },
-  { value: "ratos", label: "Ratos" },
-  { value: "mosquitos", label: "Mosquitos" },
-  { value: "cupins", label: "Cupins" },
-  { value: "lacraias", label: "Lacraias" },
-  { value: "pulgas_carrapatos", label: "Pulgas/Carrapatos" },
-  { value: "outros", label: "Outros" },
-]
 
 const equipamentosMock = [
   "Pulverizador Costal 20L",
@@ -142,7 +132,7 @@ export function VetoresForm({ dados, onChange, produtosDisponiveis = [] }: Vetor
         <div className="space-y-3">
           <Label className="text-base font-medium">Pragas/Vetores Alvo</Label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {pragasOptions.map(praga => (
+            {PRAGAS_VETORES_OPTIONS.map(praga => (
               <div key={praga.value} className="flex items-center space-x-2">
                 <Checkbox
                   id={praga.value}
@@ -169,7 +159,7 @@ export function VetoresForm({ dados, onChange, produtosDisponiveis = [] }: Vetor
                     quantidade: praga === "cupins" ? "24" : "3",
                     unidade: "meses" as const,
                   }
-                  const label = pragasOptions.find((item) => item.value === praga)?.label || praga
+                  const label = getPragaVetorLabel(praga)
 
                   return (
                     <div key={praga} className="grid grid-cols-[1fr_96px_130px] gap-2 items-end rounded-lg border bg-muted/30 p-3">
@@ -355,7 +345,7 @@ export function VetoresForm({ dados, onChange, produtosDisponiveis = [] }: Vetor
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      {pragasOptions.map(p => (
+                      {PRAGAS_VETORES_OPTIONS.map(p => (
                         <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                       ))}
                     
