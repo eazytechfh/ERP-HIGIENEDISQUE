@@ -26,6 +26,7 @@ import { isApiMode } from "@/lib/runtime-config"
 import { CLIENTE_COLUMNS_DUPLICATAS, deleteClienteSupabase, getClienteSupabase, listClientesSupabase, upsertClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
 import { listContratosSupabase, type ContratoSupabaseItem } from "@/lib/supabase/contratos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { clienteMatchesSearch } from "@/lib/supabase/clientes-search"
 
 // Types
 type TipoCliente = "pf" | "pj"
@@ -185,6 +186,7 @@ export default function ClientesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [isLoadingPage, setIsLoadingPage] = useState(false)
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState("")
   const PAGE_SIZE = 20
   const apiMode = isApiMode()
 
@@ -197,56 +199,27 @@ export default function ClientesPage() {
   const loadClientes = useCallback(async (page: number, search: string, status: string) => {
     if (!apiMode) return
     const requestId = ++clientesRequestIdRef.current
+    const normalizedSearch = search.trim()
     setIsLoadingPage(true)
     setLoadError("")
     try {
-      const [clientesResult, contratosResult] = await Promise.allSettled([
-        listClientesSupabase({ page, pageSize: PAGE_SIZE, search: search || undefined, status }),
-        listContratosSupabase(),
-      ])
-
+      const clientesResult = await listClientesSupabase({
+        page,
+        pageSize: PAGE_SIZE,
+        search: normalizedSearch || undefined,
+        status,
+      })
       if (requestId !== clientesRequestIdRef.current) return
-
-      let clientesList: Cliente[] = []
-      let clientesCount = 0
-
-      if (clientesResult.status === "fulfilled") {
-        clientesList = clientesResult.value.data as Cliente[]
-        clientesCount = clientesResult.value.count
-      } else {
-        console.error("Falha ao carregar clientes no Supabase", clientesResult.reason)
-        setLoadError("Nao foi possivel carregar os clientes do Supabase para este usuario.")
-      }
-
-      let contratos: ContratoSupabaseItem[] = []
-      if (contratosResult.status === "fulfilled") {
-        contratos = contratosResult.value
-        setContratosSupabase(contratos)
-      } else {
-        setContratosSupabase([])
-      }
-
-      // Se há busca e nenhum cliente foi encontrado pelo servidor, tenta por número de contrato
-      if (search && clientesList.length === 0 && contratos.length > 0) {
-        const term = search.toLowerCase()
-        const clienteIdsComContrato = contratos
-          .filter((c) => c.numero.toLowerCase().includes(term))
-          .map((c) => c.clienteId)
-          .filter(Boolean)
-
-        if (clienteIdsComContrato.length > 0) {
-          const porContratoResult = await listClientesSupabase({ pageSize: 9999, status })
-          if (requestId !== clientesRequestIdRef.current) return
-          const clientesPorContrato = (porContratoResult.data as Cliente[]).filter((c) =>
-            clienteIdsComContrato.includes(String(c.id))
-          )
-          clientesList = clientesPorContrato
-          clientesCount = clientesPorContrato.length
-        }
-      }
-
-      setClientes(clientesList)
-      setTotalCount(clientesCount)
+      setClientes(clientesResult.data as Cliente[])
+      setTotalCount(clientesResult.count)
+      setAppliedSearchTerm(normalizedSearch)
+    } catch (error) {
+      if (requestId !== clientesRequestIdRef.current) return
+      console.error("Falha ao carregar clientes no Supabase", error)
+      setClientes([])
+      setTotalCount(0)
+      setAppliedSearchTerm(normalizedSearch)
+      setLoadError("Não foi possível concluir a busca de clientes. Tente novamente.")
     } finally {
       if (requestId === clientesRequestIdRef.current) {
         setIsLoadingPage(false)
@@ -255,11 +228,25 @@ export default function ClientesPage() {
     }
   }, [apiMode])
 
+  useEffect(() => {
+    if (!apiMode) return
+    let mounted = true
+    listContratosSupabase()
+      .then((contratos) => { if (mounted) setContratosSupabase(contratos) })
+      .catch((error) => {
+        console.error("Falha ao carregar contratos dos clientes", error)
+        if (mounted) setContratosSupabase([])
+      })
+    return () => { mounted = false }
+  }, [apiMode])
+
   // Carga inicial (modo local)
   useEffect(() => {
     if (apiMode) return
     const store = ensureFlowStoreInitialized("operacional")
-    setClientes(Array.isArray(store.clientes) ? (store.clientes as Cliente[]) : [])
+    const localClientes = Array.isArray(store.clientes) ? (store.clientes as Cliente[]) : []
+    setClientes(localClientes)
+    setTotalCount(localClientes.length)
     setContratosSupabase([])
     setClientesLoaded(true)
   }, [apiMode])
@@ -270,7 +257,7 @@ export default function ClientesPage() {
     const timer = setTimeout(() => {
       setCurrentPage(1)
       loadClientes(1, searchTerm, statusFilter)
-    }, searchTerm ? 600 : 0)
+    }, searchTerm ? 350 : 0)
     return () => clearTimeout(timer)
   }, [searchTerm, statusFilter, apiMode])
 
@@ -815,12 +802,13 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
   }
 
   const filteredClientes = useMemo(() => clientes.filter((cliente) => {
-    // Filtro por número de contrato (client-side, sobre contratos já carregados)
-    if (searchTerm) {
+    // A busca no modo API já foi aplicada no servidor. No modo local, replica a
+    // mesma semântica e considera também o número do contrato.
+    if (!apiMode && searchTerm.trim()) {
       const contratoResumo = getContratoResumoCliente(cliente)
-      const term = searchTerm.toLowerCase()
+      const term = searchTerm.trim().toLowerCase()
       const matchesContrato = contratoResumo.numero?.toLowerCase().includes(term)
-      if (matchesContrato) return true
+      if (!matchesContrato && !clienteMatchesSearch(cliente, searchTerm)) return false
     }
 
     if (contractFilter === "todos") return true
@@ -834,7 +822,13 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
       case "vencido": return contratoResumo.possuiContrato && situacaoCliente === "Vencido"
       default: return true
     }
-  }), [clientes, searchTerm, contractFilter])
+  }), [clientes, searchTerm, contractFilter, apiMode])
+
+  const buscaEmAndamento = apiMode && (
+    isLoadingPage || searchTerm.trim() !== appliedSearchTerm
+  )
+  const activeSearchTerm = apiMode ? appliedSearchTerm : searchTerm.trim()
+  const resultCount = apiMode && contractFilter === "todos" ? totalCount : filteredClientes.length
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -928,15 +922,27 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                 </Alert>
               ) : null}
 
-              <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="relative md:col-span-2">
+              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(320px,1fr)_190px_170px]">
+                <div className="relative md:col-span-2 xl:col-span-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Pesquisar por nome, endereço, telefone, CPF, CNPJ ou nº contrato..."
+                    aria-label="Pesquisar clientes"
+                    placeholder="Nome, telefone, CPF/CNPJ, e-mail, endereço ou contrato"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="px-10"
                   />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      aria-label="Limpar busca"
+                      title="Limpar busca"
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
 
                 <Select value={contractFilter} onValueChange={(v) => setContractFilter(v as FiltroContrato)}>
@@ -966,11 +972,15 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                 </Select>
               </div>
 
-              <div className="mb-3 flex justify-end">
-                {isLoadingPage && (
-                  <span className="mr-auto self-center text-sm text-muted-foreground/60">Carregando...</span>
-                )}
-                <Button type="button" variant="outline" className="gap-2" onClick={exportarClientesCsv}>
+              <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
+                <div className="text-sm text-muted-foreground" aria-live="polite">
+                  {buscaEmAndamento
+                    ? "Buscando clientes..."
+                    : activeSearchTerm
+                      ? `${resultCount} cliente${resultCount === 1 ? "" : "s"} encontrado${resultCount === 1 ? "" : "s"} para “${activeSearchTerm}”`
+                      : `${resultCount} cliente${resultCount === 1 ? "" : "s"} cadastrado${resultCount === 1 ? "" : "s"}`}
+                </div>
+                <Button type="button" variant="outline" className="gap-2" onClick={exportarClientesCsv} disabled={buscaEmAndamento}>
                   <Download className="h-4 w-4" />
                   Exportar CSV
                 </Button>
@@ -982,7 +992,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1 || isLoadingPage}
+                    disabled={currentPage === 1 || buscaEmAndamento}
                   >
                     ← Anterior
                   </Button>
@@ -993,7 +1003,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage((p) => Math.min(Math.ceil(totalCount / PAGE_SIZE), p + 1))}
-                    disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE) || isLoadingPage}
+                    disabled={currentPage >= Math.ceil(totalCount / PAGE_SIZE) || buscaEmAndamento}
                   >
                     Próxima →
                   </Button>
@@ -1015,7 +1025,13 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredClientes.length === 0 ? (
+                    {buscaEmAndamento ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                          Buscando clientes...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredClientes.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                           Nenhum cliente encontrado
