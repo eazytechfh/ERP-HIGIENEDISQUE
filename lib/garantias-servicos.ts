@@ -27,6 +27,7 @@ type ServicoComGarantia = {
   data: string
   status: string
   osFormData?: Record<string, unknown> | null
+  osDocumentoHtml?: string
 }
 
 const ROTULOS_PRAGAS: Record<string, string> = {
@@ -87,6 +88,42 @@ function unidadeLabel(unidade: UnidadeGarantia, quantidade: number): string {
   return quantidade === 1 ? "dia" : "dias"
 }
 
+function nomeIndicaPragas(nomeNormalizado: string): boolean {
+  return /praga|dedet|desinset|desrat|cupim|cupin|vetor|controle|barata|formiga|rato|lacraia|carrapat|pulga|fumac|mosquit|traca|aranha|caruncho|percevejo|mosca/.test(nomeNormalizado)
+}
+
+function textoDoHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function extrairCoberturasDoCertificado(html: string): Array<{ nome: string; quantidade: number; unidade: UnidadeGarantia; vencimento: string }> {
+  if (!html) return []
+  const texto = textoDoHtml(html)
+  const secoes = texto.split(/garantia\s+vencimento/gi).slice(1)
+  const coberturas: Array<{ nome: string; quantidade: number; unidade: UnidadeGarantia; vencimento: string }> = []
+
+  for (const secaoCompleta of secoes) {
+    const secao = secaoCompleta.split(/observa[cç][oõ]es/i)[0]
+    const pattern = /([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ/ ()'-]{1,45}?)\s+(\d{1,3})\s+(Dia|Mes|Ano)\(es\)\s+(\d{2}\/\d{2}\/\d{4})/gi
+    for (const match of secao.matchAll(pattern)) {
+      const quantidade = Number.parseInt(match[2], 10)
+      const unidadeTexto = normalizar(match[3])
+      const unidade: UnidadeGarantia = unidadeTexto === "ano" ? "anos" : unidadeTexto === "mes" ? "meses" : "dias"
+      const data = parseDataGarantia(match[4])
+      if (!data || quantidade <= 0) continue
+      coberturas.push({ nome: match[1].trim(), quantidade, unidade, vencimento: formatIso(data) })
+    }
+  }
+
+  return [...new Map(coberturas.map((item) => [`${normalizar(item.nome)}|${item.vencimento}`, item])).values()]
+}
+
 export function classificarGarantia(vencimento: string, hoje = new Date()): Pick<GarantiaServicoItem, "situacao" | "diasRestantes"> {
   const dataVencimento = parseDataGarantia(vencimento)
   if (!dataVencimento) return { situacao: "vigente", diasRestantes: 0 }
@@ -101,7 +138,7 @@ export function classificarGarantia(vencimento: string, hoje = new Date()): Pick
 }
 
 export function extrairGarantiasServico(servico: ServicoComGarantia, hoje = new Date()): GarantiaServicoItem[] {
-  if (!["executado", "concluido"].includes(servico.status) || !servico.osFormData) return []
+  if (!["executado", "concluido"].includes(servico.status)) return []
 
   const form = objectValue(servico.osFormData)
   const request = objectValue(form.serviceRequest)
@@ -119,12 +156,20 @@ export function extrairGarantiasServico(servico: ServicoComGarantia, hoje = new 
     : "meses"
   const reservatorios = Array.isArray(limpeza.reservatorios) ? limpeza.reservatorios : []
   const ehLimpeza = reservatorios.length > 0 || /higien|reservatorio|caixa d|cisterna/.test(nomeNormalizado)
-  const ehPragas = /praga|dedet|desinset|desrat|cupim|vetor|controle/.test(nomeNormalizado)
+  const ehPragas = nomeIndicaPragas(nomeNormalizado)
   const pragas = Array.isArray(vetores.pragasAlvo) ? vetores.pragasAlvo.map(String) : []
   const garantiasPorPraga = objectValue(vetores.garantiasPorPraga)
 
-  let coberturas: Array<{ nome: string; quantidade: number; unidade: UnidadeGarantia }> = []
-  if (ehLimpeza) {
+  let coberturas: Array<{ nome: string; quantidade: number; unidade: UnidadeGarantia; vencimento?: string }> = []
+  if (!servico.osFormData) {
+    coberturas = extrairCoberturasDoCertificado(servico.osDocumentoHtml || "")
+    if (coberturas.length === 0 && ehLimpeza) {
+      coberturas = [{ nome: "Higienização", quantidade: 6, unidade: "meses" }]
+    } else if (coberturas.length === 0 && ehPragas) {
+      const cupim = /cupim|cupin/.test(nomeNormalizado)
+      coberturas = [{ nome: servico.servico || "Controle de pragas", quantidade: cupim ? 24 : 3, unidade: "meses" }]
+    }
+  } else if (ehLimpeza) {
     const quantidade = quantidadeGeral > 0 ? quantidadeGeral : 6
     const unidade = quantidadeGeral > 0 ? unidadeGeral : "meses"
     coberturas = (reservatorios.length ? reservatorios : [{ tipo: "reservatorio", numero: "" }]).map((item: any) => ({
@@ -149,7 +194,7 @@ export function extrairGarantiasServico(servico: ServicoComGarantia, hoje = new 
   }
 
   return coberturas.map((cobertura, index) => {
-    const vencimento = formatIso(adicionarPrazoGarantia(dataBase, cobertura.quantidade, cobertura.unidade))
+    const vencimento = cobertura.vencimento || formatIso(adicionarPrazoGarantia(dataBase, cobertura.quantidade, cobertura.unidade))
     return {
       id: `${servico.id}-${index}-${normalizar(cobertura.nome).replace(/\s+/g, "-")}`,
       servicoId: servico.id,

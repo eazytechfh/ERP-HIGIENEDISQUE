@@ -70,3 +70,42 @@ test("acompanha somente serviços executados e não herda a praga padrão em ser
   }, new Date(2026, 0, 20))
   assert.equal(desentupimento[0]?.cobertura, "Desentupimento de coluna")
 })
+
+test("inclui garantias de reforço e fumacê pelos dados da praga", () => {
+  for (const serviceName of ["Reforço barata", "Fumacê"]) {
+    const items = extrairGarantiasServico({
+      ...base,
+      servico: serviceName,
+      osFormData: {
+        serviceRequest: { serviceName, schedule: { date: "2026-01-10" }, warrantyDays: "", warrantyUnit: "dias" },
+        dadosTecnicosVetores: {
+          pragasAlvo: [serviceName === "Fumacê" ? "mosquitos" : "baratas"],
+          garantiasPorPraga: {
+            [serviceName === "Fumacê" ? "mosquitos" : "baratas"]: { quantidade: "3", unidade: "meses" },
+          },
+        },
+      },
+    }, new Date(2026, 0, 20))
+    assert.equal(items.length, 1)
+    assert.equal(items[0]?.vencimento, "2026-04-10")
+  }
+})
+
+test("recupera OS antiga pelo certificado e usa o padrão quando o certificado não tem vencimento", () => {
+  const certificado = extrairGarantiasServico({
+    ...base,
+    osFormData: null,
+    osDocumentoHtml: "<table><tr><th>Vetor</th><th>Garantia</th><th>Vencimento</th></tr><tr><td>Barata</td><td>03 Mes(es)</td><td>25/04/2026</td></tr></table><p>Observações</p>",
+  }, new Date(2026, 3, 1))
+  assert.equal(certificado[0]?.cobertura, "Barata")
+  assert.equal(certificado[0]?.vencimento, "2026-04-25")
+  assert.equal(certificado[0]?.situacao, "a_vencer")
+
+  const legado = extrairGarantiasServico({
+    ...base,
+    servico: "Descupinização",
+    osFormData: null,
+  }, new Date(2026, 0, 20))
+  assert.equal(legado[0]?.prazo, "24 meses")
+  assert.equal(legado[0]?.vencimento, "2028-01-10")
+})
