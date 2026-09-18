@@ -12,6 +12,7 @@ import { toIsoDate } from "@/lib/flow-store"
 import { CLIENTE_COLUMNS_SELETOR, listClientesSupabase } from "@/lib/supabase/clientes-repo"
 import { mapClienteToServicoView } from "@/lib/supabase/clientes-view"
 import { getOSAssinadaArquivoUrl, listServicosSupabase } from "@/lib/supabase/servicos-repo"
+import { extrairGarantiasServico, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
 
 type ClienteResumo = {
   id: string
@@ -40,6 +41,7 @@ type ServicoHistorico = {
   osAssinadaNome: string
   osAssinadaStorageBucket: string
   osAssinadaStoragePath: string
+  garantias: GarantiaServicoItem[]
 }
 
 const statusMap: Record<string, ServicoHistorico["status"]> = {
@@ -128,6 +130,7 @@ export default function HistoricoPage() {
             osAssinadaNome: s.osAssinadaNome,
             osAssinadaStorageBucket: s.osAssinadaStorageBucket,
             osAssinadaStoragePath: s.osAssinadaStoragePath,
+            garantias: extrairGarantiasServico(s),
           }))
         )
       })
@@ -161,6 +164,18 @@ export default function HistoricoPage() {
       case "Cancelado": return "bg-red-500/10 text-red-700 border-red-200"
       default: return ""
     }
+  }
+
+  const garantiaColor: Record<SituacaoGarantia, string> = {
+    vencida: "border-red-200 bg-red-50 text-red-700",
+    a_vencer: "border-amber-200 bg-amber-50 text-amber-700",
+    vigente: "border-green-200 bg-green-50 text-green-700",
+  }
+
+  const garantiaLabel: Record<SituacaoGarantia, string> = {
+    vencida: "Vencida",
+    a_vencer: "A vencer",
+    vigente: "Vigente",
   }
 
   const formatDate = (dateString: string) => {
@@ -358,6 +373,20 @@ export default function HistoricoPage() {
                               </div>
                               <Badge className={getStatusColor(servico.status)}>{servico.status}</Badge>
                             </div>
+                            {servico.garantias.length > 0 && (
+                              <div className="mb-3 rounded-md border bg-muted/20 p-3">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Garantias</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {servico.garantias.map((garantia) => (
+                                    <div key={garantia.id} className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1.5 text-xs">
+                                      <span className="font-medium">{garantia.cobertura}</span>
+                                      <Badge variant="outline" className={garantiaColor[garantia.situacao]}>{garantiaLabel[garantia.situacao]}</Badge>
+                                      <span className="text-muted-foreground">até {formatDate(garantia.vencimento)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             <p className="mb-3 text-sm text-muted-foreground">{servico.observacao}</p>
                             <div className="flex flex-wrap gap-2">
                               <Button variant="outline" size="sm" onClick={() => handleVerOS(servico)}>

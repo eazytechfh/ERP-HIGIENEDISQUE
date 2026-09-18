@@ -68,6 +68,7 @@ import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
 import { listServicosSupabase, reserveNextOsNumberSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
+import { extrairGarantiasServicos, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
 
 // Tipos
 type Cliente = {
@@ -1028,6 +1029,147 @@ function AgendaCalendarContent({ servicos }: { servicos: ServicoAgendado[] }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+const garantiaStatusConfig: Record<SituacaoGarantia, { label: string; className: string }> = {
+  vencida: { label: "Vencida", className: "border-red-200 bg-red-50 text-red-700" },
+  a_vencer: { label: "A vencer", className: "border-amber-200 bg-amber-50 text-amber-700" },
+  vigente: { label: "Vigente", className: "border-green-200 bg-green-50 text-green-700" },
+}
+
+function GarantiasContent({
+  garantias,
+  onVerOS,
+  onRenovar,
+}: {
+  garantias: GarantiaServicoItem[]
+  onVerOS: (servicoId: string) => void
+  onRenovar: (garantia: GarantiaServicoItem) => void
+}) {
+  const [filtroSituacao, setFiltroSituacao] = useState<"todos" | SituacaoGarantia>("todos")
+  const [filtroTexto, setFiltroTexto] = useState("")
+  const [filtroDataInicio, setFiltroDataInicio] = useState("")
+  const [filtroDataFim, setFiltroDataFim] = useState("")
+
+  const contagens = useMemo(() => ({
+    vencida: garantias.filter((item) => item.situacao === "vencida").length,
+    a_vencer: garantias.filter((item) => item.situacao === "a_vencer").length,
+    vigente: garantias.filter((item) => item.situacao === "vigente").length,
+  }), [garantias])
+
+  const garantiasFiltradas = useMemo(() => {
+    const termo = filtroTexto.trim().toLowerCase()
+    const peso: Record<SituacaoGarantia, number> = { vencida: 0, a_vencer: 1, vigente: 2 }
+    return garantias
+      .filter((item) => {
+        if (filtroSituacao !== "todos" && item.situacao !== filtroSituacao) return false
+        if (filtroDataInicio && item.vencimento < filtroDataInicio) return false
+        if (filtroDataFim && item.vencimento > filtroDataFim) return false
+        if (!termo) return true
+        return [item.cliente, item.osNumber, item.servico, item.cobertura, item.local]
+          .some((value) => value.toLowerCase().includes(termo))
+      })
+      .sort((a, b) => peso[a.situacao] - peso[b.situacao] || a.vencimento.localeCompare(b.vencimento))
+  }, [garantias, filtroSituacao, filtroTexto, filtroDataInicio, filtroDataFim])
+
+  const formatarData = (value: string) => formatDateOnlyBR(value)
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {([
+          { key: "vencida", label: "Garantias vencidas", value: contagens.vencida, icon: AlertTriangle, color: "text-red-600", border: "border-red-200 bg-red-50" },
+          { key: "a_vencer", label: "A vencer em 30 dias", value: contagens.a_vencer, icon: Clock, color: "text-amber-600", border: "border-amber-200 bg-amber-50" },
+          { key: "vigente", label: "Garantias vigentes", value: contagens.vigente, icon: Shield, color: "text-green-600", border: "border-green-200 bg-green-50" },
+        ] as const).map((card) => {
+          const Icon = card.icon
+          return (
+            <button key={card.key} type="button" onClick={() => setFiltroSituacao(card.key)} className="text-left">
+              <Card className={`${card.border} transition-shadow hover:shadow-md ${filtroSituacao === card.key ? "ring-2 ring-primary" : ""}`}>
+                <CardContent className="flex items-center justify-between pt-6">
+                  <div><p className="text-sm text-muted-foreground">{card.label}</p><p className={`text-3xl font-bold ${card.color}`}>{card.value}</p></div>
+                  <Icon className={`h-8 w-8 ${card.color}`} />
+                </CardContent>
+              </Card>
+            </button>
+          )
+        })}
+      </div>
+
+      <Card>
+        <CardHeader className="gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <CardTitle>Central de Garantias</CardTitle>
+            <CardDescription>Cada cobertura da OS é acompanhada individualmente.</CardDescription>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="relative w-full md:w-[240px]">
+              <Label className="text-xs text-muted-foreground">Buscar</Label>
+              <Search className="absolute bottom-2.5 left-3 h-4 w-4 text-muted-foreground" />
+              <Input value={filtroTexto} onChange={(event) => setFiltroTexto(event.target.value)} placeholder="Cliente, OS, serviço..." className="pl-9" />
+            </div>
+            <div className="w-full md:w-[160px]">
+              <Label className="text-xs text-muted-foreground">Situação</Label>
+              <Select value={filtroSituacao} onValueChange={(value) => setFiltroSituacao(value as "todos" | SituacaoGarantia)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas</SelectItem>
+                  <SelectItem value="vencida">Vencidas</SelectItem>
+                  <SelectItem value="a_vencer">A vencer</SelectItem>
+                  <SelectItem value="vigente">Vigentes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label className="text-xs text-muted-foreground">Vence de</Label><Input type="date" value={filtroDataInicio} onChange={(event) => setFiltroDataInicio(event.target.value)} /></div>
+            <div><Label className="text-xs text-muted-foreground">Até</Label><Input type="date" value={filtroDataFim} onChange={(event) => setFiltroDataFim(event.target.value)} /></div>
+            {(filtroSituacao !== "todos" || filtroTexto || filtroDataInicio || filtroDataFim) && (
+              <Button variant="ghost" size="sm" onClick={() => { setFiltroSituacao("todos"); setFiltroTexto(""); setFiltroDataInicio(""); setFiltroDataFim("") }}>Limpar</Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {garantiasFiltradas.map((item) => {
+              const status = garantiaStatusConfig[item.situacao]
+              return (
+                <div key={item.id} className="rounded-lg border p-4 transition-colors hover:bg-muted/40">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-primary">{item.osNumber}</span>
+                        <Badge variant="outline" className={status.className}>{status.label}</Badge>
+                        <Badge variant="secondary">{item.cobertura}</Badge>
+                      </div>
+                      <h3 className="font-semibold">{item.servico}</h3>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1"><User className="h-4 w-4" />{item.cliente}</span>
+                        <span className="flex items-center gap-1"><MapPin className="h-4 w-4" />{item.local}</span>
+                        <span>Executado em {formatarData(item.dataServico)}</span>
+                        <span>Prazo: {item.prazo}</span>
+                      </div>
+                      <p className={`text-sm font-medium ${item.situacao === "vencida" ? "text-red-600" : item.situacao === "a_vencer" ? "text-amber-700" : "text-green-700"}`}>
+                        Vencimento: {formatarData(item.vencimento)} · {item.diasRestantes < 0 ? `venceu há ${Math.abs(item.diasRestantes)} dia(s)` : item.diasRestantes === 0 ? "vence hoje" : `${item.diasRestantes} dia(s) restante(s)`}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => onVerOS(item.servicoId)}><Eye className="mr-2 h-4 w-4" />Ver OS</Button>
+                      <Button size="sm" onClick={() => onRenovar(item)}><Calendar className="mr-2 h-4 w-4" />Agendar renovação</Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {garantiasFiltradas.length === 0 && (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                <Shield className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                Nenhuma garantia encontrada para os filtros selecionados.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function ServicosAgendadosContent({
   servicos,
   onVerOS,
@@ -1324,7 +1466,7 @@ export default function ServicosPage() {
   const { can, profile } = useAccess()
 
   // Estados principais
-  const [activeTab, setActiveTab] = useState("nova-solicitacao")
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") === "garantias" ? "garantias" : "nova-solicitacao")
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1)
   const [searchTerm, setSearchTerm] = useState("")
   const [clientesSupabase, setClientesSupabase] = useState<ClienteInput[]>([])
@@ -1639,6 +1781,7 @@ export default function ServicosPage() {
   const [baixaError, setBaixaError] = useState("")
   const [baixaDraft, setBaixaDraft] = useState<Record<string, { quantidade: string; observacao: string }>>({})
   const [servicosAgendados, setServicosAgendados] = useState<ServicoAgendado[]>([])
+  const garantiasServicos = useMemo(() => extrairGarantiasServicos(servicosDb), [servicosDb])
   const [servicosHydrated, setServicosHydrated] = useState(false)
   const [showOSViewerModal, setShowOSViewerModal] = useState(false)
   const [selectedAgendadaOS, setSelectedAgendadaOS] = useState<OSViewerData | null>(null)
@@ -2209,6 +2352,47 @@ export default function ServicosPage() {
       osDocumentoHtml: servico.osDocumentoHtml,
     })
     setShowOSViewerModal(true)
+  }
+
+  const handleVerOSGarantia = (servicoId: string) => {
+    const servico = servicosAgendados.find((item) => item.id === servicoId)
+    if (servico) handleVerOSAgendada(servico)
+  }
+
+  const handleRenovarGarantia = async (garantia: GarantiaServicoItem) => {
+    const origem = servicosAgendados.find((item) => item.id === garantia.servicoId)
+    if (!origem?.osFormData) return
+    try {
+      const clienteRow = garantia.clienteId ? await getClienteSupabase(garantia.clienteId) : null
+      const cliente = clienteRow ? mapClienteToServicoView(clienteRow) : null
+      const locais = clienteRow ? (buildLocaisPorCliente([clienteRow])[clienteRow.id || ""] || []) : []
+      const formData = origem.osFormData
+      setClienteSelecionado(cliente)
+      setLocaisCliente(locais)
+      setServiceRequest({
+        ...formData.serviceRequest,
+        clientId: cliente?.id || formData.serviceRequest.clientId,
+        schedule: { ...formData.serviceRequest.schedule, date: "", startTime: "", endTime: "", teamIds: [] },
+        attachments: [],
+      })
+      setObservacoesAcesso(formData.observacoesAcesso || "")
+      setDadosTecnicosVetores(formData.dadosTecnicosVetores)
+      setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
+      setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
+      setConsumos([])
+      setServicoEmEdicaoId(null)
+      setOsNumber("")
+      reservedOsNumberRef.current = ""
+      setOsStatus("a_gerar")
+      setCurrentStep(1)
+      setActiveTab("nova-solicitacao")
+      setToastMessage(`Renovação de ${garantia.cobertura} preparada. Informe a nova data e a equipe.`)
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 4500)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (error) {
+      setPageError(getErrorMessage(error))
+    }
   }
 
   const handleEditarOSAgendada = async (servico: ServicoAgendado) => {
@@ -2995,6 +3179,7 @@ const handleConfirmarAgendamentoFinal = async () => {
           <TabsList className="mb-6">
             <TabsTrigger value="nova-solicitacao">Nova Solicitacao</TabsTrigger>
             <TabsTrigger value="agendados">Servicos Agendados</TabsTrigger>
+            <TabsTrigger value="garantias">Garantias</TabsTrigger>
             <TabsTrigger value="agenda">Agenda</TabsTrigger>
           </TabsList>
 
@@ -4446,6 +4631,14 @@ const handleConfirmarAgendamentoFinal = async () => {
               onSolicitarBaixa={handleSolicitarBaixaAgendada}
               onSolicitarCancelamento={handleSolicitarCancelamento}
               onExcluirOS={handleExcluirOSAgendada}
+            />
+          </TabsContent>
+
+          <TabsContent value="garantias" className="mt-0">
+            <GarantiasContent
+              garantias={garantiasServicos}
+              onVerOS={handleVerOSGarantia}
+              onRenovar={(garantia) => void handleRenovarGarantia(garantia)}
             />
           </TabsContent>
 
