@@ -1048,6 +1048,7 @@ function GarantiasContent({
   const [filtroTexto, setFiltroTexto] = useState("")
   const [filtroDataInicio, setFiltroDataInicio] = useState("")
   const [filtroDataFim, setFiltroDataFim] = useState("")
+  const [ordenacao, setOrdenacao] = useState<"vencimento_asc" | "vencimento_desc" | "os_asc" | "os_desc">("vencimento_asc")
 
   const contagens = useMemo(() => ({
     vencida: garantias.filter((item) => item.situacao === "vencida").length,
@@ -1057,7 +1058,8 @@ function GarantiasContent({
 
   const garantiasFiltradas = useMemo(() => {
     const termo = filtroTexto.trim().toLowerCase()
-    const peso: Record<SituacaoGarantia, number> = { vencida: 0, a_vencer: 1, vigente: 2 }
+    const compararOS = (a: GarantiaServicoItem, b: GarantiaServicoItem) =>
+      a.osNumber.localeCompare(b.osNumber, "pt-BR", { numeric: true, sensitivity: "base" })
     return garantias
       .filter((item) => {
         if (filtroSituacao !== "todos" && item.situacao !== filtroSituacao) return false
@@ -1067,8 +1069,13 @@ function GarantiasContent({
         return [item.cliente, item.osNumber, item.servico, item.cobertura, item.local]
           .some((value) => value.toLowerCase().includes(termo))
       })
-      .sort((a, b) => peso[a.situacao] - peso[b.situacao] || a.vencimento.localeCompare(b.vencimento))
-  }, [garantias, filtroSituacao, filtroTexto, filtroDataInicio, filtroDataFim])
+      .sort((a, b) => {
+        if (ordenacao === "vencimento_desc") return b.vencimento.localeCompare(a.vencimento) || compararOS(b, a)
+        if (ordenacao === "os_asc") return compararOS(a, b) || a.vencimento.localeCompare(b.vencimento)
+        if (ordenacao === "os_desc") return compararOS(b, a) || a.vencimento.localeCompare(b.vencimento)
+        return a.vencimento.localeCompare(b.vencimento) || compararOS(a, b)
+      })
+  }, [garantias, filtroSituacao, filtroTexto, filtroDataInicio, filtroDataFim, ordenacao])
 
   const formatarData = (value: string) => formatDateOnlyBR(value)
 
@@ -1115,6 +1122,18 @@ function GarantiasContent({
                   <SelectItem value="vencida">Vencidas</SelectItem>
                   <SelectItem value="a_vencer">A vencer</SelectItem>
                   <SelectItem value="vigente">Vigentes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-full md:w-[230px]">
+              <Label className="text-xs text-muted-foreground">Ordenar por</Label>
+              <Select value={ordenacao} onValueChange={(value) => setOrdenacao(value as typeof ordenacao)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vencimento_asc">Vencimento: mais próximo</SelectItem>
+                  <SelectItem value="vencimento_desc">Vencimento: mais distante</SelectItem>
+                  <SelectItem value="os_asc">OS: crescente</SelectItem>
+                  <SelectItem value="os_desc">OS: decrescente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
