@@ -159,7 +159,7 @@ const SERVICO_COLUMNS_SEM_HTML = [
   "responsavel_baixa", "os_assinada_nome", "os_assinada_mime_type", "os_assinada_storage_bucket",
   "os_assinada_storage_path", "os_assinada_tamanho", "cobranca_modo", "contrato_id",
   "contrato_item_id", "valor_cobranca", "forma_pagamento", "tipo_documento_cobranca",
-  "motivo_adicional", "cobranca_aprovada",
+  "motivo_adicional", "cobranca_aprovada", "os_form_data",
 ].join(",")
 
 // Para dashboard e métricas: não carrega os_documento_html (campo pesado).

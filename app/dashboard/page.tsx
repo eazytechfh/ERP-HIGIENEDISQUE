@@ -1,16 +1,18 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { ErpHeader } from "@/components/erp-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Users, UserCheck, Calendar, CheckCircle2, Clock, AlertTriangle, AlertCircle, TrendingUp, Package, Wrench, FileSignature, RefreshCw } from "lucide-react"
+import { Users, UserCheck, Calendar, CheckCircle2, Clock, AlertTriangle, AlertCircle, TrendingUp, Package, Wrench, FileSignature, RefreshCw, Shield } from "lucide-react"
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts"
 import { getClientesMetricasSupabase, listClientesContratoAVencerSupabase, type ClientesMetricas, type ClienteContratoAVencer } from "@/lib/supabase/clientes-repo"
 import { listServicosSupabaseDashboard, type ServicoSupabaseItem } from "@/lib/supabase/servicos-repo"
 import { listProdutosSupabase, type ProdutoSupabaseItem } from "@/lib/supabase/estoque-repo"
 import { listManutencoesPreventivasSupabase, listVeiculosSupabase, type ManutencaoPreventivaSupabaseItem, type VeiculoSupabaseItem } from "@/lib/supabase/veiculos-repo"
 import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabase/equipe-repo"
+import { extrairGarantiasServicos } from "@/lib/garantias-servicos"
 
 type DashboardMetrics = {
   programadosHoje: number
@@ -29,6 +31,8 @@ type DashboardMetrics = {
   alertas: {
     osSemAssinatura: number
     servicosVencidos: number
+    garantiasVencidas: number
+    garantiasAVencer: number
     manutencaoVeiculo: number
     equipamentoDefeito: number
   }
@@ -80,6 +84,7 @@ function computeMetrics(
   today.setHours(0, 0, 0, 0)
   const weekStart = startOfWeekMonday(today)
   const weekEnd = endOfWeekSunday(today)
+  const garantias = extrairGarantiasServicos(servicos, today)
 
   const servicosHoje = servicos.filter((s) => {
     const data = parseServiceDate(s.data)
@@ -167,6 +172,8 @@ function computeMetrics(
         const data = parseServiceDate(s.data)
         return data ? data < today && s.status !== "executado" && s.status !== "cancelado" : false
       }).length,
+      garantiasVencidas: garantias.filter((item) => item.situacao === "vencida").length,
+      garantiasAVencer: garantias.filter((item) => item.situacao === "a_vencer").length,
       manutencaoVeiculo: manutencoes.filter((m) => m.status === "Pendente").length,
       equipamentoDefeito: produtos.filter((p) => p.ativo && p.estoqueAtual <= p.estoqueMinimo).length,
     },
@@ -281,7 +288,9 @@ export default function DashboardPage() {
 
   const alertas = [
     { tipo: "OS sem assinatura", quantidade: metrics.alertas.osSemAssinatura, icon: FileSignature, cor: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
-    { tipo: "Serviços Vencidos", quantidade: metrics.alertas.servicosVencidos, icon: AlertCircle, cor: "text-red-600", bg: "bg-red-50 border-red-200" },
+    { tipo: "Serviços atrasados", quantidade: metrics.alertas.servicosVencidos, icon: AlertCircle, cor: "text-red-600", bg: "bg-red-50 border-red-200" },
+    { tipo: "Garantias vencidas", quantidade: metrics.alertas.garantiasVencidas, icon: Shield, cor: "text-red-600", bg: "bg-red-50 border-red-200", href: "/dashboard/servicos?tab=garantias" },
+    { tipo: "Garantias a vencer (30d)", quantidade: metrics.alertas.garantiasAVencer, icon: Clock, cor: "text-amber-600", bg: "bg-amber-50 border-amber-200", href: "/dashboard/servicos?tab=garantias" },
     { tipo: "Contratos a Vencer (30d)", quantidade: clientesAVencer.length, icon: AlertTriangle, cor: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200" },
     { tipo: "Manutenção de Veículo", quantidade: metrics.alertas.manutencaoVeiculo, icon: Wrench, cor: "text-amber-600", bg: "bg-amber-50 border-amber-200" },
     { tipo: "Estoque crítico", quantidade: metrics.alertas.equipamentoDefeito, icon: Package, cor: "text-orange-600", bg: "bg-orange-50 border-orange-200" },
@@ -366,8 +375,8 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 {alertas.map((alerta) => {
                   const Icon = alerta.icon
-                  return (
-                    <div key={alerta.tipo} className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${alerta.quantidade > 0 ? alerta.bg : "bg-muted/30 border-border"}`}>
+                  const content = (
+                    <div className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${alerta.quantidade > 0 ? alerta.bg : "bg-muted/30 border-border"}`}>
                       <Icon className={`h-4 w-4 shrink-0 ${alerta.quantidade > 0 ? alerta.cor : "text-muted-foreground"}`} />
                       <span className="flex-1 text-sm">{alerta.tipo}</span>
                       <span className={`text-sm font-bold tabular-nums ${alerta.quantidade > 0 ? alerta.cor : "text-muted-foreground"}`}>
@@ -375,6 +384,9 @@ export default function DashboardPage() {
                       </span>
                     </div>
                   )
+                  return "href" in alerta && alerta.href
+                    ? <Link key={alerta.tipo} href={alerta.href} className="block transition-opacity hover:opacity-80">{content}</Link>
+                    : <div key={alerta.tipo}>{content}</div>
                 })}
               </div>
             </CardContent>
