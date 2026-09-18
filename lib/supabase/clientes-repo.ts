@@ -2,7 +2,7 @@
 
 import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import { appendLocalClientIds, buildClienteTextSearchFilter, buildLocalAddressSearchFilter } from "./clientes-search"
+import { buildClienteIdentitySearchFilter, buildLocalAddressSearchFilter, rankClienteSearchResult } from "./clientes-search"
 import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 
 export type ClienteLocalInput = {
@@ -202,52 +202,79 @@ export async function listClientesSupabase(params?: ListClientesParams): Promise
   const pageSize = params?.pageSize ?? 20
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
-
   const supabase = getSupabaseBrowserClient()
   const selectColumns = params?.columns ?? "*"
-  const countMode = params?.search ? "planned" : "estimated"
-  let localClientIds: string[] = []
+  const search = params?.search?.trim() || ""
+  const mapRows = (rows: unknown[]) => rows.map((row) => mapDbToCliente({
+    ...(row as Record<string, unknown>),
+    cliente_locais: [],
+    cliente_contatos: [],
+    cliente_arquivos: [],
+  }))
 
-  if (params?.search) {
-    const { data: locais, error: locaisError } = await supabase
-      .from("cliente_locais")
-      .select("cliente_id")
-      .or(buildLocalAddressSearchFilter(params.search))
+  if (search) {
+    // Identidade vem antes de endereço. Isso impede que "paulo" encontre toda a
+    // cidade de São Paulo antes de clientes cujo nome realmente contém Paulo.
+    let identityQuery = supabase
+      .from("clientes")
+      .select(selectColumns)
+      .is("deleted_at", null)
+      .or(buildClienteIdentitySearchFilter(search))
       .limit(1000)
+    if (params?.status && params.status !== "todos") identityQuery = identityQuery.eq("status", params.status)
 
-    if (locaisError) throw new Error(locaisError.message || JSON.stringify(locaisError))
-    localClientIds = (locais || []).map((local: any) => String(local.cliente_id)).filter(Boolean)
+    const { data: identityRows, error: identityError } = await identityQuery
+    if (identityError) throw new Error(identityError.message || JSON.stringify(identityError))
+    const identityMatches = mapRows(identityRows || []).sort((a, b) =>
+      rankClienteSearchResult(a, search) - rankClienteSearchResult(b, search) ||
+      a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }),
+    )
+    if (identityMatches.length > 0) {
+      return { data: identityMatches.slice(from, to + 1), count: identityMatches.length }
+    }
+
+    // Endereço e número de contrato são alternativas quando nenhum dado de
+    // identidade corresponde ao termo informado.
+    const escapedTerm = search.replace(/[%_]/g, "\\$&")
+    const [locaisResult, contratosResult] = await Promise.all([
+      supabase.from("cliente_locais").select("cliente_id").or(buildLocalAddressSearchFilter(search)).limit(1000),
+      supabase.from("contratos").select("cliente_id").is("deleted_at", null).ilike("numero", `%${escapedTerm}%`).limit(1000),
+    ])
+    if (locaisResult.error) throw new Error(locaisResult.error.message || JSON.stringify(locaisResult.error))
+    if (contratosResult.error) throw new Error(contratosResult.error.message || JSON.stringify(contratosResult.error))
+
+    const fallbackIds = [...new Set([
+      ...(locaisResult.data || []).map((row: any) => String(row.cliente_id)),
+      ...(contratosResult.data || []).map((row: any) => String(row.cliente_id)),
+    ].filter(Boolean))]
+    if (fallbackIds.length === 0) return { data: [], count: 0 }
+
+    let fallbackQuery = supabase
+      .from("clientes")
+      .select(selectColumns)
+      .is("deleted_at", null)
+      .in("id", fallbackIds)
+      .order("nome", { ascending: true })
+      .limit(1000)
+    if (params?.status && params.status !== "todos") fallbackQuery = fallbackQuery.eq("status", params.status)
+
+    const { data: fallbackRows, error: fallbackError } = await fallbackQuery
+    if (fallbackError) throw new Error(fallbackError.message || JSON.stringify(fallbackError))
+    const fallbackMatches = mapRows(fallbackRows || [])
+    return { data: fallbackMatches.slice(from, to + 1), count: fallbackMatches.length }
   }
 
   let query = supabase
     .from("clientes")
-    .select(selectColumns, { count: countMode })
+    .select(selectColumns, { count: "estimated" })
     .is("deleted_at", null)
     .order("nome", { ascending: true })
     .range(from, to)
-
-  if (params?.search) {
-    const term = params.search.replace(/[%_]/g, "\\$&")
-    // Detecta se o termo é numérico (telefone/cpf/cnpj) ou textual (nome).
-    // OR em 4 colunas simultaneamente impede o uso eficiente dos índices trigram.
-    const isNumeric = /^[\d\s\-\.\(\)\/]+$/.test(params.search)
-    if (isNumeric) {
-      query = query.or(appendLocalClientIds(`telefone.ilike.%${term}%,cpf.ilike.%${term}%,cnpj.ilike.%${term}%`, localClientIds))
-    } else {
-      query = query.or(buildClienteTextSearchFilter(params.search, localClientIds))
-    }
-  }
-
-  if (params?.status && params.status !== "todos") {
-    query = query.eq("status", params.status)
-  }
+  if (params?.status && params.status !== "todos") query = query.eq("status", params.status)
 
   const { data, error, count } = await query
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
-  return {
-    data: (data || []).map((row) => mapDbToCliente({ ...(row as unknown as Record<string, unknown>), cliente_locais: [], cliente_contatos: [], cliente_arquivos: [] })),
-    count: count ?? 0,
-  }
+  return { data: mapRows(data || []), count: count ?? 0 }
 }
 
 export type ClientesMetricas = {
