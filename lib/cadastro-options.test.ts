@@ -12,6 +12,10 @@ test("oferece limpeza de reservatorios de agua potavel como servico de contrato"
   assert.equal(TIPOS_SERVICO_CONTRATO.some((tipo) => /caixa d.?água|cisterna/i.test(tipo)), false)
 })
 
+test("oferece desentupimento como servico de contrato", () => {
+  assert.equal(TIPOS_SERVICO_CONTRATO.includes("Desentupimento"), true)
+})
+
 test("mantem higienizacao de ar-condicionado fora dos contratos", () => {
   assert.equal(TIPOS_SERVICO_CONTRATO.some((tipo) => /ar.?condicionado/i.test(tipo)), false)
 })
