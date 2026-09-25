@@ -18,7 +18,7 @@ const formasPagamento: Record<string, string> = {
   transferencia: "Transferência",
 }
 
-const responsavelPadraoDesentupimento = "Bruna Freitas"
+const responsavelPadraoDesentupimento = "Thelma"
 
 function formatarHorario(inicio: string, fim: string): string {
   if (inicio && fim) return `${inicio} - ${fim}`

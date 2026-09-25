@@ -13,6 +13,7 @@ import { CLIENTE_COLUMNS_SELETOR, listClientesSupabase } from "@/lib/supabase/cl
 import { mapClienteToServicoView } from "@/lib/supabase/clientes-view"
 import { getOSAssinadaArquivoUrl, listServicosSupabase } from "@/lib/supabase/servicos-repo"
 import { extrairGarantiasServico, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
+import { openPrintDocument } from "@/components/os-generation/print-utils"
 
 type ClienteResumo = {
   id: string
@@ -207,11 +208,7 @@ export default function HistoricoPage() {
 
   const handleImprimirOS = () => {
     if (!selectedServico?.osDocumentoHtml) return
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) return
-    printWindow.document.write(buildOSDocumentHtml(selectedServico.osDocumentoHtml, selectedServico.osNumber))
-    printWindow.document.close()
-    printWindow.print()
+    openPrintDocument(buildOSDocumentHtml(selectedServico.osDocumentoHtml, selectedServico.osNumber))
   }
 
   const handleAbrirAnexoAssinado = async (servico: ServicoHistorico) => {

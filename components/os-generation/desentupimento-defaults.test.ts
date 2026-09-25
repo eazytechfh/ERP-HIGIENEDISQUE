@@ -31,9 +31,9 @@ test("preenche os dados da OS a partir de uma cobrança direta", () => {
     formaPagamento: "pix",
   })
 
-  assert.equal(resultado.atendente, "Bruna Freitas")
-  assert.equal(resultado.tecnico, "Bruna Freitas")
-  assert.equal(resultado.vendedor, "Bruna Freitas")
+  assert.equal(resultado.atendente, "Thelma")
+  assert.equal(resultado.tecnico, "Thelma")
+  assert.equal(resultado.vendedor, "Thelma")
   assert.equal(resultado.horaServico, "09:00 - 11:30")
   assert.equal(resultado.servicos[0]?.descricao, "Desentupimento de coluna")
   assert.equal(resultado.servicos[0]?.valorServico, "R$ 1.250,50")

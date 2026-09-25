@@ -40,10 +40,13 @@ export function OSHeaderCard({
   clienteSelecionado,
   agendamentoCompleto,
 }: OSHeaderCardProps) {
-  const statusInfo = statusConfig[status]
+  const aguardandoConfirmacao = !osNumber && status === "gerada"
+  const statusInfo = aguardandoConfirmacao
+    ? { label: "Aguardando confirmação", variant: "outline" as const }
+    : statusConfig[status]
   const canGenerate = clienteSelecionado && agendamentoCompleto && status === "a_gerar"
-  const canVisualize = status !== "a_gerar"
-  const canPrint = status !== "a_gerar"
+  const canVisualize = Boolean(osNumber) && status !== "a_gerar"
+  const canPrint = Boolean(osNumber) && status !== "a_gerar"
   const canMarkDelivered = status === "impressa"
 
   return (
@@ -59,7 +62,7 @@ export function OSHeaderCard({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Numero da OS</p>
-              <p className="font-semibold">{osNumber}</p>
+              <p className="font-semibold">{osNumber || "Gerado ao finalizar"}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Tipo de OS</p>
@@ -84,7 +87,7 @@ export function OSHeaderCard({
               className="gap-2"
             >
               <FileText className="h-4 w-4" />
-              Gerar OS
+              {aguardandoConfirmacao ? "Número ao finalizar" : "Gerar OS"}
             </Button>
             <Button
               variant="outline"

@@ -53,7 +53,7 @@ import { classificarTipoOS, servicoSemGarantia } from "@/components/os-generatio
 import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "@/components/os-generation/responsavel-tecnica"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
-import { buildPrintDocument, openPrintWindow } from "@/components/os-generation/print-utils"
+import { buildPrintDocument, openPrintDocument, openPrintWindow } from "@/components/os-generation/print-utils"
 import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -65,7 +65,8 @@ import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
 import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabase/equipe-repo"
 import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
 import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
-import { listServicosSupabase, reserveNextOsNumberSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
+import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
+import { deleteServicoRascunhoSupabase, listServicosRascunhosSupabase, upsertServicoRascunhoSupabase, type ServicoRascunho } from "@/lib/supabase/servicos-rascunhos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 import { extrairGarantiasServicos, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
@@ -199,6 +200,8 @@ const veiculosMock: Veiculo[] = [
 
 type StatusAgendado = "agendado" | "em_execucao" | "concluido" | "cancelado"
 type StatusOSVisual = Exclude<OSStatus, "a_gerar"> | "cancelada"
+
+const OS_NUMBER_PENDING = "OS-PENDENTE"
 
 type ServicoAgendado = {
   id: string
@@ -1508,6 +1511,11 @@ export default function ServicosPage() {
   const [tipoForm, setTipoForm] = useState({ nome: "", categoria: "outro" as TipoServico["categoria"] })
   const [tipoFormError, setTipoFormError] = useState("")
   const [pageError, setPageError] = useState("")
+  const [rascunhos, setRascunhos] = useState<ServicoRascunho[]>([])
+  const [rascunhoAtualId, setRascunhoAtualId] = useState<string | null>(null)
+  const [showRascunhosDialog, setShowRascunhosDialog] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isLoadingDrafts, setIsLoadingDrafts] = useState(false)
 
   const [clientesBuscaErro, setClientesBuscaErro] = useState<string | null>(null)
 
@@ -1553,6 +1561,26 @@ export default function ServicosPage() {
   useEffect(() => {
     loadClientesPaginados(clientesPage, searchTermRef.current)
   }, [clientesPage])
+
+  const carregarRascunhos = useCallback(async (mostrarErro = false) => {
+    setIsLoadingDrafts(true)
+    try {
+      setRascunhos(await listServicosRascunhosSupabase())
+    } catch (error) {
+      console.error("Falha ao carregar rascunhos", error)
+      if (mostrarErro) {
+        setToastMessage("Não foi possível carregar os rascunhos. Tente novamente.")
+        setShowToast(true)
+        setTimeout(() => setShowToast(false), 3000)
+      }
+    } finally {
+      setIsLoadingDrafts(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void carregarRascunhos()
+  }, [carregarRascunhos])
 
   useEffect(() => {
     let mounted = true
@@ -1723,8 +1751,7 @@ export default function ServicosPage() {
   // Estados para etapa 3 - Geração da OS
   const [osStatus, setOsStatus] = useState<OSStatus>("a_gerar")
   const [osNumber, setOsNumber] = useState("")
-  const reservedOsNumberRef = useRef("")
-  const osNumberReservationRef = useRef<Promise<string> | null>(null)
+  const osNumberPreview = osNumber || OS_NUMBER_PENDING
   const [dataGeracao, setDataGeracao] = useState<string | null>(null)
   const [dadosTecnicosVetores, setDadosTecnicosVetores] = useState<DadosTecnicosVetores>({
     pragasAlvo: ["baratas"],
@@ -2136,8 +2163,102 @@ export default function ServicosPage() {
     }
   }
 
-  const handleSalvarRascunho = () => {
-    setToastMessage("Rascunho salvo com sucesso!")
+  const handleSalvarRascunho = async () => {
+    if (servicoEmEdicaoId) {
+      setToastMessage("Conclua ou cancele a edição da O.S. antes de salvar um rascunho.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return
+    }
+
+    setIsSavingDraft(true)
+    try {
+      const saved = await upsertServicoRascunhoSupabase({
+        id: rascunhoAtualId || undefined,
+        clienteId: clienteSelecionado?.id,
+        cliente: clienteSelecionado?.nome || "Cliente ainda não selecionado",
+        servico: serviceRequest.serviceName || "Serviço ainda não informado",
+        currentStep,
+        formData: criarOSFormData() as unknown as Record<string, unknown>,
+      })
+      setRascunhoAtualId(saved.id)
+      setRascunhos((prev) => [saved, ...prev.filter((item) => item.id !== saved.id)])
+      setToastMessage("Rascunho salvo. Nenhum número de O.S. foi gerado.")
+    } catch (error) {
+      console.error("Falha ao salvar rascunho", error)
+      setToastMessage("Não foi possível salvar o rascunho. Tente novamente.")
+    } finally {
+      setIsSavingDraft(false)
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+    }
+  }
+
+  const handleAbrirRascunhos = () => {
+    setShowRascunhosDialog(true)
+    void carregarRascunhos(true)
+  }
+
+  const handleRetomarRascunho = async (rascunho: ServicoRascunho) => {
+    const formData = rascunho.formData as unknown as OSFormData
+    if (!formData?.serviceRequest) {
+      setToastMessage("Este rascunho não pôde ser aberto. Exclua-o e crie um novo.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return
+    }
+
+    try {
+      let cliente: Cliente | null = null
+      let locais: LocalAtendimento[] = []
+      if (rascunho.clienteId) {
+        const clienteRow = await getClienteSupabase(rascunho.clienteId)
+        cliente = clienteRow ? mapClienteToServicoView(clienteRow) : null
+        locais = clienteRow ? (buildLocaisPorCliente([clienteRow])[clienteRow.id || ""] || []) : []
+      }
+
+      setClienteSelecionado(cliente)
+      setLocaisCliente(locais)
+      setServiceRequest({ ...formData.serviceRequest, attachments: [] })
+      setObservacoesAcesso(formData.observacoesAcesso || "")
+      setDadosTecnicosVetores(formData.dadosTecnicosVetores)
+      setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
+      setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
+      setConsumos(formData.consumos || [])
+      setRascunhoAtualId(rascunho.id)
+      setServicoEmEdicaoId(null)
+      setOsNumber("")
+      setOsStatus(rascunho.currentStep === 3 ? "gerada" : "a_gerar")
+      setDataGeracao(null)
+      setOsDocumentoHtmlSnapshot("")
+      setCertificadoGerado(false)
+      setErrors({})
+      setCurrentStep(rascunho.currentStep)
+      setActiveTab("nova-solicitacao")
+      setShowRascunhosDialog(false)
+      setToastMessage("Rascunho aberto. Continue de onde parou.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (error) {
+      console.error("Falha ao abrir rascunho", error)
+      setToastMessage("Não foi possível abrir o rascunho. Tente novamente.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+    }
+  }
+
+  const handleExcluirRascunho = async (rascunho: ServicoRascunho) => {
+    if (!window.confirm("Deseja excluir este rascunho?")) return
+    try {
+      await deleteServicoRascunhoSupabase(rascunho.id)
+      setRascunhos((prev) => prev.filter((item) => item.id !== rascunho.id))
+      if (rascunhoAtualId === rascunho.id) setRascunhoAtualId(null)
+      setToastMessage("Rascunho excluído.")
+    } catch (error) {
+      console.error("Falha ao excluir rascunho", error)
+      setToastMessage("Não foi possível excluir o rascunho. Tente novamente.")
+    }
     setShowToast(true)
     setTimeout(() => setShowToast(false), 3000)
   }
@@ -2153,7 +2274,6 @@ export default function ServicosPage() {
       setCurrentStep(prev => (prev - 1) as 1 | 2 | 3)
     } else if (servicoEmEdicaoId) {
       setServicoEmEdicaoId(null)
-      reservedOsNumberRef.current = ""
       setOsNumber("")
       setOsStatus("a_gerar")
       setActiveTab("agendados")
@@ -2164,33 +2284,14 @@ export default function ServicosPage() {
 
   // Handlers da etapa 3 - OS
   const handleGerarOS = async (): Promise<boolean> => {
-    try {
-      let reservedNumber = reservedOsNumberRef.current
-      if (!reservedNumber) {
-        if (!osNumberReservationRef.current) {
-          osNumberReservationRef.current = reserveNextOsNumberSupabase()
-        }
-        reservedNumber = await osNumberReservationRef.current
-        reservedOsNumberRef.current = reservedNumber
-        setOsNumber(reservedNumber)
-      }
-
-      setOsStatus("gerada")
-      setDataGeracao(new Date().toLocaleDateString('pt-BR'))
-      setToastMessage(`OS ${reservedNumber} gerada com sucesso!`)
-      setShowToast(true)
-      setTimeout(() => setShowToast(false), 3000)
-      return true
-    } catch (error) {
-      console.error("Falha ao reservar numero da OS", error)
-      setPageError(getErrorMessage(error))
-      setToastMessage("Nao foi possivel reservar o numero da OS.")
-      setShowToast(true)
-      setTimeout(() => setShowToast(false), 3000)
-      return false
-    } finally {
-      osNumberReservationRef.current = null
-    }
+    setOsStatus("gerada")
+    if (!osNumber) setDataGeracao(null)
+    setToastMessage(osNumber
+      ? `A ${osNumber} está pronta para revisão.`
+      : "Prévia pronta. O número será gerado somente ao finalizar e confirmar.")
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
+    return true
   }
 
   const handleVisualizarPDF = () => {
@@ -2205,17 +2306,11 @@ export default function ServicosPage() {
 
   const openAndPrintSavedOS = (contentHtml: string, osNumberValue: string) => {
     if (!contentHtml) return false
-    openPrintWindow(contentHtml, `OS ${osNumberValue}`)
-    return true
+    return openPrintWindow(contentHtml, `OS ${osNumberValue}`)
   }
 
   const abrirEImprimirRecibo = (params: ReciboDocumentoParams) => {
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) return false
-    printWindow.document.write(buildReciboDocumentHtml(params))
-    printWindow.document.close()
-    printWindow.print()
-    return true
+    return openPrintDocument(buildReciboDocumentHtml(params))
   }
 
   const handleImprimirOS = () => {
@@ -2399,9 +2494,9 @@ export default function ServicosPage() {
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
       setConsumos([])
+      setRascunhoAtualId(null)
       setServicoEmEdicaoId(null)
       setOsNumber("")
-      reservedOsNumberRef.current = ""
       setOsStatus("a_gerar")
       setCurrentStep(1)
       setActiveTab("nova-solicitacao")
@@ -2437,9 +2532,9 @@ export default function ServicosPage() {
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
       setConsumos(formData.consumos || [])
+      setRascunhoAtualId(null)
       setServicoEmEdicaoId(servico.id)
       setOsNumber(servico.osNumber)
-      reservedOsNumberRef.current = servico.osNumber
       setOsStatus(servico.osStatus === "cancelada" ? "gerada" : servico.osStatus)
       setDataGeracao(new Date().toLocaleDateString("pt-BR"))
       setOsDocumentoHtmlSnapshot("")
@@ -2502,7 +2597,7 @@ export default function ServicosPage() {
       osAssinadaStoragePath?: string
       osAssinadaTamanho?: number
     },
-  ): Promise<{ financeiroErro?: string }> => {
+  ): Promise<{ saved: ServicoSupabaseItem; financeiroErro?: string }> => {
     const saved = await upsertServicoSupabase({
       id: servico.id,
       osNumber: servico.osNumber,
@@ -2576,7 +2671,7 @@ export default function ServicosPage() {
 
     if (servico.registerRevenueInCashFlow && saved.cobrancaModo !== "contrato") {
       if (saved.valorCobranca <= 0) {
-        return { financeiroErro: "valor informado é R$ 0,00 — informe o valor do serviço para registrar no financeiro" }
+        return { saved, financeiroErro: "Informe um valor maior que zero para registrar a cobrança no Financeiro." }
       }
       try {
         await upsertReceitaServicoSupabase({
@@ -2594,12 +2689,12 @@ export default function ServicosPage() {
           observacoes: saved.motivoAdicional || undefined,
         })
       } catch (err) {
-        const msg = (err as any)?.message || (err as any)?.code || JSON.stringify(err) || "erro desconhecido ao registrar no financeiro"
-        return { financeiroErro: msg }
+        console.error("Falha ao registrar cobrança no Financeiro", err)
+        return { saved, financeiroErro: "A cobrança não foi registrada. Abra o Financeiro e tente novamente." }
       }
     }
 
-    return {}
+    return { saved }
   }
 
   const handleAtualizarStatusAgendada = async (id: string, status: StatusAgendado) => {
@@ -2799,8 +2894,7 @@ export default function ServicosPage() {
   }
 
   const concluirFluxoAgendamento = () => {
-    reservedOsNumberRef.current = ""
-    osNumberReservationRef.current = null
+    setRascunhoAtualId(null)
     setOsNumber("")
     setOsStatus("a_gerar")
     setDataGeracao(null)
@@ -2815,16 +2909,8 @@ const handleConfirmarAgendamentoFinal = async () => {
     if (isFinalizandoAgendamento) return
     setIsFinalizandoAgendamento(true)
 
-    if (!osNumber) {
-      setToastMessage("A OS ainda nao possui um numero reservado. Gere a OS novamente.")
-      setShowToast(true)
-      setTimeout(() => setShowToast(false), 2500)
-      setIsFinalizandoAgendamento(false)
-      return
-    }
-
     if (!osDocumentoHtmlSnapshot) {
-      setToastMessage("A OS ainda esta carregando. Aguarde 1 segundo e clique novamente.")
+      setToastMessage("A prévia ainda está sendo preparada. Aguarde alguns segundos e tente novamente. A O.S. não foi gerada.")
       setShowToast(true)
       setTimeout(() => setShowToast(false), 2500)
       setIsFinalizandoAgendamento(false)
@@ -2859,7 +2945,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     })
 
     if (osExistente) {
-      setToastMessage(`A OS ${osExistente.osNumber} ja foi gerada para este agendamento.`)
+      setToastMessage(`Este agendamento já possui a ${osExistente.osNumber}. Nenhuma nova O.S. foi gerada.`)
       setShowToast(true)
       setTimeout(() => {
         setShowToast(false)
@@ -2874,7 +2960,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     const novoServico: ServicoAgendado = {
       ...servicoOriginal,
       id: servicoEmEdicaoId || "",
-      osNumber,
+      osNumber: servicoOriginal?.osNumber || osNumber,
       cliente: clienteSelecionado?.nome || "Cliente nao informado",
       clienteId: clienteSelecionado?.id,
       servico: serviceRequest.serviceName || "Servico sem nome",
@@ -2909,7 +2995,16 @@ const handleConfirmarAgendamentoFinal = async () => {
     }
     try {
       setPageError("")
-      const { financeiroErro } = await persistServicoAgendado(novoServico)
+      const { saved, financeiroErro } = await persistServicoAgendado(novoServico)
+      setOsNumber(saved.osNumber)
+      setDataGeracao(new Date().toLocaleDateString("pt-BR"))
+      if (rascunhoAtualId) {
+        const rascunhoFinalizadoId = rascunhoAtualId
+        setRascunhoAtualId(null)
+        void deleteServicoRascunhoSupabase(rascunhoFinalizadoId)
+          .then(() => setRascunhos((prev) => prev.filter((item) => item.id !== rascunhoFinalizadoId)))
+          .catch((error) => console.error("Falha ao remover rascunho já finalizado", error))
+      }
 
       if (
         isBillingDireto(serviceRequest.billing.mode) &&
@@ -2917,7 +3012,7 @@ const handleConfirmarAgendamentoFinal = async () => {
         serviceRequest.billing.issueReceipt
       ) {
         abrirEImprimirRecibo({
-          osNumber: novoServico.osNumber,
+          osNumber: saved.osNumber,
           clienteNome: clienteSelecionado?.nome || "Cliente não informado",
           clienteEndereco: localSelecionado
             ? `${localSelecionado.endereco}, ${localSelecionado.numero} - ${localSelecionado.bairro} - ${localSelecionado.cidade}/${localSelecionado.estado} - Cep : ${localSelecionado.cep}`
@@ -2932,16 +3027,16 @@ const handleConfirmarAgendamentoFinal = async () => {
       }
 
       if (financeiroErro) {
-        setPageError(`Serviço salvo! Mas a receita NÃO foi registrada no financeiro: ${financeiroErro}`)
-        setToastMessage("Serviço salvo. Verifique o aviso sobre o financeiro acima.")
+        setPageError(`${saved.osNumber} gerada com sucesso. ${financeiroErro}`)
+        setToastMessage(`${saved.osNumber} foi gerada. Verifique o aviso sobre a cobrança.`)
         setShowToast(true)
         setTimeout(() => { setShowToast(false); concluirFluxoAgendamento() }, 4000)
       } else if (isTipoPragas(serviceRequest.serviceType) && consumos.length === 0) {
-        setToastMessage("Aviso: Voce ainda nao informou produtos utilizados. Isso pode ser preenchido apos a execucao.")
+        setToastMessage(`${saved.osNumber} foi gerada. Os produtos utilizados podem ser informados após a execução.`)
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
-          setToastMessage("Agendamento confirmado. OS pronta para execucao em campo.")
+          setToastMessage(`${saved.osNumber} confirmada e pronta para execução.`)
           setShowToast(true)
           setTimeout(() => {
             setShowToast(false)
@@ -2949,7 +3044,7 @@ const handleConfirmarAgendamentoFinal = async () => {
           }, 2000)
         }, 3000)
       } else {
-        setToastMessage(servicoEmEdicaoId ? "Alteracoes da OS salvas com sucesso." : "Agendamento confirmado. OS pronta para execucao em campo.")
+        setToastMessage(servicoEmEdicaoId ? `${saved.osNumber} atualizada com sucesso.` : `${saved.osNumber} gerada e salva com sucesso.`)
         setShowToast(true)
         setTimeout(() => {
           setShowToast(false)
@@ -2957,9 +3052,9 @@ const handleConfirmarAgendamentoFinal = async () => {
         }, 2000)
       }
     } catch (error) {
-      console.error("Falha ao salvar agendamento no Supabase", error)
-      setPageError(getErrorMessage(error))
-      setToastMessage("Nao foi possivel salvar a OS no Supabase.")
+      console.error("Falha ao gerar a OS", error)
+      setPageError("Não foi possível gerar a O.S. Nenhum número foi confirmado. Verifique sua conexão e tente novamente.")
+      setToastMessage("A O.S. não foi gerada. Tente novamente.")
       setShowToast(true)
       setTimeout(() => setShowToast(false), 2500)
     } finally {
@@ -3107,7 +3202,7 @@ const handleConfirmarAgendamentoFinal = async () => {
 
     return {
       tipoServico,
-      osNumber,
+      osNumber: osNumberPreview,
       dataServico: formatDateBR(dataBase),
       validadeCrv: "09/08/2027",
       cliente: clienteSelecionado.nome,
@@ -3143,7 +3238,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     dadosTecnicosDesentupimento.observacoes,
     dadosTecnicosDesentupimento.tecnico,
     localSelecionado,
-    osNumber,
+    osNumberPreview,
     nomesResponsaveisSelecionados,
     tiposServico,
   ])
@@ -4102,7 +4197,7 @@ const handleConfirmarAgendamentoFinal = async () => {
 
               <div className="flex items-center justify-center pt-4">
                 <Badge variant="outline" className="text-lg px-4 py-2">
-                  Clique em "Confirmar Agendamento" para gerar a OS
+                  Avance para revisar. O número será gerado somente ao finalizar e confirmar.
                 </Badge>
               </div>
             </CardContent>
@@ -4384,7 +4479,7 @@ const handleConfirmarAgendamentoFinal = async () => {
             {/* CARD 6 - Prévia do Documento (PDF Preview) */}
             <PdfPreviewMock
               status={osStatus}
-              osNumber={osNumber}
+              osNumber={osNumberPreview}
               tipoOS={getTipoOS()}
               cliente={clienteSelecionado ? {
                 nome: clienteSelecionado.nome,
@@ -4938,6 +5033,66 @@ const handleConfirmarAgendamentoFinal = async () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showRascunhosDialog} onOpenChange={setShowRascunhosDialog}>
+        <DialogContent className="max-h-[85vh] sm:max-w-[680px]">
+          <DialogHeader>
+            <DialogTitle>Rascunhos de O.S.</DialogTitle>
+            <DialogDescription>
+              Continue um preenchimento salvo anteriormente. Rascunhos não possuem número de O.S.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+            {isLoadingDrafts ? (
+              <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+                Carregando rascunhos...
+              </div>
+            ) : rascunhos.length === 0 ? (
+              <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+                Nenhum rascunho salvo.
+              </div>
+            ) : (
+              rascunhos.map((rascunho) => (
+                <div key={rascunho.id} className="rounded-lg border p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{rascunho.cliente || "Cliente ainda não selecionado"}</p>
+                      <p className="truncate text-sm text-muted-foreground">{rascunho.servico || "Serviço ainda não informado"}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline">Etapa {rascunho.currentStep} de 3</Badge>
+                        <span>
+                          Salvo em {rascunho.updatedAt ? new Date(rascunho.updatedAt).toLocaleString("pt-BR") : "data não informada"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button size="sm" onClick={() => void handleRetomarRascunho(rascunho)}>
+                        Continuar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-transparent text-red-600"
+                        onClick={() => void handleExcluirRascunho(rascunho)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRascunhosDialog(false)} className="bg-transparent">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {activeTab === "nova-solicitacao" && (
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -4946,10 +5101,19 @@ const handleConfirmarAgendamentoFinal = async () => {
             {currentStep === 1 ? "Cancelar" : "Voltar"}
           </Button>
 
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={handleSalvarRascunho} className="gap-2 bg-transparent">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button variant="outline" onClick={handleAbrirRascunhos} className="gap-2 bg-transparent">
+              <ClipboardList className="h-4 w-4" />
+              Rascunhos{rascunhos.length > 0 ? ` (${rascunhos.length})` : ""}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void handleSalvarRascunho()}
+              className="gap-2 bg-transparent"
+              disabled={isSavingDraft || Boolean(servicoEmEdicaoId)}
+            >
               <FileText className="h-4 w-4" />
-              Salvar rascunho
+              {isSavingDraft ? "Salvando..." : rascunhoAtualId ? "Atualizar rascunho" : "Salvar rascunho"}
             </Button>
             
             {currentStep === 1 ? (
@@ -4963,14 +5127,14 @@ const handleConfirmarAgendamentoFinal = async () => {
                 const generated = await handleGerarOS()
                 if (generated) setCurrentStep(3)
               }} className="gap-2">
-              {servicoEmEdicaoId ? "Revisar alteracoes" : "Confirmar Agendamento"}
+              {servicoEmEdicaoId ? "Revisar alterações" : "Revisar O.S."}
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
               <Button 
                 onClick={handleConfirmarAgendamentoFinal} 
                 className="gap-2"
-                disabled={osStatus === "a_gerar" || isFinalizandoAgendamento}
+                disabled={isFinalizandoAgendamento}
               >
                 {servicoEmEdicaoId ? "Salvar alteracoes" : "Finalizar e Confirmar"}
                 <CheckCircle className="h-4 w-4" />
