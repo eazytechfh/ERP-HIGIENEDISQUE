@@ -80,6 +80,7 @@ export function PdfPreviewMock({
   const osOnlyRef = useRef<HTMLDivElement>(null)
   const certificadoRef = useRef<HTMLDivElement>(null)
   const isGenerated = status !== "a_gerar"
+  const canPrint = isGenerated && osNumber !== "OS-PENDENTE"
 
   useEffect(() => {
     if (!onCaptureHtml || !isGenerated || !printRef.current) return
@@ -168,7 +169,7 @@ export function PdfPreviewMock({
             <FileText className="h-5 w-5 text-primary" />
             Previa do Documento (OS Oficial)
           </CardTitle>
-          {isGenerated && (
+          {canPrint && (
             <div className="flex gap-2">
               {certificadoData && (
                 <Button variant="outline" size="sm" onClick={handlePrintCertificado} className="gap-2 bg-transparent">

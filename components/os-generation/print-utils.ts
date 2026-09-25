@@ -136,28 +136,37 @@ export function buildPrintDocument(bodyHtml: string, title: string, options: Pri
 </html>`
 }
 
-export function openPrintWindow(bodyHtml: string, title: string, options: PrintOptions = {}): void {
+export function openPrintDocument(documentHtml: string): boolean {
   const printWindow = window.open("", "_blank")
-  if (!printWindow) return
+  if (!printWindow) return false
+
+  // Nao use document.write() aqui. Em Chromium, escrever sobre o documento
+  // inicial da nova janela pode destruir o contexto JavaScript que originou
+  // a chamada. Quando o print() roda depois do carregamento das imagens, o
+  // navegador pode entao rejeita-lo com "callback is no longer runnable".
+  // Copiar head/body preserva o mesmo Window e o mesmo contexto durante todo
+  // o fluxo de impressao.
+  const parsedDocument = new DOMParser().parseFromString(documentHtml, "text/html")
+  const targetDocument = printWindow.document
+  targetDocument.documentElement.lang = parsedDocument.documentElement.lang
+  targetDocument.head.innerHTML = parsedDocument.head.innerHTML
+  targetDocument.body.className = parsedDocument.body.className
+  targetDocument.body.innerHTML = parsedDocument.body.innerHTML
 
   let printed = false
   const triggerPrint = async () => {
     if (printed) return
     printed = true
     await waitForPrintImages(Array.from(printWindow.document.images))
+    if (printWindow.closed) return
     printWindow.focus()
     printWindow.print()
   }
 
-  printWindow.document.write(buildPrintDocument(bodyHtml, title, options))
-  printWindow.document.close()
+  void triggerPrint()
+  return true
+}
 
-  // Espera a janela carregar e, dentro de triggerPrint, aguarda tambem logos
-  // e QR codes. O fallback evita travar se algum recurso nao responder.
-  if (printWindow.document.readyState === "complete") {
-    triggerPrint()
-  } else {
-    printWindow.addEventListener("load", triggerPrint, { once: true })
-    setTimeout(triggerPrint, 1500)
-  }
+export function openPrintWindow(bodyHtml: string, title: string, options: PrintOptions = {}): boolean {
+  return openPrintDocument(buildPrintDocument(bodyHtml, title, options))
 }
