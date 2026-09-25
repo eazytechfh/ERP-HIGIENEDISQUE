@@ -14,7 +14,7 @@ import { CLIENTE_COLUMNS_SELETOR, listClientesSupabase } from "@/lib/supabase/cl
 import { mapClienteToServicoView } from "@/lib/supabase/clientes-view"
 import { getOSAssinadaArquivoUrl, listServicosSupabase } from "@/lib/supabase/servicos-repo"
 import { extrairGarantiasServico, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
-import { openPrintDocument } from "@/components/os-generation/print-utils"
+import { buildPrintDocument, openPrintWindow, splitSavedOSDocumentHtml } from "@/components/os-generation/print-utils"
 
 type ClienteResumo = {
   id: string
@@ -237,20 +237,8 @@ export default function HistoricoPage() {
     return date.toLocaleDateString("pt-BR")
   }
 
-  const buildOSDocumentHtml = (contentHtml: string, osNumberValue: string) => `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${osNumberValue}</title>
-  <style>
-    body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111827; }
-    table { border-collapse: collapse; width: 100%; }
-    @media print { body { margin: 0; padding: 10px; } .no-print { display: none; } }
-  </style>
-</head>
-<body>${contentHtml}</body>
-</html>`
+  const buildOSDocumentHtml = (contentHtml: string, osNumberValue: string) =>
+    buildPrintDocument(contentHtml, osNumberValue)
 
   const handleVerOS = (servico: ServicoHistorico) => {
     setSelectedServico(servico)
@@ -259,7 +247,9 @@ export default function HistoricoPage() {
 
   const handleImprimirOS = () => {
     if (!selectedServico?.osDocumentoHtml) return
-    openPrintDocument(buildOSDocumentHtml(selectedServico.osDocumentoHtml, selectedServico.osNumber))
+    const { serviceOrderHtml } = splitSavedOSDocumentHtml(selectedServico.osDocumentoHtml)
+    if (!serviceOrderHtml) return
+    openPrintWindow(serviceOrderHtml, `OS ${selectedServico.osNumber}`)
   }
 
   const handleAbrirAnexoAssinado = async (servico: ServicoHistorico) => {
