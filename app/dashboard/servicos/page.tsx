@@ -66,6 +66,7 @@ import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabas
 import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
 import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
 import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
+import { deleteServicoRascunhoSupabase, listServicosRascunhosSupabase, upsertServicoRascunhoSupabase, type ServicoRascunho } from "@/lib/supabase/servicos-rascunhos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 import { extrairGarantiasServicos, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
@@ -1510,6 +1511,11 @@ export default function ServicosPage() {
   const [tipoForm, setTipoForm] = useState({ nome: "", categoria: "outro" as TipoServico["categoria"] })
   const [tipoFormError, setTipoFormError] = useState("")
   const [pageError, setPageError] = useState("")
+  const [rascunhos, setRascunhos] = useState<ServicoRascunho[]>([])
+  const [rascunhoAtualId, setRascunhoAtualId] = useState<string | null>(null)
+  const [showRascunhosDialog, setShowRascunhosDialog] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isLoadingDrafts, setIsLoadingDrafts] = useState(false)
 
   const [clientesBuscaErro, setClientesBuscaErro] = useState<string | null>(null)
 
@@ -1555,6 +1561,26 @@ export default function ServicosPage() {
   useEffect(() => {
     loadClientesPaginados(clientesPage, searchTermRef.current)
   }, [clientesPage])
+
+  const carregarRascunhos = useCallback(async (mostrarErro = false) => {
+    setIsLoadingDrafts(true)
+    try {
+      setRascunhos(await listServicosRascunhosSupabase())
+    } catch (error) {
+      console.error("Falha ao carregar rascunhos", error)
+      if (mostrarErro) {
+        setToastMessage("Não foi possível carregar os rascunhos. Tente novamente.")
+        setShowToast(true)
+        setTimeout(() => setShowToast(false), 3000)
+      }
+    } finally {
+      setIsLoadingDrafts(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void carregarRascunhos()
+  }, [carregarRascunhos])
 
   useEffect(() => {
     let mounted = true
@@ -2137,8 +2163,102 @@ export default function ServicosPage() {
     }
   }
 
-  const handleSalvarRascunho = () => {
-    setToastMessage("Rascunho salvo com sucesso!")
+  const handleSalvarRascunho = async () => {
+    if (servicoEmEdicaoId) {
+      setToastMessage("Conclua ou cancele a edição da O.S. antes de salvar um rascunho.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return
+    }
+
+    setIsSavingDraft(true)
+    try {
+      const saved = await upsertServicoRascunhoSupabase({
+        id: rascunhoAtualId || undefined,
+        clienteId: clienteSelecionado?.id,
+        cliente: clienteSelecionado?.nome || "Cliente ainda não selecionado",
+        servico: serviceRequest.serviceName || "Serviço ainda não informado",
+        currentStep,
+        formData: criarOSFormData() as unknown as Record<string, unknown>,
+      })
+      setRascunhoAtualId(saved.id)
+      setRascunhos((prev) => [saved, ...prev.filter((item) => item.id !== saved.id)])
+      setToastMessage("Rascunho salvo. Nenhum número de O.S. foi gerado.")
+    } catch (error) {
+      console.error("Falha ao salvar rascunho", error)
+      setToastMessage("Não foi possível salvar o rascunho. Tente novamente.")
+    } finally {
+      setIsSavingDraft(false)
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+    }
+  }
+
+  const handleAbrirRascunhos = () => {
+    setShowRascunhosDialog(true)
+    void carregarRascunhos(true)
+  }
+
+  const handleRetomarRascunho = async (rascunho: ServicoRascunho) => {
+    const formData = rascunho.formData as unknown as OSFormData
+    if (!formData?.serviceRequest) {
+      setToastMessage("Este rascunho não pôde ser aberto. Exclua-o e crie um novo.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      return
+    }
+
+    try {
+      let cliente: Cliente | null = null
+      let locais: LocalAtendimento[] = []
+      if (rascunho.clienteId) {
+        const clienteRow = await getClienteSupabase(rascunho.clienteId)
+        cliente = clienteRow ? mapClienteToServicoView(clienteRow) : null
+        locais = clienteRow ? (buildLocaisPorCliente([clienteRow])[clienteRow.id || ""] || []) : []
+      }
+
+      setClienteSelecionado(cliente)
+      setLocaisCliente(locais)
+      setServiceRequest({ ...formData.serviceRequest, attachments: [] })
+      setObservacoesAcesso(formData.observacoesAcesso || "")
+      setDadosTecnicosVetores(formData.dadosTecnicosVetores)
+      setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
+      setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
+      setConsumos(formData.consumos || [])
+      setRascunhoAtualId(rascunho.id)
+      setServicoEmEdicaoId(null)
+      setOsNumber("")
+      setOsStatus(rascunho.currentStep === 3 ? "gerada" : "a_gerar")
+      setDataGeracao(null)
+      setOsDocumentoHtmlSnapshot("")
+      setCertificadoGerado(false)
+      setErrors({})
+      setCurrentStep(rascunho.currentStep)
+      setActiveTab("nova-solicitacao")
+      setShowRascunhosDialog(false)
+      setToastMessage("Rascunho aberto. Continue de onde parou.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (error) {
+      console.error("Falha ao abrir rascunho", error)
+      setToastMessage("Não foi possível abrir o rascunho. Tente novamente.")
+      setShowToast(true)
+      setTimeout(() => setShowToast(false), 3000)
+    }
+  }
+
+  const handleExcluirRascunho = async (rascunho: ServicoRascunho) => {
+    if (!window.confirm("Deseja excluir este rascunho?")) return
+    try {
+      await deleteServicoRascunhoSupabase(rascunho.id)
+      setRascunhos((prev) => prev.filter((item) => item.id !== rascunho.id))
+      if (rascunhoAtualId === rascunho.id) setRascunhoAtualId(null)
+      setToastMessage("Rascunho excluído.")
+    } catch (error) {
+      console.error("Falha ao excluir rascunho", error)
+      setToastMessage("Não foi possível excluir o rascunho. Tente novamente.")
+    }
     setShowToast(true)
     setTimeout(() => setShowToast(false), 3000)
   }
@@ -2374,6 +2494,7 @@ export default function ServicosPage() {
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
       setConsumos([])
+      setRascunhoAtualId(null)
       setServicoEmEdicaoId(null)
       setOsNumber("")
       setOsStatus("a_gerar")
@@ -2411,6 +2532,7 @@ export default function ServicosPage() {
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
       setConsumos(formData.consumos || [])
+      setRascunhoAtualId(null)
       setServicoEmEdicaoId(servico.id)
       setOsNumber(servico.osNumber)
       setOsStatus(servico.osStatus === "cancelada" ? "gerada" : servico.osStatus)
@@ -2772,6 +2894,7 @@ export default function ServicosPage() {
   }
 
   const concluirFluxoAgendamento = () => {
+    setRascunhoAtualId(null)
     setOsNumber("")
     setOsStatus("a_gerar")
     setDataGeracao(null)
@@ -2875,6 +2998,13 @@ const handleConfirmarAgendamentoFinal = async () => {
       const { saved, financeiroErro } = await persistServicoAgendado(novoServico)
       setOsNumber(saved.osNumber)
       setDataGeracao(new Date().toLocaleDateString("pt-BR"))
+      if (rascunhoAtualId) {
+        const rascunhoFinalizadoId = rascunhoAtualId
+        setRascunhoAtualId(null)
+        void deleteServicoRascunhoSupabase(rascunhoFinalizadoId)
+          .then(() => setRascunhos((prev) => prev.filter((item) => item.id !== rascunhoFinalizadoId)))
+          .catch((error) => console.error("Falha ao remover rascunho já finalizado", error))
+      }
 
       if (
         isBillingDireto(serviceRequest.billing.mode) &&
@@ -4903,6 +5033,66 @@ const handleConfirmarAgendamentoFinal = async () => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showRascunhosDialog} onOpenChange={setShowRascunhosDialog}>
+        <DialogContent className="max-h-[85vh] sm:max-w-[680px]">
+          <DialogHeader>
+            <DialogTitle>Rascunhos de O.S.</DialogTitle>
+            <DialogDescription>
+              Continue um preenchimento salvo anteriormente. Rascunhos não possuem número de O.S.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+            {isLoadingDrafts ? (
+              <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+                Carregando rascunhos...
+              </div>
+            ) : rascunhos.length === 0 ? (
+              <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+                Nenhum rascunho salvo.
+              </div>
+            ) : (
+              rascunhos.map((rascunho) => (
+                <div key={rascunho.id} className="rounded-lg border p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{rascunho.cliente || "Cliente ainda não selecionado"}</p>
+                      <p className="truncate text-sm text-muted-foreground">{rascunho.servico || "Serviço ainda não informado"}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline">Etapa {rascunho.currentStep} de 3</Badge>
+                        <span>
+                          Salvo em {rascunho.updatedAt ? new Date(rascunho.updatedAt).toLocaleString("pt-BR") : "data não informada"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button size="sm" onClick={() => void handleRetomarRascunho(rascunho)}>
+                        Continuar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-transparent text-red-600"
+                        onClick={() => void handleExcluirRascunho(rascunho)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Excluir
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRascunhosDialog(false)} className="bg-transparent">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {activeTab === "nova-solicitacao" && (
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t shadow-lg">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -4911,10 +5101,19 @@ const handleConfirmarAgendamentoFinal = async () => {
             {currentStep === 1 ? "Cancelar" : "Voltar"}
           </Button>
 
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={handleSalvarRascunho} className="gap-2 bg-transparent">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button variant="outline" onClick={handleAbrirRascunhos} className="gap-2 bg-transparent">
+              <ClipboardList className="h-4 w-4" />
+              Rascunhos{rascunhos.length > 0 ? ` (${rascunhos.length})` : ""}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void handleSalvarRascunho()}
+              className="gap-2 bg-transparent"
+              disabled={isSavingDraft || Boolean(servicoEmEdicaoId)}
+            >
               <FileText className="h-4 w-4" />
-              Salvar rascunho
+              {isSavingDraft ? "Salvando..." : rascunhoAtualId ? "Atualizar rascunho" : "Salvar rascunho"}
             </Button>
             
             {currentStep === 1 ? (
