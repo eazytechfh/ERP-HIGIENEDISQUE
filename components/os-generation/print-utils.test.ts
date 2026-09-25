@@ -1,7 +1,34 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { buildPrintDocument, waitForPrintImages } from "./print-utils.ts"
+import {
+  buildPrintDocument,
+  composeSavedOSDocumentHtml,
+  hasSavedCertificateHtml,
+  splitSavedOSDocumentHtml,
+  waitForPrintImages,
+} from "./print-utils.ts"
+
+test("stores and separates the service order from its certificate", () => {
+  const savedHtml = composeSavedOSDocumentHtml(
+    '<div class="os-a4-page">OS</div>',
+    '<div class="certificado-a5-page">Certificado</div>',
+  )
+  const sections = splitSavedOSDocumentHtml(savedHtml)
+
+  assert.equal(sections.serviceOrderHtml, '<div class="os-a4-page">OS</div>')
+  assert.equal(sections.certificateHtml, '<div class="certificado-a5-page">Certificado</div>')
+  assert.equal(hasSavedCertificateHtml(savedHtml), true)
+})
+
+test("keeps saved service orders without a certificate printable", () => {
+  const savedHtml = composeSavedOSDocumentHtml('<div class="os-a4-page">OS</div>')
+  const sections = splitSavedOSDocumentHtml(savedHtml)
+
+  assert.equal(sections.serviceOrderHtml, '<div class="os-a4-page">OS</div>')
+  assert.equal(sections.certificateHtml, "")
+  assert.equal(hasSavedCertificateHtml(savedHtml), false)
+})
 
 test("keeps service orders on A4 by default", () => {
   const html = buildPrintDocument('<div class="os-a4-page">OS</div>', "OS")

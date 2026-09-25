@@ -13,7 +13,7 @@ import type { DadosTecnicosVetores } from "./vetores-form"
 import type { DadosTecnicosLimpeza } from "./limpeza-form"
 import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
-import { openPrintWindow } from "./print-utils"
+import { composeSavedOSDocumentHtml, openPrintWindow } from "./print-utils"
 import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "./responsavel-tecnica"
 
 type ClienteInfo = {
@@ -83,8 +83,11 @@ export function PdfPreviewMock({
   const canPrint = isGenerated && osNumber !== "OS-PENDENTE"
 
   useEffect(() => {
-    if (!onCaptureHtml || !isGenerated || !printRef.current) return
-    onCaptureHtml(printRef.current.innerHTML)
+    if (!onCaptureHtml || !isGenerated || !osOnlyRef.current) return
+    const certificateHtml = incluirCertificado && certificadoData && certificadoRef.current
+      ? certificadoRef.current.innerHTML
+      : ""
+    onCaptureHtml(composeSavedOSDocumentHtml(osOnlyRef.current.innerHTML, certificateHtml))
   }, [onCaptureHtml, isGenerated, osNumber, tipoOS, cliente, local, dadosTecnicos, dadosTecnicosLimpeza, dadosTecnicosDesentupimento, dataServico, consumos, veiculo, descricaoServico, mostrarDeclaracaoCupim, certificadoData, incluirCertificado])
 
   const handlePrint = () => {

@@ -35,6 +35,71 @@ type PrintOptions = {
   extraStyle?: string
 }
 
+const OS_SECTION_START = "<!-- HD_OS_SECTION_START -->"
+const OS_SECTION_END = "<!-- HD_OS_SECTION_END -->"
+const CERTIFICATE_SECTION_START = "<!-- HD_CERTIFICATE_SECTION_START -->"
+const CERTIFICATE_SECTION_END = "<!-- HD_CERTIFICATE_SECTION_END -->"
+
+export type SavedOSDocumentSections = {
+  serviceOrderHtml: string
+  certificateHtml: string
+}
+
+export function composeSavedOSDocumentHtml(serviceOrderHtml: string, certificateHtml = ""): string {
+  const serviceOrderSection = `${OS_SECTION_START}${serviceOrderHtml}${OS_SECTION_END}`
+  if (!certificateHtml) return serviceOrderSection
+
+  return `${serviceOrderSection}${CERTIFICATE_SECTION_START}${certificateHtml}${CERTIFICATE_SECTION_END}`
+}
+
+function extractMarkedSection(contentHtml: string, start: string, end: string): string {
+  const startIndex = contentHtml.indexOf(start)
+  if (startIndex < 0) return ""
+  const contentStart = startIndex + start.length
+  const endIndex = contentHtml.indexOf(end, contentStart)
+  if (endIndex < 0) return ""
+  return contentHtml.slice(contentStart, endIndex).trim()
+}
+
+export function splitSavedOSDocumentHtml(contentHtml: string): SavedOSDocumentSections {
+  if (!contentHtml) return { serviceOrderHtml: "", certificateHtml: "" }
+
+  const markedServiceOrder = extractMarkedSection(contentHtml, OS_SECTION_START, OS_SECTION_END)
+  if (markedServiceOrder) {
+    return {
+      serviceOrderHtml: markedServiceOrder,
+      certificateHtml: extractMarkedSection(contentHtml, CERTIFICATE_SECTION_START, CERTIFICATE_SECTION_END),
+    }
+  }
+
+  // Compatibilidade com documentos gravados antes da separacao. Neles, a OS
+  // e o certificado eram dois elementos de primeiro nivel no mesmo HTML.
+  if (typeof DOMParser !== "undefined") {
+    const parsed = new DOMParser().parseFromString(`<body>${contentHtml}</body>`, "text/html")
+    const certificatePage = parsed.querySelector(".certificado-a5-page")
+    if (certificatePage) {
+      let certificateRoot: Element = certificatePage
+      while (certificateRoot.parentElement && certificateRoot.parentElement !== parsed.body) {
+        certificateRoot = certificateRoot.parentElement
+      }
+      const certificateHtml = certificateRoot.outerHTML
+      certificateRoot.remove()
+      return {
+        serviceOrderHtml: parsed.body.innerHTML.trim(),
+        certificateHtml,
+      }
+    }
+  }
+
+  return { serviceOrderHtml: contentHtml, certificateHtml: "" }
+}
+
+export function hasSavedCertificateHtml(contentHtml: string): boolean {
+  if (!contentHtml) return false
+  if (contentHtml.includes(CERTIFICATE_SECTION_START)) return true
+  return contentHtml.includes("certificado-a5-page")
+}
+
 type PrintImage = {
   complete: boolean
   addEventListener: (type: "load" | "error", listener: () => void, options?: { once?: boolean }) => void
