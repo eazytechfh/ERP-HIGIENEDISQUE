@@ -53,7 +53,7 @@ import { classificarTipoOS, servicoSemGarantia } from "@/components/os-generatio
 import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "@/components/os-generation/responsavel-tecnica"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
-import { buildPrintDocument, openPrintDocument, openPrintWindow } from "@/components/os-generation/print-utils"
+import { buildPrintDocument, hasSavedCertificateHtml, openPrintDocument, openPrintWindow, splitSavedOSDocumentHtml } from "@/components/os-generation/print-utils"
 import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -1196,6 +1196,7 @@ function ServicosAgendadosContent({
   servicos,
   onVerOS,
   onImprimirOS,
+  onImprimirCertificado,
   onEditarOS,
   canEditOS,
   onVerRecibo,
@@ -1207,6 +1208,7 @@ function ServicosAgendadosContent({
   servicos: ServicoAgendado[]
   onVerOS: (servico: ServicoAgendado) => void
   onImprimirOS: (servico: ServicoAgendado) => void
+  onImprimirCertificado: (servico: ServicoAgendado) => void
   onEditarOS: (servico: ServicoAgendado) => void
   canEditOS: boolean
   onVerRecibo: (servico: ServicoAgendado) => void
@@ -1419,8 +1421,14 @@ function ServicosAgendadosContent({
                     </Button>
                     <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onImprimirOS(servico)}>
                       <Printer className="h-4 w-4" />
-                      Imprimir
+                      Imprimir O.S.
                     </Button>
+                    {hasSavedCertificateHtml(servico.osDocumentoHtml || "") ? (
+                      <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onImprimirCertificado(servico)}>
+                        <Award className="h-4 w-4" />
+                        Imprimir certificado
+                      </Button>
+                    ) : null}
                     {canEditOS && servico.osDocumentoHtml ? (
                       <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={() => onEditarOS(servico)}>
                         <Pencil className="h-4 w-4" />
@@ -2306,7 +2314,16 @@ export default function ServicosPage() {
 
   const openAndPrintSavedOS = (contentHtml: string, osNumberValue: string) => {
     if (!contentHtml) return false
-    return openPrintWindow(contentHtml, `OS ${osNumberValue}`)
+    const { serviceOrderHtml } = splitSavedOSDocumentHtml(contentHtml)
+    if (!serviceOrderHtml) return false
+    return openPrintWindow(serviceOrderHtml, `OS ${osNumberValue}`)
+  }
+
+  const openAndPrintSavedCertificate = (contentHtml: string, osNumberValue: string) => {
+    if (!contentHtml) return false
+    const { certificateHtml } = splitSavedOSDocumentHtml(contentHtml)
+    if (!certificateHtml) return false
+    return openPrintWindow(certificateHtml, `Certificado ${osNumberValue}`, { page: "certificate" })
   }
 
   const abrirEImprimirRecibo = (params: ReciboDocumentoParams) => {
@@ -2572,6 +2589,15 @@ export default function ServicosPage() {
     setToastMessage(`Impressao da ${servico.osNumber} enviada.`)
     setShowToast(true)
     setTimeout(() => setShowToast(false), 2000)
+  }
+
+  const handleImprimirCertificadoAgendado = (servico: ServicoAgendado) => {
+    const impresso = openAndPrintSavedCertificate(servico.osDocumentoHtml || "", servico.osNumber)
+    setToastMessage(impresso
+      ? `Impressao do certificado da ${servico.osNumber} enviada.`
+      : `A ${servico.osNumber} nao possui certificado salvo.`)
+    setShowToast(true)
+    setTimeout(() => setShowToast(false), 3000)
   }
 
   const handleVerReciboAgendado = (servico: ServicoAgendado) => {
@@ -4738,6 +4764,7 @@ const handleConfirmarAgendamentoFinal = async () => {
               servicos={servicosAgendados}
               onVerOS={handleVerOSAgendada}
               onImprimirOS={handleImprimirOSAgendada}
+              onImprimirCertificado={handleImprimirCertificadoAgendado}
               onEditarOS={handleEditarOSAgendada}
               canEditOS={can("servicos.edit")}
               onVerRecibo={handleVerReciboAgendado}
@@ -4815,13 +4842,26 @@ const handleConfirmarAgendamentoFinal = async () => {
           )}
           <DialogFooter>
             {selectedAgendadaOS?.osDocumentoHtml && (
-              <Button
-                variant="outline"
-                onClick={() => openAndPrintSavedOS(selectedAgendadaOS.osDocumentoHtml || "", selectedAgendadaOS.osNumber)}
-                className="bg-transparent"
-              >
-                Imprimir OS
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => openAndPrintSavedOS(selectedAgendadaOS.osDocumentoHtml || "", selectedAgendadaOS.osNumber)}
+                  className="bg-transparent"
+                >
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir O.S.
+                </Button>
+                {hasSavedCertificateHtml(selectedAgendadaOS.osDocumentoHtml) ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => openAndPrintSavedCertificate(selectedAgendadaOS.osDocumentoHtml || "", selectedAgendadaOS.osNumber)}
+                    className="bg-transparent"
+                  >
+                    <Award className="mr-2 h-4 w-4" />
+                    Imprimir certificado
+                  </Button>
+                ) : null}
+              </>
             )}
             <Button variant="outline" onClick={() => setShowOSViewerModal(false)} className="bg-transparent">
               Fechar
