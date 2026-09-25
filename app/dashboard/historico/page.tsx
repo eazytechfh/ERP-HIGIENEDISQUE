@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, CheckCircle2, Clock, XCircle, Bell, Calendar, FileText, Eye, Paperclip, ChevronLeft, ChevronRight } from "lucide-react"
 import { toIsoDate } from "@/lib/flow-store"
 import { CLIENTE_COLUMNS_SELETOR, listClientesSupabase } from "@/lib/supabase/clientes-repo"
@@ -54,19 +55,29 @@ const statusMap: Record<string, ServicoHistorico["status"]> = {
 
 const PAGE_SIZE = 20
 
+type ListaClientesModo = "com_servicos" | "todos"
+
+function normalizeSearch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .trim()
+}
+
 export default function HistoricoPage() {
+  const [listaClientesModo, setListaClientesModo] = useState<ListaClientesModo>("com_servicos")
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCliente, setSelectedCliente] = useState<ClienteResumo | null>(null)
   const [clientes, setClientes] = useState<ClienteResumo[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoadingClientes, setIsLoadingClientes] = useState(false)
+  const [isLoadingServicos, setIsLoadingServicos] = useState(true)
   const [servicos, setServicos] = useState<ServicoHistorico[]>([])
   const [selectedServico, setSelectedServico] = useState<ServicoHistorico | null>(null)
   const [showOSDialog, setShowOSDialog] = useState(false)
 
-  const searchTermRef = useRef(searchTerm)
-  useEffect(() => { searchTermRef.current = searchTerm }, [searchTerm])
   const clientesRequestIdRef = useRef(0)
 
   const loadClientes = useCallback(async (page: number, search: string) => {
@@ -92,19 +103,14 @@ export default function HistoricoPage() {
     }
   }, [])
 
-  // Busca com debounce — reseta para página 1
+  // Busca paginada no cadastro completo de clientes.
   useEffect(() => {
+    if (listaClientesModo !== "todos") return
     const timer = setTimeout(() => {
-      setCurrentPage(1)
-      loadClientes(1, searchTerm)
+      loadClientes(currentPage, searchTerm)
     }, searchTerm ? 600 : 0)
     return () => clearTimeout(timer)
-  }, [searchTerm])
-
-  // Mudança de página
-  useEffect(() => {
-    loadClientes(currentPage, searchTermRef.current)
-  }, [currentPage])
+  }, [currentPage, listaClientesModo, loadClientes, searchTerm])
 
   // Carrega serviços uma vez
   useEffect(() => {
@@ -136,8 +142,53 @@ export default function HistoricoPage() {
         )
       })
       .catch((err) => console.error("Falha ao carregar servicos no historico", err))
+      .finally(() => {
+        if (mounted) setIsLoadingServicos(false)
+      })
     return () => { mounted = false }
   }, [])
+
+  const servicosPorCliente = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const servico of servicos) {
+      if (!servico.clienteId) continue
+      counts.set(servico.clienteId, (counts.get(servico.clienteId) || 0) + 1)
+    }
+    return counts
+  }, [servicos])
+
+  const clientesComServicos = useMemo(() => {
+    const unicos = new Map<string, ClienteResumo>()
+    for (const servico of servicos) {
+      if (!servico.clienteId || unicos.has(servico.clienteId)) continue
+      unicos.set(servico.clienteId, {
+        id: servico.clienteId,
+        nome: servico.cliente || "Cliente sem nome",
+        telefone: "",
+        email: "",
+        empresa: "",
+        cpfCnpj: "",
+      })
+    }
+    return Array.from(unicos.values()).sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }),
+    )
+  }, [servicos])
+
+  const clientesComServicosFiltrados = useMemo(() => {
+    const termo = normalizeSearch(searchTerm)
+    if (!termo) return clientesComServicos
+    return clientesComServicos.filter((cliente) => normalizeSearch(cliente.nome).includes(termo))
+  }, [clientesComServicos, searchTerm])
+
+  const clientesComServicosPaginados = useMemo(() => {
+    const inicio = (currentPage - 1) * PAGE_SIZE
+    return clientesComServicosFiltrados.slice(inicio, inicio + PAGE_SIZE)
+  }, [clientesComServicosFiltrados, currentPage])
+
+  const clientesVisiveis = listaClientesModo === "com_servicos" ? clientesComServicosPaginados : clientes
+  const totalClientesVisiveis = listaClientesModo === "com_servicos" ? clientesComServicosFiltrados.length : totalCount
+  const carregandoLista = listaClientesModo === "com_servicos" ? isLoadingServicos : isLoadingClientes
 
   const notificacoes = useMemo(() => {
     return servicos.map((s) => ({
@@ -155,7 +206,7 @@ export default function HistoricoPage() {
   const servicosRealizados = clienteServicos.filter((s) => s.status === "Realizado").length
   const servicosProgramados = clienteServicos.filter((s) => s.status === "Programado" || s.status === "Em execucao").length
   const servicosCancelados = clienteServicos.filter((s) => s.status === "Cancelado").length
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
+  const totalPages = Math.ceil(totalClientesVisiveis / PAGE_SIZE)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -236,29 +287,54 @@ export default function HistoricoPage() {
             <CardHeader>
               <CardTitle>Selecionar Cliente</CardTitle>
               <CardDescription>
-                {totalCount > 0 ? `${totalCount.toLocaleString("pt-BR")} clientes` : "Busque e selecione um cliente"}
+                {listaClientesModo === "com_servicos"
+                  ? `${totalClientesVisiveis.toLocaleString("pt-BR")} cliente(s) com serviço`
+                  : totalCount > 0
+                    ? `${totalCount.toLocaleString("pt-BR")} clientes cadastrados`
+                    : "Busque e selecione um cliente"}
               </CardDescription>
             </CardHeader>
             <CardContent>
+              <Tabs
+                value={listaClientesModo}
+                onValueChange={(value) => {
+                  setListaClientesModo(value as ListaClientesModo)
+                  setSearchTerm("")
+                  setCurrentPage(1)
+                }}
+                className="mb-3"
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="com_servicos">
+                    Com serviços ({clientesComServicos.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="todos">Todos</TabsTrigger>
+                </TabsList>
+              </Tabs>
               <div className="mb-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Nome, telefone, CPF ou CNPJ..."
+                    placeholder={listaClientesModo === "com_servicos" ? "Buscar cliente com serviço..." : "Nome, telefone, CPF ou CNPJ..."}
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value)
+                      setCurrentPage(1)
+                    }}
                     className="pl-10"
                   />
                 </div>
               </div>
 
               <div className="max-h-[520px] space-y-2 overflow-y-auto">
-                {isLoadingClientes ? (
+                {carregandoLista ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">Carregando...</p>
-                ) : clientes.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">Nenhum cliente encontrado</p>
+                ) : clientesVisiveis.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    {listaClientesModo === "com_servicos" ? "Nenhum cliente com serviço encontrado" : "Nenhum cliente encontrado"}
+                  </p>
                 ) : (
-                  clientes.map((cliente) => (
+                  clientesVisiveis.map((cliente) => (
                     <div
                       key={cliente.id}
                       onClick={() => setSelectedCliente(cliente)}
@@ -266,7 +342,14 @@ export default function HistoricoPage() {
                         selectedCliente?.id === cliente.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                       }`}
                     >
-                      <h3 className="font-semibold text-foreground text-sm">{cliente.nome}</h3>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-foreground text-sm">{cliente.nome}</h3>
+                        {listaClientesModo === "com_servicos" ? (
+                          <Badge variant="secondary" className="shrink-0 text-[11px]">
+                            {servicosPorCliente.get(cliente.id) || 0} serviço(s)
+                          </Badge>
+                        ) : null}
+                      </div>
                       {cliente.empresa && cliente.empresa !== cliente.nome && (
                         <p className="text-xs text-muted-foreground">{cliente.empresa}</p>
                       )}
@@ -283,7 +366,7 @@ export default function HistoricoPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1 || isLoadingClientes}
+                    disabled={currentPage === 1 || carregandoLista}
                     className="gap-1 px-2"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -296,7 +379,7 @@ export default function HistoricoPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage >= totalPages || isLoadingClientes}
+                    disabled={currentPage >= totalPages || carregandoLista}
                     className="gap-1 px-2"
                   >
                     Próx.
