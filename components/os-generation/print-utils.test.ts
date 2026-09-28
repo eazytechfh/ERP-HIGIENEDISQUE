@@ -62,7 +62,7 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   assert.match(html, /<body class="certificate-print">/)
 })
 
-test("moves only the certificate away from the top and left printer edges", () => {
+test("centers the certificate inside the printable area without shifting its right edge out of the page", () => {
   const certificateHtml = buildPrintDocument(
     '<div class="certificado-a5-page">Certificado</div>',
     "Certificado",
@@ -75,7 +75,7 @@ test("moves only the certificate away from the top and left printer edges", () =
 
   assert.match(
     certificateHtml,
-    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*0mm\);/s,
+    /body\.certificate-print\s*{[^}]*transform:\s*none;/s,
   )
   assert.doesNotMatch(serviceOrderHtml, /<body class="certificate-print">/)
 })
