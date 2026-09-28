@@ -100,7 +100,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
                     src={certificadoLogoQrSrc}
                     alt="Higiene Disque e QR Code"
                     style={{
-                      width: "100%",
+                      width: "90%",
                       height: "auto",
                       objectFit: "contain",
                       objectPosition: "left center",

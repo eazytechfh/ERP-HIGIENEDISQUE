@@ -78,6 +78,10 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   )
   assert.match(
     html,
+    /td:has\(\.certificate-company-title\)\s+img\s*{[^}]*width:\s*90%\s*!important;/s,
+  )
+  assert.match(
+    html,
     /\.certificate-company-title\s*~\s*div\s*{[^}]*font-size:\s*0\.92em;/s,
   )
   assert.match(

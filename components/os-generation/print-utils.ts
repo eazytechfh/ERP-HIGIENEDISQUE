@@ -175,6 +175,7 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   .certificado-a5-page { ${certificateDimensions} margin: 0 auto; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
   .certificate-company-title, .certificate-client-field { white-space: nowrap; }
   td:has(.certificate-company-title) > div { grid-template-columns: 51% minmax(0, 1fr) !important; }
+  td:has(.certificate-company-title) img { width: 90% !important; }
   td:has(.certificate-company-title) > div > div:last-child { min-width: 0; }
   .certificate-company-title ~ div { font-size: 0.92em; }
   td > div:has(.certificate-client-field) { grid-template-columns: 18% minmax(0, 1fr) 12% 20% !important; }
