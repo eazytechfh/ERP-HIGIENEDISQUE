@@ -59,6 +59,18 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   assert.match(html, /body\.certificate-print\s*{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s)
   assert.match(html, /\.certificado-a5-page\s*{[^}]*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;[^}]*overflow:\s*hidden;/s)
   assert.match(html, /\.certificate-company-title,\s*\.certificate-client-field\s*{\s*white-space:\s*nowrap;/s)
+  assert.match(
+    html,
+    /td:has\(\.certificate-company-title\)\s*>\s*div\s*{[^}]*grid-template-columns:\s*51% minmax\(0,\s*1fr\)\s*!important;/s,
+  )
+  assert.match(
+    html,
+    /\.certificate-company-title\s*~\s*div\s*{[^}]*font-size:\s*0\.92em;/s,
+  )
+  assert.match(
+    html,
+    /td\s*>\s*div:has\(\.certificate-client-field\)\s*{[^}]*grid-template-columns:\s*18% minmax\(0,\s*1fr\) 12% 20%\s*!important;/s,
+  )
   assert.match(html, /<body class="certificate-print">/)
 })
 
