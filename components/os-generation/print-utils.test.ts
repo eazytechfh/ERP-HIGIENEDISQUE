@@ -13,11 +13,16 @@ import {
 test("provides one shared A5 print builder for every certificate entry point", () => {
   assert.equal(typeof printUtils.buildCertificatePrintDocument, "function")
 
+  const bodyHtml = '<div class="certificado-a5-page">Certificado</div>'
   const html = printUtils.buildCertificatePrintDocument(
-    '<div class="certificado-a5-page">Certificado</div>',
+    bodyHtml,
     "Certificado OS-1",
   )
 
+  assert.equal(
+    html,
+    buildPrintDocument(bodyHtml, "Certificado OS-1", { page: "certificate" }),
+  )
   assert.match(html, /@page\s*{\s*size:\s*A5 landscape;/)
   assert.match(html, /<body class="certificate-print">/)
 })
@@ -62,7 +67,7 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*font-size:\s*11px !important;/s,
+    /\.certificado-a5-page\s*{[^}]*font-size:\s*12px !important;/s,
   )
   assert.match(
     html,
@@ -72,26 +77,12 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   assert.match(html, /body\.certificate-print\s*{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s)
   assert.match(html, /\.certificado-a5-page\s*{[^}]*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;[^}]*overflow:\s*hidden;/s)
   assert.match(html, /\.certificate-company-title,\s*\.certificate-client-field\s*{\s*white-space:\s*nowrap;/s)
-  assert.match(
-    html,
-    /td:has\(\.certificate-company-title\)\s*>\s*div\s*{[^}]*grid-template-columns:\s*51% minmax\(0,\s*1fr\)\s*!important;/s,
-  )
-  assert.match(
-    html,
-    /td:has\(\.certificate-company-title\)\s+img\s*{[^}]*width:\s*90%\s*!important;/s,
-  )
-  assert.match(
-    html,
-    /\.certificate-company-title\s*~\s*div\s*{[^}]*font-size:\s*0\.92em;/s,
-  )
-  assert.match(
-    html,
-    /td\s*>\s*div:has\(\.certificate-client-field\)\s*{[^}]*grid-template-columns:\s*18% minmax\(0,\s*1fr\) 12% 20%\s*!important;/s,
-  )
+  assert.doesNotMatch(html, /td:has\(\.certificate-company-title\)/)
+  assert.doesNotMatch(html, /div:has\(\.certificate-client-field\)/)
   assert.match(html, /<body class="certificate-print">/)
 })
 
-test("centers the certificate inside the printable area without shifting its right edge out of the page", () => {
+test("keeps the original certificate offset inside the printable area", () => {
   const certificateHtml = buildPrintDocument(
     '<div class="certificado-a5-page">Certificado</div>',
     "Certificado",
@@ -104,7 +95,7 @@ test("centers the certificate inside the printable area without shifting its rig
 
   assert.match(
     certificateHtml,
-    /body\.certificate-print\s*{[^}]*transform:\s*none;/s,
+    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*0mm\);/s,
   )
   assert.doesNotMatch(serviceOrderHtml, /<body class="certificate-print">/)
 })

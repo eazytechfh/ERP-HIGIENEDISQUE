@@ -163,22 +163,17 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   // conta em vw/vh. max-width/max-height garantem que a folha encolha para
   // caber dentro da area imprimivel reduzida pela margem acima, sem cortar.
   const certificateDimensions = page === "certificate"
-    ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 11px !important;"
+    ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
     : "width: 210mm; height: 148mm; padding: 5mm;"
   return `
   @page { size: ${pageSize}; margin: ${pageMargin}; }
   * { box-sizing: border-box; }
   html, body { width: 100%; height: 100%; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-  body.certificate-print { display: flex; align-items: center; justify-content: center; transform: none; }
+  body.certificate-print { display: flex; align-items: center; justify-content: center; transform: translate(3mm, 0mm); }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
   .certificado-a5-page { ${certificateDimensions} margin: 0 auto; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
   .certificate-company-title, .certificate-client-field { white-space: nowrap; }
-  td:has(.certificate-company-title) > div { grid-template-columns: 51% minmax(0, 1fr) !important; }
-  td:has(.certificate-company-title) img { width: 90% !important; }
-  td:has(.certificate-company-title) > div > div:last-child { min-width: 0; }
-  .certificate-company-title ~ div { font-size: 0.92em; }
-  td > div:has(.certificate-client-field) { grid-template-columns: 18% minmax(0, 1fr) 12% 20% !important; }
   @media print {
     body { margin: 0; padding: 0; }
     .no-print { display: none; }

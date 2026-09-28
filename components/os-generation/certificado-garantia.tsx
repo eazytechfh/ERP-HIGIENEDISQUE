@@ -85,7 +85,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
           height: "148mm",
           padding: "5mm",
           fontFamily: "Arial, sans-serif",
-          fontSize: "11px",
+          fontSize: "12px",
           lineHeight: 1.25,
           overflowWrap: "anywhere",
           pageBreakBefore: pageBreakBefore ? "always" : "auto",
@@ -95,25 +95,25 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
           <tbody>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: "1.5mm 3mm 1mm" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "51% minmax(0, 1fr)", alignItems: "center", gap: "1.5%" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "56% 1fr", alignItems: "center", gap: "1.5%" }}>
                   <img
                     src={certificadoLogoQrSrc}
                     alt="Higiene Disque e QR Code"
                     style={{
-                      width: "90%",
+                      width: "100%",
                       height: "auto",
                       objectFit: "contain",
                       objectPosition: "left center",
                       display: "block",
                     }}
                   />
-                  <div style={{ minWidth: 0, textAlign: "right", fontSize: "1em", lineHeight: 1.32 }}>
+                  <div style={{ textAlign: "right", fontSize: "1em", lineHeight: 1.32 }}>
                     <div className="certificate-company-title" style={{ fontSize: "1.46em", fontWeight: 700 }}>Higiene Disque Higienizações Ltda</div>
-                    <div style={{ fontSize: "0.92em" }}>Av São Gualter, 200, lote 71 B - Piratininga</div>
-                    <div style={{ fontSize: "0.92em" }}>Niterói - RJ - Cep.: 24355-010</div>
-                    <div style={{ fontSize: "0.92em" }}>Telefones.: (21)2626-3000&nbsp;&nbsp;-&nbsp;&nbsp;(21)2625-3233</div>
-                    <div style={{ fontSize: "0.92em" }}>contato@higienedisque.com.br</div>
-                    <div style={{ fontSize: "0.92em" }}>www.higienedisque.com.br</div>
+                    <div>Av São Gualter, 200, lote 71 B - Piratininga</div>
+                    <div>Niterói - RJ - Cep.: 24355-010</div>
+                    <div>Telefones.: (21)2626-3000&nbsp;&nbsp;-&nbsp;&nbsp;(21)2625-3233</div>
+                    <div>contato@higienedisque.com.br</div>
+                    <div>www.higienedisque.com.br</div>
                   </div>
                 </div>
               </td>
@@ -132,7 +132,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
             </tr>
             <tr>
               <td colSpan={5} style={{ ...cellStyle, padding: "0.8mm 1.5mm", fontSize: "1em" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "18% minmax(0, 1fr) 12% 20%", rowGap: "1.4mm", columnGap: "1%", alignItems: "center", lineHeight: 1.3 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "20% 1fr 12% 15%", rowGap: "1.4mm", columnGap: "1%", alignItems: "center", lineHeight: 1.3 }}>
                   <LabeledValue label="Cliente" value={data.cliente} wide />
                   <div style={{ fontWeight: 700, textAlign: "right" }}>Nº Pedido :</div>
                   <div>{data.pedido || ""}</div>
