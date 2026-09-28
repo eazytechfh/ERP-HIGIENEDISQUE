@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import * as printUtils from "./print-utils.ts"
 
 import {
   buildPrintDocument,
@@ -8,6 +9,18 @@ import {
   splitSavedOSDocumentHtml,
   waitForPrintImages,
 } from "./print-utils.ts"
+
+test("provides one shared A5 print builder for every certificate entry point", () => {
+  assert.equal(typeof printUtils.buildCertificatePrintDocument, "function")
+
+  const html = printUtils.buildCertificatePrintDocument(
+    '<div class="certificado-a5-page">Certificado</div>',
+    "Certificado OS-1",
+  )
+
+  assert.match(html, /@page\s*{\s*size:\s*A5 landscape;/)
+  assert.match(html, /<body class="certificate-print">/)
+})
 
 test("stores and separates the service order from its certificate", () => {
   const savedHtml = composeSavedOSDocumentHtml(

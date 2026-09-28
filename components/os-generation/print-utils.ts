@@ -205,6 +205,10 @@ export function buildPrintDocument(bodyHtml: string, title: string, options: Pri
 </html>`
 }
 
+export function buildCertificatePrintDocument(bodyHtml: string, title: string): string {
+  return buildPrintDocument(bodyHtml, title, { page: "certificate" })
+}
+
 export function openPrintDocument(documentHtml: string): boolean {
   const printWindow = window.open("", "_blank")
   if (!printWindow) return false
@@ -238,4 +242,8 @@ export function openPrintDocument(documentHtml: string): boolean {
 
 export function openPrintWindow(bodyHtml: string, title: string, options: PrintOptions = {}): boolean {
   return openPrintDocument(buildPrintDocument(bodyHtml, title, options))
+}
+
+export function openCertificatePrintWindow(bodyHtml: string, title: string): boolean {
+  return openPrintDocument(buildCertificatePrintDocument(bodyHtml, title))
 }

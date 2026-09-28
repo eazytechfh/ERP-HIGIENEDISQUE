@@ -53,7 +53,7 @@ import { classificarTipoOS, servicoSemGarantia } from "@/components/os-generatio
 import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "@/components/os-generation/responsavel-tecnica"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
-import { buildPrintDocument, hasSavedCertificateHtml, openPrintDocument, openPrintWindow, splitSavedOSDocumentHtml } from "@/components/os-generation/print-utils"
+import { buildPrintDocument, hasSavedCertificateHtml, openCertificatePrintWindow, openPrintDocument, openPrintWindow, splitSavedOSDocumentHtml } from "@/components/os-generation/print-utils"
 import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -2323,7 +2323,7 @@ export default function ServicosPage() {
     if (!contentHtml) return false
     const { certificateHtml } = splitSavedOSDocumentHtml(contentHtml)
     if (!certificateHtml) return false
-    return openPrintWindow(certificateHtml, `Certificado ${osNumberValue}`, { page: "certificate" })
+    return openCertificatePrintWindow(certificateHtml, `Certificado ${osNumberValue}`)
   }
 
   const abrirEImprimirRecibo = (params: ReciboDocumentoParams) => {
