@@ -67,22 +67,23 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*font-size:\s*12px !important;/s,
+    /\.certificado-a5-page\s*{[^}]*font-size:\s*9px !important;/s,
   )
   assert.match(
     html,
     /\.certificado-a5-page\s*{[^}]*width:\s*210mm !important;[^}]*height:\s*148mm !important;[^}]*max-width:\s*100% !important;[^}]*max-height:\s*100% !important;/s,
   )
-  assert.match(html, /\.certificado-a5-page\s*{[^}]*padding:\s*5mm !important;/s)
+  assert.match(html, /\.certificado-a5-page\s*{[^}]*padding:\s*4mm !important;/s)
   assert.match(html, /body\.certificate-print\s*{[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s)
   assert.match(html, /\.certificado-a5-page\s*{[^}]*break-inside:\s*avoid;[^}]*page-break-inside:\s*avoid;[^}]*overflow:\s*hidden;/s)
-  assert.match(html, /\.certificate-company-title,\s*\.certificate-client-field\s*{\s*white-space:\s*nowrap;/s)
+  assert.match(html, /\.certificate-company-title\s*{\s*white-space:\s*nowrap;/s)
+  assert.match(html, /\.certificate-client-field\s*{\s*white-space:\s*normal;/s)
   assert.doesNotMatch(html, /td:has\(\.certificate-company-title\)/)
   assert.doesNotMatch(html, /div:has\(\.certificate-client-field\)/)
   assert.match(html, /<body class="certificate-print">/)
 })
 
-test("keeps the original certificate offset inside the printable area", () => {
+test("centers the certificate without shifting it outside the printable area", () => {
   const certificateHtml = buildPrintDocument(
     '<div class="certificado-a5-page">Certificado</div>',
     "Certificado",
@@ -93,9 +94,12 @@ test("keeps the original certificate offset inside the printable area", () => {
     "OS",
   )
 
-  assert.match(
+  // Um transform: translate() aqui empurra a folha para fora da area
+  // imprimivel (o max-width/max-height ja encolhe a folha para caber
+  // dentro das margens de pagina), cortando conteudo na impressao real.
+  assert.doesNotMatch(
     certificateHtml,
-    /body\.certificate-print\s*{[^}]*transform:\s*translate\(3mm,\s*0mm\);/s,
+    /body\.certificate-print\s*{[^}]*transform:/s,
   )
   assert.doesNotMatch(serviceOrderHtml, /<body class="certificate-print">/)
 })
