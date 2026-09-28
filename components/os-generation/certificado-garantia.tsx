@@ -85,7 +85,7 @@ export const CertificadoGarantia = forwardRef<HTMLDivElement, CertificadoGaranti
           height: "148mm",
           padding: "5mm",
           fontFamily: "Arial, sans-serif",
-          fontSize: "12px",
+          fontSize: "11px",
           lineHeight: 1.25,
           overflowWrap: "anywhere",
           pageBreakBefore: pageBreakBefore ? "always" : "auto",

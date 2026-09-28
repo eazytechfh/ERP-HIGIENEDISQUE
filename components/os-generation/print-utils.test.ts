@@ -62,7 +62,7 @@ test("defaults the certificate print dialog to A5 landscape and fills its printa
   )
   assert.match(
     html,
-    /\.certificado-a5-page\s*{[^}]*font-size:\s*12px !important;/s,
+    /\.certificado-a5-page\s*{[^}]*font-size:\s*11px !important;/s,
   )
   assert.match(
     html,
