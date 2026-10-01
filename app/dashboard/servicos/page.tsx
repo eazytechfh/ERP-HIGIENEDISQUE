@@ -3132,9 +3132,14 @@ const handleConfirmarAgendamentoFinal = async () => {
   // Obter contrato selecionado
   const contratoSelecionado = contratosDoCliente.find((c) => c.id === serviceRequest.billing.contractId)
 
+  const certificadoEhLimpeza =
+    isTipoHigienizacao(serviceRequest.serviceType) ||
+    isTipoReservatorioPotavel(serviceRequest.serviceType)
+
   const podeGerarCertificado =
     isTipoPragas(serviceRequest.serviceType) ||
-    isTipoHigienizacao(serviceRequest.serviceType)
+    certificadoEhLimpeza ||
+    isTipoGordura(serviceRequest.serviceType)
 
   const semGarantia = servicoSemGarantia(
     getTipoServicoAtual(serviceRequest.serviceType)?.nome || serviceRequest.serviceName,
@@ -3153,23 +3158,27 @@ const handleConfirmarAgendamentoFinal = async () => {
       ? `${localSelecionado.endereco} ${localSelecionado.numero}`.trim()
       : ""
 
+    const nomeServicoCertificado = getTipoServicoAtual(serviceRequest.serviceType)?.nome || serviceRequest.serviceName || "-"
+    const garantiaLabel = (amount: number, unit: ServiceRequest["warrantyUnit"]) =>
+      `${String(amount).padStart(2, "0")} ${unit === "anos" ? "Ano(s)" : unit === "meses" ? "Mes(es)" : "Dia(s)"}`
+
     let tipoServico: CertificadoGarantiaData["tipoServico"]
     let vetores: CertificadoGarantiaData["vetores"]
     let observacoes: string
     let responsavel: string
 
-    if (isTipoHigienizacao(serviceRequest.serviceType)) {
+    if (certificadoEhLimpeza) {
       tipoServico = "limpeza"
       // Periodicidade legal (Decreto RJ 20356/94): limpeza e higienizacao SEMESTRAL, salvo garantia informada
       const amount = temGarantiaInformada ? garantiaInformada : 6
       const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
       const proximaHigienizacao = formatDateBR(addWarrantyToDate(dataBase, amount, unit))
 
-      vetores = dadosTecnicosLimpeza.reservatorios.map((r) => ({
-        vetor: `${reservatorioTipoLabels[r.tipo] || r.tipo} ${r.numero}`,
-        garantia: r.volumeM3 ? `${r.volumeM3} m³` : "-",
+      vetores = [{
+        vetor: nomeServicoCertificado,
+        garantia: garantiaLabel(amount, unit),
         vencimento: proximaHigienizacao,
-      }))
+      }]
       observacoes = serviceRequest.notes.trim()
       responsavel = dadosTecnicosLimpeza.aplicador || nomesResponsaveisSelecionados[0] || ""
     } else if (isTipoGordura(serviceRequest.serviceType)) {
@@ -3177,15 +3186,11 @@ const handleConfirmarAgendamentoFinal = async () => {
       const amount = temGarantiaInformada ? garantiaInformada : 3
       const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
       const vencimentoPadrao = formatDateBR(addWarrantyToDate(dataBase, amount, unit))
-      const servicosGordura = dadosTecnicosDesentupimento.servicos.length > 0
-        ? dadosTecnicosDesentupimento.servicos
-        : [{ id: "gordura-default", descricao: "Limpeza de Caixa de Gordura", garantia: "", valorServico: "" }]
-
-      vetores = servicosGordura.map((s) => ({
-        vetor: s.descricao || "Limpeza de Caixa de Gordura",
-        garantia: s.garantia?.trim() || "-",
+      vetores = [{
+        vetor: nomeServicoCertificado,
+        garantia: garantiaLabel(amount, unit),
         vencimento: vencimentoPadrao,
-      }))
+      }]
       observacoes = [
         serviceRequest.notes.trim(),
         dadosTecnicosDesentupimento.observacoes.trim(),
@@ -3247,6 +3252,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     }
   }, [
     podeGerarCertificado,
+    certificadoEhLimpeza,
     clienteSelecionado,
     contratoSelecionado,
     serviceRequest.schedule.date,
@@ -4254,7 +4260,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   Certificado de Garantia
                 </CardTitle>
                 <CardDescription>
-                  Disponivel para servicos de controle de vetores e higienizacao de reservatorios.
+                  Disponivel para servicos de controle de vetores, higienizacao de reservatorios e caixa de gordura.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
