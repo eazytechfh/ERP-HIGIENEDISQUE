@@ -206,6 +206,24 @@ export function buildCertificatePrintDocument(bodyHtml: string, title: string): 
   return buildPrintDocument(bodyHtml, title, { page: "certificate" })
 }
 
+// A4 (297mm) menos as margens verticais de @page (5mm + 5mm), com folga de 1% para
+// diferencas de arredondamento entre a tela e o motor de impressao.
+const SERVICE_ORDER_MAX_HEIGHT_PX = ((297 - 10) * 96) / 25.4 * 0.99
+
+// Garante que a OS ocupe sempre uma unica folha: se o conteudo (muitos produtos,
+// textos longos, declaracoes) passar da altura util da pagina, reduz a escala da
+// pagina proporcionalmente em vez de deixar o excedente cair numa segunda folha.
+function fitServiceOrderToSinglePage(targetDocument: Document) {
+  const pages = Array.from(targetDocument.querySelectorAll<HTMLElement>(".os-a4-page"))
+  for (const page of pages) {
+    page.style.zoom = ""
+    const height = page.getBoundingClientRect().height
+    if (height > SERVICE_ORDER_MAX_HEIGHT_PX) {
+      page.style.zoom = String(SERVICE_ORDER_MAX_HEIGHT_PX / height)
+    }
+  }
+}
+
 export function openPrintDocument(documentHtml: string): boolean {
   const printWindow = window.open("", "_blank")
   if (!printWindow) return false
@@ -228,6 +246,7 @@ export function openPrintDocument(documentHtml: string): boolean {
     if (printed) return
     printed = true
     await waitForPrintImages(Array.from(printWindow.document.images))
+    fitServiceOrderToSinglePage(printWindow.document)
     if (printWindow.closed) return
     printWindow.focus()
     printWindow.print()
