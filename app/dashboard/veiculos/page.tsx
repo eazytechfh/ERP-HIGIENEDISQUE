@@ -26,7 +26,7 @@ type Veiculo = {
   modelo: string
   marca: string
   placa: string
-  renavan?: string
+  renavam?: string
   responsavel: string
   ativo: boolean
 }
@@ -66,7 +66,7 @@ export default function VeiculosPage() {
     modelo: "",
     marca: "",
     placa: "",
-    renavan: "",
+    renavam: "",
     responsavel: "",
     ativo: true,
   })
@@ -138,7 +138,7 @@ export default function VeiculosPage() {
   }, [veiculos, searchVeiculo])
 
   const resetVeiculoForm = () => {
-    setVeiculoForm({ modelo: "", marca: "", placa: "", renavan: "", responsavel: "", ativo: true })
+    setVeiculoForm({ modelo: "", marca: "", placa: "", renavam: "", responsavel: "", ativo: true })
     setEditingVeiculoId(null)
   }
 
@@ -155,7 +155,7 @@ export default function VeiculosPage() {
         modelo: veiculoForm.modelo.trim(),
         marca: veiculoForm.marca.trim(),
         placa: veiculoForm.placa.trim().toUpperCase(),
-        renavan: veiculoForm.renavan.trim(),
+        renavam: veiculoForm.renavam.trim(),
         responsavel: veiculoForm.responsavel.trim(),
         ativo: veiculoForm.ativo,
       }
@@ -184,7 +184,7 @@ export default function VeiculosPage() {
       modelo: veiculo.modelo,
       marca: veiculo.marca,
       placa: veiculo.placa,
-      renavan: veiculo.renavan || "",
+      renavam: veiculo.renavam || "",
       responsavel: veiculo.responsavel,
       ativo: veiculo.ativo,
     })
@@ -312,7 +312,7 @@ export default function VeiculosPage() {
                         <TableHead>Modelo</TableHead>
                         <TableHead>Marca</TableHead>
                         <TableHead>Placa</TableHead>
-                        <TableHead>RENAVAN</TableHead>
+                        <TableHead>RENAVAM</TableHead>
                         <TableHead>Responsavel</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Acoes</TableHead>
@@ -331,7 +331,7 @@ export default function VeiculosPage() {
                             <TableCell>{v.modelo}</TableCell>
                             <TableCell>{v.marca}</TableCell>
                             <TableCell className="font-medium">{v.placa}</TableCell>
-                            <TableCell>{v.renavan || "-"}</TableCell>
+                            <TableCell>{v.renavam || "-"}</TableCell>
                             <TableCell>{v.responsavel}</TableCell>
                             <TableCell>
                               <Badge variant={v.ativo ? "default" : "secondary"}>{v.ativo ? "Ativo" : "Inativo"}</Badge>
@@ -465,8 +465,8 @@ export default function VeiculosPage() {
                       <Input value={veiculoForm.placa} onChange={(e) => setVeiculoForm((p) => ({ ...p, placa: e.target.value.toUpperCase() }))} required />
                     </div>
                     <div className="space-y-2">
-                      <Label>RENAVAN</Label>
-                      <Input value={veiculoForm.renavan} onChange={(e) => setVeiculoForm((p) => ({ ...p, renavan: e.target.value }))} placeholder="Ex: 12345678901" />
+                      <Label>RENAVAM</Label>
+                      <Input value={veiculoForm.renavam} onChange={(e) => setVeiculoForm((p) => ({ ...p, renavam: e.target.value }))} placeholder="Ex: 12345678901" />
                     </div>
                     <div className="space-y-2">
                       <Label>Responsavel</Label>
