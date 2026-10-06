@@ -160,7 +160,7 @@ export default function VeiculosPage() {
         ativo: veiculoForm.ativo,
       }
 
-      if (!payload.modelo || !payload.marca || !payload.placa || !payload.responsavel) return
+      if (!payload.marca || !payload.placa) return
 
       const saved = await upsertVeiculoSupabase({
         id: editingVeiculoId || undefined,
@@ -454,7 +454,7 @@ export default function VeiculosPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Modelo</Label>
-                      <Input value={veiculoForm.modelo} onChange={(e) => setVeiculoForm((p) => ({ ...p, modelo: e.target.value }))} required />
+                      <Input value={veiculoForm.modelo} onChange={(e) => setVeiculoForm((p) => ({ ...p, modelo: e.target.value }))} />
                     </div>
                     <div className="space-y-2">
                       <Label>Marca</Label>
@@ -470,7 +470,7 @@ export default function VeiculosPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Responsavel</Label>
-                      <Input value={veiculoForm.responsavel} onChange={(e) => setVeiculoForm((p) => ({ ...p, responsavel: e.target.value }))} required />
+                      <Input value={veiculoForm.responsavel} onChange={(e) => setVeiculoForm((p) => ({ ...p, responsavel: e.target.value }))} />
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

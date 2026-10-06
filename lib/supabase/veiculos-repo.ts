@@ -59,11 +59,11 @@ function mapDbToVeiculo(row: any): VeiculoSupabaseItem {
 function mapVeiculoToDb(input: VeiculoSupabaseInput) {
   return {
     id: input.id,
-    modelo: input.modelo,
+    modelo: input.modelo || null,
     marca: input.marca,
     placa: input.placa,
     renavam: input.renavam || null,
-    responsavel: input.responsavel,
+    responsavel: input.responsavel || null,
     ativo: Boolean(input.ativo),
     deleted_at: null,
   }
