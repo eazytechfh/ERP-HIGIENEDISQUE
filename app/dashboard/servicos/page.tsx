@@ -70,6 +70,8 @@ import { deleteServicoRascunhoSupabase, listServicosRascunhosSupabase, upsertSer
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 import { extrairGarantiasServicos, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
+import { TIPOS_AMBIENTE_CLIENTE } from "@/lib/cadastro-options"
+import { resolveClientActivity } from "@/lib/os-client-activity"
 
 // Tipos
 type Cliente = {
@@ -90,6 +92,7 @@ type LocalAtendimento = {
   bairro: string
   cidade: string
   estado: string
+  tipoAmbiente?: string
 }
 
 type Equipe = {
@@ -154,6 +157,7 @@ type OSFormData = {
   dadosTecnicosLimpeza: DadosTecnicosLimpeza
   dadosTecnicosDesentupimento: DadosTecnicosDesentupimento
   consumos: ConsumoItem[]
+  tipoAtividadeCliente?: string
 }
 
 // Mock Data
@@ -1705,7 +1709,7 @@ export default function ServicosPage() {
   // Modal para novo local
   const [showNovoLocalModal, setShowNovoLocalModal] = useState(false)
   const [novoLocal, setNovoLocal] = useState<Omit<LocalAtendimento, 'id'>>({
-    nome: "", cep: "", endereco: "", numero: "", bairro: "", cidade: "", estado: ""
+    nome: "", cep: "", endereco: "", numero: "", bairro: "", cidade: "", estado: "", tipoAmbiente: ""
   })
 
   // Estado do formulário de serviço
@@ -1755,6 +1759,7 @@ export default function ServicosPage() {
 
   // Observações de acesso
   const [observacoesAcesso, setObservacoesAcesso] = useState("")
+  const [tipoAtividadeCliente, setTipoAtividadeCliente] = useState("")
 
   // Estados para etapa 3 - Geração da OS
   const [osStatus, setOsStatus] = useState<OSStatus>("a_gerar")
@@ -2000,6 +2005,7 @@ export default function ServicosPage() {
   // Handlers
   const handleClienteSelect = async (cliente: Cliente) => {
     setClienteSelecionado(cliente)
+    setTipoAtividadeCliente("")
     setServiceRequest((prev) => ({
       ...prev,
       clientId: cliente.id,
@@ -2024,6 +2030,12 @@ export default function ServicosPage() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
+  }
+
+  const handleLocalChange = (locationId: string) => {
+    handleInputChange("locationId", locationId)
+    const ambiente = locaisCliente.find((local) => local.id === locationId)?.tipoAmbiente || ""
+    setTipoAtividadeCliente(ambiente)
   }
 
   const handleScheduleChange = (field: string, value: string) => {
@@ -2122,7 +2134,7 @@ export default function ServicosPage() {
     }
     setLocaisCliente(prev => [...prev, newLocal])
     setShowNovoLocalModal(false)
-    setNovoLocal({ nome: "", cep: "", endereco: "", numero: "", bairro: "", cidade: "", estado: "" })
+    setNovoLocal({ nome: "", cep: "", endereco: "", numero: "", bairro: "", cidade: "", estado: "", tipoAmbiente: "" })
   }
 
   // Validação
@@ -2229,6 +2241,9 @@ export default function ServicosPage() {
       setLocaisCliente(locais)
       setServiceRequest({ ...formData.serviceRequest, attachments: [] })
       setObservacoesAcesso(formData.observacoesAcesso || "")
+      setTipoAtividadeCliente(
+        formData.tipoAtividadeCliente || locais.find((local) => local.id === formData.serviceRequest.locationId)?.tipoAmbiente || ""
+      )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
@@ -2507,6 +2522,9 @@ export default function ServicosPage() {
         attachments: [],
       })
       setObservacoesAcesso(formData.observacoesAcesso || "")
+      setTipoAtividadeCliente(
+        formData.tipoAtividadeCliente || locais.find((local) => local.id === formData.serviceRequest.locationId)?.tipoAmbiente || ""
+      )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
@@ -2545,6 +2563,9 @@ export default function ServicosPage() {
       setLocaisCliente(locais)
       setServiceRequest({ ...formData.serviceRequest, attachments: [] })
       setObservacoesAcesso(formData.observacoesAcesso || "")
+      setTipoAtividadeCliente(
+        formData.tipoAtividadeCliente || locais.find((local) => local.id === formData.serviceRequest.locationId)?.tipoAmbiente || ""
+      )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
@@ -2916,6 +2937,7 @@ export default function ServicosPage() {
       dadosTecnicosLimpeza,
       dadosTecnicosDesentupimento,
       consumos,
+      tipoAtividadeCliente,
     }
   }
 
@@ -3526,7 +3548,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                       <Label htmlFor="location">Local de Atendimento *</Label>
                       <Select
                         value={serviceRequest.locationId}
-                        onValueChange={(value) => handleInputChange("locationId", value)}
+                        onValueChange={handleLocalChange}
                         disabled={!clienteSelecionado}
                       >
                         <SelectTrigger className={errors.locationId ? "border-destructive" : ""}>
@@ -3541,6 +3563,23 @@ const handleConfirmarAgendamentoFinal = async () => {
                         </SelectContent>
                       </Select>
                       {errors.locationId && <p className="text-sm text-destructive">{errors.locationId}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="tipoAtividadeCliente">Tipo de Atividade na O.S.</Label>
+                      <Input
+                        id="tipoAtividadeCliente"
+                        value={tipoAtividadeCliente}
+                        onChange={(event) => setTipoAtividadeCliente(event.target.value)}
+                        placeholder="Ex: Empresa, Condomínio, Restaurante"
+                        list="tipos-atividade-cliente"
+                      />
+                      <datalist id="tipos-atividade-cliente">
+                        {TIPOS_AMBIENTE_CLIENTE.map((tipo) => <option key={tipo} value={tipo} />)}
+                      </datalist>
+                      <p className="text-xs text-muted-foreground">
+                        Preenchido pelo tipo do local e editável para esta ordem de serviço.
+                      </p>
                     </div>
 
                     <div className="space-y-2">
@@ -4517,7 +4556,8 @@ const handleConfirmarAgendamentoFinal = async () => {
                 nome: clienteSelecionado.nome,
                 cpfCnpj: clienteSelecionado.cpfCnpj,
                 telefone: clienteSelecionado.telefone,
-                email: clienteSelecionado.email
+                email: clienteSelecionado.email,
+                tipoAtividade: resolveClientActivity(tipoAtividadeCliente, localSelecionado?.tipoAmbiente || "")
               } : undefined}
               local={localSelecionado ? {
                 endereco: `${localSelecionado.endereco}, ${localSelecionado.numero}`,
