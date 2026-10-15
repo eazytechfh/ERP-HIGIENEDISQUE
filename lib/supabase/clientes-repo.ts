@@ -4,19 +4,9 @@ import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { buildClienteIdentitySearchFilter, buildLocalAddressSearchFilter, rankClienteSearchResult } from "./clientes-search"
 import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
+import { mapClienteLocalFromDb, mapClienteLocalToDb, type ClienteLocalData } from "@/lib/cliente-local"
 
-export type ClienteLocalInput = {
-  id?: string
-  nome: string
-  cep: string
-  endereco: string
-  numero: string
-  complemento: string
-  bairro: string
-  cidade: string
-  estado: string
-  tipoAmbiente: string
-}
+export type ClienteLocalInput = ClienteLocalData
 
 export type ClienteContatoInput = {
   id?: string
@@ -91,18 +81,7 @@ function mapDbToCliente(row: any): ClienteInput {
     cnpj: row.cnpj || "",
     inscricaoEstadual: row.inscricao_estadual || "",
     inscricaoMunicipal: row.inscricao_municipal || "",
-    locais: emptyArray(row.cliente_locais).map((l: any) => ({
-      id: String(l.id),
-      nome: l.nome || "",
-      cep: l.cep || "",
-      endereco: l.endereco || "",
-      numero: l.numero || "",
-      complemento: l.complemento || "",
-      bairro: l.bairro || "",
-      cidade: l.cidade || "",
-      estado: l.estado || "",
-      tipoAmbiente: l.tipo_ambiente || "",
-    })),
+    locais: emptyArray(row.cliente_locais).map((local: any) => mapClienteLocalFromDb(local)),
     contatos: emptyArray(row.cliente_contatos).map((c: any) => ({
       id: String(c.id),
       nome: c.nome || "",
@@ -366,15 +345,7 @@ export async function upsertClienteSupabase(input: ClienteInput): Promise<Client
 
   const locaisRows = emptyArray(input.locais).map((l) => ({
     cliente_id: clienteId,
-    nome: l.nome || null,
-    cep: l.cep || null,
-    endereco: l.endereco || null,
-    numero: l.numero || null,
-    complemento: l.complemento || null,
-    bairro: l.bairro || null,
-    cidade: l.cidade || null,
-    estado: l.estado || null,
-    tipo_ambiente: l.tipoAmbiente || null,
+    ...mapClienteLocalToDb(l),
   }))
 
   if (locaisRows.length > 0) {

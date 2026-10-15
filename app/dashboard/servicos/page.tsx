@@ -72,6 +72,7 @@ import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 import { extrairGarantiasServicos, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
 import { TIPOS_AMBIENTE_CLIENTE } from "@/lib/cadastro-options"
 import { resolveClientActivity } from "@/lib/os-client-activity"
+import { resolveLocalActivity } from "@/lib/cliente-local"
 
 // Tipos
 type Cliente = {
@@ -93,6 +94,7 @@ type LocalAtendimento = {
   cidade: string
   estado: string
   tipoAmbiente?: string
+  tipoAtividade?: string
 }
 
 type Equipe = {
@@ -2034,8 +2036,8 @@ export default function ServicosPage() {
 
   const handleLocalChange = (locationId: string) => {
     handleInputChange("locationId", locationId)
-    const ambiente = locaisCliente.find((local) => local.id === locationId)?.tipoAmbiente || ""
-    setTipoAtividadeCliente(ambiente)
+    const local = locaisCliente.find((item) => item.id === locationId)
+    setTipoAtividadeCliente(resolveLocalActivity(local))
   }
 
   const handleScheduleChange = (field: string, value: string) => {
@@ -2242,7 +2244,7 @@ export default function ServicosPage() {
       setServiceRequest({ ...formData.serviceRequest, attachments: [] })
       setObservacoesAcesso(formData.observacoesAcesso || "")
       setTipoAtividadeCliente(
-        formData.tipoAtividadeCliente || locais.find((local) => local.id === formData.serviceRequest.locationId)?.tipoAmbiente || ""
+        formData.tipoAtividadeCliente || resolveLocalActivity(locais.find((local) => local.id === formData.serviceRequest.locationId))
       )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
@@ -2523,7 +2525,7 @@ export default function ServicosPage() {
       })
       setObservacoesAcesso(formData.observacoesAcesso || "")
       setTipoAtividadeCliente(
-        formData.tipoAtividadeCliente || locais.find((local) => local.id === formData.serviceRequest.locationId)?.tipoAmbiente || ""
+        formData.tipoAtividadeCliente || resolveLocalActivity(locais.find((local) => local.id === formData.serviceRequest.locationId))
       )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
@@ -2564,7 +2566,7 @@ export default function ServicosPage() {
       setServiceRequest({ ...formData.serviceRequest, attachments: [] })
       setObservacoesAcesso(formData.observacoesAcesso || "")
       setTipoAtividadeCliente(
-        formData.tipoAtividadeCliente || locais.find((local) => local.id === formData.serviceRequest.locationId)?.tipoAmbiente || ""
+        formData.tipoAtividadeCliente || resolveLocalActivity(locais.find((local) => local.id === formData.serviceRequest.locationId))
       )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
@@ -4557,7 +4559,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                 cpfCnpj: clienteSelecionado.cpfCnpj,
                 telefone: clienteSelecionado.telefone,
                 email: clienteSelecionado.email,
-                tipoAtividade: resolveClientActivity(tipoAtividadeCliente, localSelecionado?.tipoAmbiente || "")
+                tipoAtividade: resolveClientActivity(tipoAtividadeCliente, resolveLocalActivity(localSelecionado))
               } : undefined}
               local={localSelecionado ? {
                 endereco: `${localSelecionado.endereco}, ${localSelecionado.numero}`,
