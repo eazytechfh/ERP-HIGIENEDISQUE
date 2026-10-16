@@ -13,7 +13,7 @@ import type { DadosTecnicosVetores } from "./vetores-form"
 import type { DadosTecnicosLimpeza } from "./limpeza-form"
 import type { DadosTecnicosDesentupimento } from "./desentupimento-form"
 import type { ConsumoItem } from "./consumo-estoque-card"
-import { composeSavedOSDocumentHtml, openPrintWindow } from "./print-utils"
+import { composeSavedOSDocumentHtml, openCertificatePrintWindow, openPrintWindow } from "./print-utils"
 import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "./responsavel-tecnica"
 
 type ClienteInfo = {
@@ -103,9 +103,7 @@ export function PdfPreviewMock({
     if (!certificadoRef.current || !certificadoData) return
     // certificadoRef aponta para o wrapper do certificado. Os vetores sao
     // compactados dentro da unica folha .certificado-a5-page.
-    openPrintWindow(certificadoRef.current.innerHTML, `Certificado ${osNumber}`, {
-      page: "certificate",
-    })
+    openCertificatePrintWindow(certificadoRef.current.innerHTML, `Certificado ${osNumber}`)
   }
 
   const defaultDadosTecnicos: DadosTecnicosVetores = dadosTecnicos || {

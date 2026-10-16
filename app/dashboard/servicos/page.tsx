@@ -53,7 +53,7 @@ import { classificarTipoOS, servicoSemGarantia } from "@/components/os-generatio
 import { RESPONSAVEL_TECNICA_NOME, RESPONSAVEL_TECNICA_REGISTRO } from "@/components/os-generation/responsavel-tecnica"
 import { PdfPreviewMock, type TipoOS } from "@/components/os-generation/pdf-preview-mock"
 import type { CertificadoGarantiaData } from "@/components/os-generation/certificado-garantia"
-import { buildPrintDocument, hasSavedCertificateHtml, openPrintDocument, openPrintWindow, splitSavedOSDocumentHtml } from "@/components/os-generation/print-utils"
+import { buildPrintDocument, hasSavedCertificateHtml, openCertificatePrintWindow, openPrintDocument, openPrintWindow, splitSavedOSDocumentHtml } from "@/components/os-generation/print-utils"
 import type { ConsumoItem, ItemEstoque } from "@/components/os-generation/consumo-estoque-card"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -70,6 +70,9 @@ import { deleteServicoRascunhoSupabase, listServicosRascunhosSupabase, upsertSer
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { listVeiculosSupabase } from "@/lib/supabase/veiculos-repo"
 import { extrairGarantiasServicos, type GarantiaServicoItem, type SituacaoGarantia } from "@/lib/garantias-servicos"
+import { TIPOS_AMBIENTE_CLIENTE } from "@/lib/cadastro-options"
+import { resolveClientActivity } from "@/lib/os-client-activity"
+import { resolveLocalActivity } from "@/lib/cliente-local"
 
 // Tipos
 type Cliente = {
@@ -90,6 +93,8 @@ type LocalAtendimento = {
   bairro: string
   cidade: string
   estado: string
+  tipoAmbiente?: string
+  tipoAtividade?: string
 }
 
 type Equipe = {
@@ -154,6 +159,7 @@ type OSFormData = {
   dadosTecnicosLimpeza: DadosTecnicosLimpeza
   dadosTecnicosDesentupimento: DadosTecnicosDesentupimento
   consumos: ConsumoItem[]
+  tipoAtividadeCliente?: string
 }
 
 // Mock Data
@@ -1705,7 +1711,7 @@ export default function ServicosPage() {
   // Modal para novo local
   const [showNovoLocalModal, setShowNovoLocalModal] = useState(false)
   const [novoLocal, setNovoLocal] = useState<Omit<LocalAtendimento, 'id'>>({
-    nome: "", cep: "", endereco: "", numero: "", bairro: "", cidade: "", estado: ""
+    nome: "", cep: "", endereco: "", numero: "", bairro: "", cidade: "", estado: "", tipoAmbiente: ""
   })
 
   // Estado do formulário de serviço
@@ -1755,6 +1761,7 @@ export default function ServicosPage() {
 
   // Observações de acesso
   const [observacoesAcesso, setObservacoesAcesso] = useState("")
+  const [tipoAtividadeCliente, setTipoAtividadeCliente] = useState("")
 
   // Estados para etapa 3 - Geração da OS
   const [osStatus, setOsStatus] = useState<OSStatus>("a_gerar")
@@ -2000,6 +2007,7 @@ export default function ServicosPage() {
   // Handlers
   const handleClienteSelect = async (cliente: Cliente) => {
     setClienteSelecionado(cliente)
+    setTipoAtividadeCliente("")
     setServiceRequest((prev) => ({
       ...prev,
       clientId: cliente.id,
@@ -2024,6 +2032,12 @@ export default function ServicosPage() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
+  }
+
+  const handleLocalChange = (locationId: string) => {
+    handleInputChange("locationId", locationId)
+    const local = locaisCliente.find((item) => item.id === locationId)
+    setTipoAtividadeCliente(resolveLocalActivity(local))
   }
 
   const handleScheduleChange = (field: string, value: string) => {
@@ -2122,7 +2136,7 @@ export default function ServicosPage() {
     }
     setLocaisCliente(prev => [...prev, newLocal])
     setShowNovoLocalModal(false)
-    setNovoLocal({ nome: "", cep: "", endereco: "", numero: "", bairro: "", cidade: "", estado: "" })
+    setNovoLocal({ nome: "", cep: "", endereco: "", numero: "", bairro: "", cidade: "", estado: "", tipoAmbiente: "" })
   }
 
   // Validação
@@ -2229,6 +2243,9 @@ export default function ServicosPage() {
       setLocaisCliente(locais)
       setServiceRequest({ ...formData.serviceRequest, attachments: [] })
       setObservacoesAcesso(formData.observacoesAcesso || "")
+      setTipoAtividadeCliente(
+        formData.tipoAtividadeCliente || resolveLocalActivity(locais.find((local) => local.id === formData.serviceRequest.locationId))
+      )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
@@ -2323,7 +2340,7 @@ export default function ServicosPage() {
     if (!contentHtml) return false
     const { certificateHtml } = splitSavedOSDocumentHtml(contentHtml)
     if (!certificateHtml) return false
-    return openPrintWindow(certificateHtml, `Certificado ${osNumberValue}`, { page: "certificate" })
+    return openCertificatePrintWindow(certificateHtml, `Certificado ${osNumberValue}`)
   }
 
   const abrirEImprimirRecibo = (params: ReciboDocumentoParams) => {
@@ -2507,6 +2524,9 @@ export default function ServicosPage() {
         attachments: [],
       })
       setObservacoesAcesso(formData.observacoesAcesso || "")
+      setTipoAtividadeCliente(
+        formData.tipoAtividadeCliente || resolveLocalActivity(locais.find((local) => local.id === formData.serviceRequest.locationId))
+      )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
@@ -2545,6 +2565,9 @@ export default function ServicosPage() {
       setLocaisCliente(locais)
       setServiceRequest({ ...formData.serviceRequest, attachments: [] })
       setObservacoesAcesso(formData.observacoesAcesso || "")
+      setTipoAtividadeCliente(
+        formData.tipoAtividadeCliente || resolveLocalActivity(locais.find((local) => local.id === formData.serviceRequest.locationId))
+      )
       setDadosTecnicosVetores(formData.dadosTecnicosVetores)
       setDadosTecnicosLimpeza(formData.dadosTecnicosLimpeza)
       setDadosTecnicosDesentupimento(formData.dadosTecnicosDesentupimento)
@@ -2916,6 +2939,7 @@ export default function ServicosPage() {
       dadosTecnicosLimpeza,
       dadosTecnicosDesentupimento,
       consumos,
+      tipoAtividadeCliente,
     }
   }
 
@@ -3132,9 +3156,14 @@ const handleConfirmarAgendamentoFinal = async () => {
   // Obter contrato selecionado
   const contratoSelecionado = contratosDoCliente.find((c) => c.id === serviceRequest.billing.contractId)
 
+  const certificadoEhLimpeza =
+    isTipoHigienizacao(serviceRequest.serviceType) ||
+    isTipoReservatorioPotavel(serviceRequest.serviceType)
+
   const podeGerarCertificado =
     isTipoPragas(serviceRequest.serviceType) ||
-    isTipoHigienizacao(serviceRequest.serviceType)
+    certificadoEhLimpeza ||
+    isTipoGordura(serviceRequest.serviceType)
 
   const semGarantia = servicoSemGarantia(
     getTipoServicoAtual(serviceRequest.serviceType)?.nome || serviceRequest.serviceName,
@@ -3153,23 +3182,27 @@ const handleConfirmarAgendamentoFinal = async () => {
       ? `${localSelecionado.endereco} ${localSelecionado.numero}`.trim()
       : ""
 
+    const nomeServicoCertificado = getTipoServicoAtual(serviceRequest.serviceType)?.nome || serviceRequest.serviceName || "-"
+    const garantiaLabel = (amount: number, unit: ServiceRequest["warrantyUnit"]) =>
+      `${String(amount).padStart(2, "0")} ${unit === "anos" ? "Ano(s)" : unit === "meses" ? "Mes(es)" : "Dia(s)"}`
+
     let tipoServico: CertificadoGarantiaData["tipoServico"]
     let vetores: CertificadoGarantiaData["vetores"]
     let observacoes: string
     let responsavel: string
 
-    if (isTipoHigienizacao(serviceRequest.serviceType)) {
+    if (certificadoEhLimpeza) {
       tipoServico = "limpeza"
       // Periodicidade legal (Decreto RJ 20356/94): limpeza e higienizacao SEMESTRAL, salvo garantia informada
       const amount = temGarantiaInformada ? garantiaInformada : 6
       const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
       const proximaHigienizacao = formatDateBR(addWarrantyToDate(dataBase, amount, unit))
 
-      vetores = dadosTecnicosLimpeza.reservatorios.map((r) => ({
-        vetor: `${reservatorioTipoLabels[r.tipo] || r.tipo} ${r.numero}`,
-        garantia: r.volumeM3 ? `${r.volumeM3} m³` : "-",
+      vetores = [{
+        vetor: nomeServicoCertificado,
+        garantia: garantiaLabel(amount, unit),
         vencimento: proximaHigienizacao,
-      }))
+      }]
       observacoes = serviceRequest.notes.trim()
       responsavel = dadosTecnicosLimpeza.aplicador || nomesResponsaveisSelecionados[0] || ""
     } else if (isTipoGordura(serviceRequest.serviceType)) {
@@ -3177,15 +3210,11 @@ const handleConfirmarAgendamentoFinal = async () => {
       const amount = temGarantiaInformada ? garantiaInformada : 3
       const unit = temGarantiaInformada ? serviceRequest.warrantyUnit : "meses"
       const vencimentoPadrao = formatDateBR(addWarrantyToDate(dataBase, amount, unit))
-      const servicosGordura = dadosTecnicosDesentupimento.servicos.length > 0
-        ? dadosTecnicosDesentupimento.servicos
-        : [{ id: "gordura-default", descricao: "Limpeza de Caixa de Gordura", garantia: "", valorServico: "" }]
-
-      vetores = servicosGordura.map((s) => ({
-        vetor: s.descricao || "Limpeza de Caixa de Gordura",
-        garantia: s.garantia?.trim() || "-",
+      vetores = [{
+        vetor: nomeServicoCertificado,
+        garantia: garantiaLabel(amount, unit),
         vencimento: vencimentoPadrao,
-      }))
+      }]
       observacoes = [
         serviceRequest.notes.trim(),
         dadosTecnicosDesentupimento.observacoes.trim(),
@@ -3247,6 +3276,7 @@ const handleConfirmarAgendamentoFinal = async () => {
     }
   }, [
     podeGerarCertificado,
+    certificadoEhLimpeza,
     clienteSelecionado,
     contratoSelecionado,
     serviceRequest.schedule.date,
@@ -3520,7 +3550,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                       <Label htmlFor="location">Local de Atendimento *</Label>
                       <Select
                         value={serviceRequest.locationId}
-                        onValueChange={(value) => handleInputChange("locationId", value)}
+                        onValueChange={handleLocalChange}
                         disabled={!clienteSelecionado}
                       >
                         <SelectTrigger className={errors.locationId ? "border-destructive" : ""}>
@@ -3535,6 +3565,23 @@ const handleConfirmarAgendamentoFinal = async () => {
                         </SelectContent>
                       </Select>
                       {errors.locationId && <p className="text-sm text-destructive">{errors.locationId}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="tipoAtividadeCliente">Tipo de Atividade na O.S.</Label>
+                      <Input
+                        id="tipoAtividadeCliente"
+                        value={tipoAtividadeCliente}
+                        onChange={(event) => setTipoAtividadeCliente(event.target.value)}
+                        placeholder="Ex: Empresa, Condomínio, Restaurante"
+                        list="tipos-atividade-cliente"
+                      />
+                      <datalist id="tipos-atividade-cliente">
+                        {TIPOS_AMBIENTE_CLIENTE.map((tipo) => <option key={tipo} value={tipo} />)}
+                      </datalist>
+                      <p className="text-xs text-muted-foreground">
+                        Preenchido pelo tipo do local e editável para esta ordem de serviço.
+                      </p>
                     </div>
 
                     <div className="space-y-2">
@@ -4254,7 +4301,7 @@ const handleConfirmarAgendamentoFinal = async () => {
                   Certificado de Garantia
                 </CardTitle>
                 <CardDescription>
-                  Disponivel para servicos de controle de vetores e higienizacao de reservatorios.
+                  Disponivel para servicos de controle de vetores, higienizacao de reservatorios e caixa de gordura.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -4511,7 +4558,8 @@ const handleConfirmarAgendamentoFinal = async () => {
                 nome: clienteSelecionado.nome,
                 cpfCnpj: clienteSelecionado.cpfCnpj,
                 telefone: clienteSelecionado.telefone,
-                email: clienteSelecionado.email
+                email: clienteSelecionado.email,
+                tipoAtividade: resolveClientActivity(tipoAtividadeCliente, resolveLocalActivity(localSelecionado))
               } : undefined}
               local={localSelecionado ? {
                 endereco: `${localSelecionado.endereco}, ${localSelecionado.numero}`,

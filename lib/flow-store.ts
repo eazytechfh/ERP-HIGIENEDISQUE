@@ -119,7 +119,22 @@ export function saveFlowStore(next: Partial<FlowStore>) {
   if (typeof window === "undefined") return
   const current = loadFlowStore()
   const merged: FlowStore = normalizeStore({ ...current, ...next })
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+  // O HTML completo das OS (e certificados) fica no banco e pesa centenas de KB por
+  // registro: guarda-lo aqui estourava a cota do localStorage (~5MB) e derrubava a
+  // pagina com QuotaExceededError. Nenhuma tela le esse campo deste cache.
+  const slim: FlowStore = {
+    ...merged,
+    servicos: merged.servicos.map(({ osDocumentoHtml: _html, ...servico }) => servico),
+  }
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(slim))
+  } catch (error) {
+    // Cache e apenas auxiliar: se nao couber, descarta em vez de quebrar a tela.
+    console.warn("Nao foi possivel salvar o cache local do fluxo", error)
+    try {
+      window.localStorage.removeItem(STORAGE_KEY)
+    } catch {}
+  }
 }
 
 export function ensureFlowStoreInitialized(_scenario: FlowScenario = "operacional") {

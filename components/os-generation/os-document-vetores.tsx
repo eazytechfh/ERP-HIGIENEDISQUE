@@ -252,7 +252,7 @@ export const OSDocumentVetores = forwardRef<HTMLDivElement, OSDocumentVetoresPro
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="font-bold">Tipo Atividade: </span>
-                  <span>{cliente.tipoAtividade || "APARTAMENTO"}</span>
+                  <span>{cliente.tipoAtividade || "Não informado"}</span>
                 </div>
                 <div>
                   <span className="font-bold">{getDocumentoLabel(cliente.cpfCnpj)}: </span>

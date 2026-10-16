@@ -49,6 +49,18 @@ export function preencherDadosDesentupimento(
 ): DadosTecnicosDesentupimento {
   const servico = origem.servico.trim()
   const valorServico = formatarValor(origem.valor, origem.modoCobranca)
+  const servicos = dados.servicos.length === 0
+    ? (!servico && !valorServico)
+      ? []
+      : [{
+          id: "servico-solicitacao",
+          descricao: servico,
+          garantia: "",
+          valorServico,
+        }]
+    : dados.servicos.map((item) => item.id === "servico-solicitacao"
+      ? { ...item, descricao: servico, valorServico }
+      : item)
 
   return {
     ...dados,
@@ -57,13 +69,6 @@ export function preencherDadosDesentupimento(
     tecnico: dados.tecnico || responsavelPadraoDesentupimento,
     vendedor: dados.vendedor || responsavelPadraoDesentupimento,
     condicaoPagamento: dados.condicaoPagamento || formasPagamento[origem.formaPagamento] || origem.formaPagamento,
-    servicos: dados.servicos.length > 0 || (!servico && !valorServico)
-      ? dados.servicos
-      : [{
-          id: "servico-solicitacao",
-          descricao: servico,
-          garantia: "",
-          valorServico,
-        }],
+    servicos,
   }
 }

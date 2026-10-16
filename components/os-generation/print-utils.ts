@@ -163,17 +163,18 @@ function getBaseStyle(page: NonNullable<PrintOptions["page"]>): string {
   // conta em vw/vh. max-width/max-height garantem que a folha encolha para
   // caber dentro da area imprimivel reduzida pela margem acima, sem cortar.
   const certificateDimensions = page === "certificate"
-    ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 5mm !important; font-size: 12px !important;"
+    ? "width: 210mm !important; height: 148mm !important; max-width: 100% !important; max-height: 100% !important; padding: 4mm !important; font-size: 9px !important;"
     : "width: 210mm; height: 148mm; padding: 5mm;"
   return `
   @page { size: ${pageSize}; margin: ${pageMargin}; }
   * { box-sizing: border-box; }
   html, body { width: 100%; height: 100%; }
   body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-  body.certificate-print { display: flex; align-items: center; justify-content: center; transform: translate(3mm, 0mm); }
+  body.certificate-print { display: flex; align-items: center; justify-content: center; }
   .os-a4-page { width: 200mm; min-height: 287mm; margin: 0 auto; }
   .certificado-a5-page { ${certificateDimensions} margin: 0 auto; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
-  .certificate-company-title, .certificate-client-field { white-space: nowrap; }
+  .certificate-company-title { white-space: nowrap; }
+  .certificate-client-field { white-space: normal; }
   @media print {
     body { margin: 0; padding: 0; }
     .no-print { display: none; }
@@ -201,6 +202,28 @@ export function buildPrintDocument(bodyHtml: string, title: string, options: Pri
 </html>`
 }
 
+export function buildCertificatePrintDocument(bodyHtml: string, title: string): string {
+  return buildPrintDocument(bodyHtml, title, { page: "certificate" })
+}
+
+// A4 (297mm) menos as margens verticais de @page (5mm + 5mm), com folga de 1% para
+// diferencas de arredondamento entre a tela e o motor de impressao.
+const SERVICE_ORDER_MAX_HEIGHT_PX = ((297 - 10) * 96) / 25.4 * 0.99
+
+// Garante que a OS ocupe sempre uma unica folha: se o conteudo (muitos produtos,
+// textos longos, declaracoes) passar da altura util da pagina, reduz a escala da
+// pagina proporcionalmente em vez de deixar o excedente cair numa segunda folha.
+function fitServiceOrderToSinglePage(targetDocument: Document) {
+  const pages = Array.from(targetDocument.querySelectorAll<HTMLElement>(".os-a4-page"))
+  for (const page of pages) {
+    page.style.zoom = ""
+    const height = page.getBoundingClientRect().height
+    if (height > SERVICE_ORDER_MAX_HEIGHT_PX) {
+      page.style.zoom = String(SERVICE_ORDER_MAX_HEIGHT_PX / height)
+    }
+  }
+}
+
 export function openPrintDocument(documentHtml: string): boolean {
   const printWindow = window.open("", "_blank")
   if (!printWindow) return false
@@ -223,6 +246,7 @@ export function openPrintDocument(documentHtml: string): boolean {
     if (printed) return
     printed = true
     await waitForPrintImages(Array.from(printWindow.document.images))
+    fitServiceOrderToSinglePage(printWindow.document)
     if (printWindow.closed) return
     printWindow.focus()
     printWindow.print()
@@ -234,4 +258,8 @@ export function openPrintDocument(documentHtml: string): boolean {
 
 export function openPrintWindow(bodyHtml: string, title: string, options: PrintOptions = {}): boolean {
   return openPrintDocument(buildPrintDocument(bodyHtml, title, options))
+}
+
+export function openCertificatePrintWindow(bodyHtml: string, title: string): boolean {
+  return openPrintDocument(buildCertificatePrintDocument(bodyHtml, title))
 }

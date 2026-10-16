@@ -31,6 +31,8 @@ export type ClienteLocalView = {
   bairro: string
   cidade: string
   estado: string
+  tipoAmbiente: string
+  tipoAtividade: string
 }
 
 export function mapClienteToResumoView(c: ClienteInput): ClienteResumoView {
@@ -69,6 +71,8 @@ export function buildLocaisPorCliente(clientes: ClienteInput[]): Record<string, 
       bairro: l.bairro || "",
       cidade: l.cidade || "",
       estado: l.estado || "",
+      tipoAmbiente: l.tipoAmbiente || "",
+      tipoAtividade: l.tipoAtividade || "",
     }))
   })
   return mapped

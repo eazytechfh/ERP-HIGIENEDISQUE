@@ -192,7 +192,7 @@ export const OSDocumentLimpeza = forwardRef<HTMLDivElement, OSDocumentLimpezaPro
               <div className="border-b border-black flex">
                 <div className="flex-1 border-r border-black p-1">
                   <span className="font-bold">Tipo Atividade : </span>
-                  <span>{cliente.tipoAtividade || "CONDOMINIO"}</span>
+                  <span>{cliente.tipoAtividade || "Não informado"}</span>
                 </div>
                 <div className="flex-1 p-1">
                   <span className="font-bold">{getDocumentoLabel(cliente.cpfCnpj)} : </span>

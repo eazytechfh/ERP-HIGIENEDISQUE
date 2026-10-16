@@ -46,6 +46,7 @@ type LocalAtendimento = {
   cidade: string
   estado: string
   tipoAmbiente: string
+  tipoAtividade: string
 }
 
 type Contato = {
@@ -146,7 +147,8 @@ const localInicial: Omit<LocalAtendimento, 'id'> = {
   bairro: "",
   cidade: "",
   estado: "",
-  tipoAmbiente: ""
+  tipoAmbiente: "",
+  tipoAtividade: ""
 }
 
 const contatoInicial: Omit<Contato, 'id'> = {
@@ -1454,6 +1456,18 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div className="space-y-2 lg:col-span-2">
+                        <Label>Tipo de Atividade na O.S.</Label>
+                        <Input
+                          value={local.tipoAtividade || ""}
+                          onChange={(e) => updateLocal(local.id, "tipoAtividade", e.target.value)}
+                          placeholder="Ex: Empresa, Condomínio, Restaurante"
+                          list={`tipos-atividade-local-${local.id}`}
+                        />
+                        <datalist id={`tipos-atividade-local-${local.id}`}>
+                          {TIPOS_AMBIENTE_CLIENTE.map((tipo) => <option key={tipo} value={tipo} />)}
+                        </datalist>
                       </div>
                     </div>
                   </div>
