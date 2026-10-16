@@ -1806,7 +1806,7 @@ export default function ServicosPage() {
   useEffect(() => {
     const tipoAtual = tiposServico.find((tipo) => tipo.id === serviceRequest.serviceType)
     const tipoOSAtual = classificarTipoOS(tipoAtual?.nome || serviceRequest.serviceName, tipoAtual?.categoria || "outro")
-    if (currentStep !== 3 || tipoOSAtual !== "desentupimento") {
+    if (tipoOSAtual !== "desentupimento") {
       return
     }
 
@@ -1820,7 +1820,6 @@ export default function ServicosPage() {
       formaPagamento: serviceRequest.billing.paymentMethod || "",
     }))
   }, [
-    currentStep,
     profile?.nome,
     serviceRequest.serviceType,
     serviceRequest.serviceName,
