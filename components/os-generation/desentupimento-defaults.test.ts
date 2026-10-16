@@ -81,3 +81,30 @@ test("preserva campos e serviços editados manualmente", () => {
   assert.equal(resultado.condicaoPagamento, "2 parcelas")
   assert.deepEqual(resultado.servicos, [{ id: "manual", descricao: "Serviço ajustado", garantia: "3 meses", valorServico: "R$ 900,00" }])
 })
+
+test("atualiza o servico automatico quando o valor da cobranca muda", () => {
+  const resultado = preencherDadosDesentupimento({
+    ...dadosVazios,
+    servicos: [{
+      id: "servico-solicitacao",
+      descricao: "Desentupimento",
+      garantia: "",
+      valorServico: "R$ 380,00",
+    }],
+  }, {
+    usuario: "Fernanda Souza",
+    inicio: "14:00",
+    fim: "15:00",
+    servico: "Desentupimento",
+    modoCobranca: "avulso",
+    valor: "1.100,00",
+    formaPagamento: "boleto",
+  })
+
+  assert.deepEqual(resultado.servicos, [{
+    id: "servico-solicitacao",
+    descricao: "Desentupimento",
+    garantia: "",
+    valorServico: "R$ 1.100,00",
+  }])
+})
