@@ -27,6 +27,7 @@ import { CLIENTE_COLUMNS_DUPLICATAS, deleteClienteSupabase, getClienteSupabase, 
 import { listContratosSupabase, type ContratoSupabaseItem } from "@/lib/supabase/contratos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { clienteMatchesSearch } from "@/lib/supabase/clientes-search"
+import { useAccess } from "@/components/access-provider"
 
 // Types
 type TipoCliente = "pf" | "pj"
@@ -167,6 +168,7 @@ type GrupoDuplicata = {
 
 export default function ClientesPage() {
   const router = useRouter()
+  const { can } = useAccess()
   const [activeTab, setActiveTab] = useState<"consultar" | "cadastrar" | "duplicatas">("consultar")
   const [searchTerm, setSearchTerm] = useState("")
   const [contractFilter, setContractFilter] = useState<FiltroContrato>("todos")
@@ -191,6 +193,10 @@ export default function ClientesPage() {
   const [appliedSearchTerm, setAppliedSearchTerm] = useState("")
   const PAGE_SIZE = 20
   const apiMode = isApiMode()
+  const clienteIdsConsultaContratos = useMemo(
+    () => clientes.map((cliente) => String(cliente.id)).filter(Boolean),
+    [clientes],
+  )
 
   // Estados da aba de duplicatas
   const [duplicatasGrupos, setDuplicatasGrupos] = useState<GrupoDuplicata[]>([])
@@ -232,15 +238,19 @@ export default function ClientesPage() {
 
   useEffect(() => {
     if (!apiMode) return
+    if (clienteIdsConsultaContratos.length === 0) {
+      setContratosSupabase([])
+      return
+    }
     let mounted = true
-    listContratosSupabase()
+    listContratosSupabase({ clienteIds: clienteIdsConsultaContratos })
       .then((contratos) => { if (mounted) setContratosSupabase(contratos) })
       .catch((error) => {
         console.error("Falha ao carregar contratos dos clientes", error)
         if (mounted) setContratosSupabase([])
-      })
+    })
     return () => { mounted = false }
-  }, [apiMode])
+  }, [apiMode, clienteIdsConsultaContratos])
 
   // Carga inicial (modo local)
   useEffect(() => {
@@ -1045,6 +1055,7 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                           {(() => {
                             const contratoResumo = getContratoResumoCliente(cliente)
                             const contratoArquivo = getContratoArquivoCliente(cliente)
+                            const contratoAtual = contratosPorCliente.get(String(cliente.id))
                             return (
                               <>
                           <TableCell>
@@ -1083,6 +1094,22 @@ const handleSubmit = async (action: "salvar" | "contrato" | "servico") => {
                                   title="Ver contrato"
                                 >
                                   <Eye className="h-4 w-4 text-primary" />
+                                </Button>
+                              ) : null}
+                              {can("contratos.edit")
+                                && can("clientes.edit")
+                                && can("contratos.generate")
+                                && apiMode
+                                && contratoAtual ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => router.push(
+                                    `/dashboard/clientes/contratos?clienteId=${encodeURIComponent(String(cliente.id))}&contratoId=${encodeURIComponent(String(contratoAtual.id))}`,
+                                  )}
+                                  title="Editar contrato"
+                                >
+                                  <FileText className="h-4 w-4 text-primary" />
                                 </Button>
                               ) : null}
                               <Button variant="ghost" size="sm" onClick={() => handleEdit(cliente)} title="Editar cliente">

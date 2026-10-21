@@ -33,10 +33,21 @@ import {
 import Link from "next/link"
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog"
 import { DIAS_VENCIMENTO_CONTRATO } from "@/components/contratos/dias-vencimento"
-import { listClientesSupabase, upsertClienteSupabase, getClienteSupabase, type ClienteInput } from "@/lib/supabase/clientes-repo"
+import {
+  getClienteSupabase,
+  listClientesSupabase,
+  type ClienteInput,
+} from "@/lib/supabase/clientes-repo"
 import { mapClienteToResumoView } from "@/lib/supabase/clientes-view"
 import { upsertFlowContrato, type FlowContrato } from "@/lib/flow-store"
-import { addClienteArquivoContratoSupabase, listContratosSupabase, upsertContratoSupabase } from "@/lib/supabase/contratos-repo"
+import {
+  addClienteArquivoContratoSupabase,
+  assertContratoSavePermissionsSupabase,
+  getContratoSupabase,
+  listContratosSupabase,
+  upsertContratoSupabase,
+  type ContratoSupabaseItem,
+} from "@/lib/supabase/contratos-repo"
 
 interface ServicoContrato {
   id: string
@@ -86,6 +97,7 @@ export default function NovoContratoPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const clienteIdParam = searchParams.get("clienteId")
+  const contratoIdParam = searchParams.get("contratoId")
 
   // Estado para seleção de cliente
   const [searchTerm, setSearchTerm] = useState("")
@@ -95,6 +107,8 @@ export default function NovoContratoPage() {
   const [showClienteList, setShowClienteList] = useState(false)
   const [pageError, setPageError] = useState("")
   const [isSavingContrato, setIsSavingContrato] = useState(false)
+  const [isLoadingContrato, setIsLoadingContrato] = useState(Boolean(contratoIdParam))
+  const [contratoEmEdicao, setContratoEmEdicao] = useState<ContratoSupabaseItem | null>(null)
   const [confirmContrato, setConfirmContrato] = useState<{
     open: boolean
     afterSave: "listar" | "servico" | null
@@ -132,7 +146,7 @@ export default function NovoContratoPage() {
   }, [searchTerm])
 
   useEffect(() => {
-    if (!clienteIdParam) return
+    if (!clienteIdParam || contratoIdParam) return
     let mounted = true
 
     const loadCliente = async () => {
@@ -149,7 +163,7 @@ export default function NovoContratoPage() {
     return () => {
       mounted = false
     }
-  }, [clienteIdParam])
+  }, [clienteIdParam, contratoIdParam])
 
   const clientesFiltrados = clientesDisponiveis
 
@@ -172,6 +186,65 @@ export default function NovoContratoPage() {
   const [servicosContrato, setServicosContrato] = useState<ServicoContrato[]>([
     { id: "1", tipoServico: "", frequencia: "", limites: "" }
   ])
+
+  useEffect(() => {
+    if (!contratoIdParam) {
+      setIsLoadingContrato(false)
+      setContratoEmEdicao(null)
+      return
+    }
+
+    let mounted = true
+    const loadContrato = async () => {
+      setIsLoadingContrato(true)
+      setContratoEmEdicao(null)
+      setPageError("")
+      try {
+        const contrato = await getContratoSupabase(contratoIdParam)
+        const cliente = await getClienteSupabase(contrato.clienteId)
+        if (!mounted) return
+
+        setContratoEmEdicao(contrato)
+        setClienteSelecionado(mapClienteToResumoView(cliente))
+        setClientesCompletos((current) => {
+          if (current.some((item) => String(item.id) === String(cliente.id))) return current
+          return [...current, cliente]
+        })
+        setTipoContrato(contrato.tipoContrato)
+        setStatusContrato(contrato.status)
+        setDataInicio(contrato.dataInicio)
+        setDataTermino(contrato.dataTermino)
+        setDiaVencimento(contrato.diaVencimento)
+        setValorMensal(contrato.valorMensal)
+        setReajusteAnual(contrato.reajusteAnual)
+        setMultaContratual(contrato.multaContratual)
+        setExigeAprovacao(contrato.exigeAprovacao)
+        setAdicionalDescricao(contrato.adicionalDescricao)
+        setObservacoesContratuais(contrato.observacoesContratuais)
+        setObservacoesInternas(contrato.observacoesInternas)
+        setServicosContrato(
+          contrato.itens.length > 0
+            ? contrato.itens.map((item) => ({
+                id: item.id,
+                tipoServico: item.nome,
+                frequencia: item.frequencia,
+                limites: item.limites,
+              }))
+            : [{ id: "1", tipoServico: "", frequencia: "", limites: "" }],
+        )
+      } catch (error) {
+        console.error("Falha ao carregar contrato para edicao", error)
+        if (mounted) setPageError(`Não foi possível carregar o contrato. ${getErrorMessage(error)}`)
+      } finally {
+        if (mounted) setIsLoadingContrato(false)
+      }
+    }
+
+    void loadContrato()
+    return () => {
+      mounted = false
+    }
+  }, [contratoIdParam])
 
   const frequencias = [
     { value: "mensal", label: "Mensal" },
@@ -372,29 +445,59 @@ export default function NovoContratoPage() {
       .map((s) => ({ id: s.id, nome: s.tipoServico }))
     const itensDetalhados = servicosContrato
       .filter((s) => s.tipoServico.trim())
-      .map((s) => ({ nome: s.tipoServico, frequencia: s.frequencia, limites: s.limites }))
+      .map((s) => ({ id: s.id, nome: s.tipoServico, frequencia: s.frequencia, limites: s.limites }))
 
     if (itensValidos.length === 0) {
       alert("Adicione ao menos um servico no contrato.")
       return null
     }
 
-    const contratosExistentes = await listContratosSupabase()
+    await assertContratoSavePermissionsSupabase(Boolean(contratoEmEdicao))
+
+    const contratosExistentes = contratoEmEdicao ? [] : await listContratosSupabase()
     const ano = new Date().getFullYear()
     const sequencial = String(contratosExistentes.length + 1).padStart(3, "0")
 
     const clienteCompleto = clientesCompletos.find((cliente) => String(cliente.id) === clienteSelecionado.id)
       ?? await getClienteSupabase(clienteSelecionado.id)
 
+    let situacaoContrato = clienteCompleto.situacaoContrato || ""
+    if (statusContrato === "encerrado") {
+      situacaoContrato = "Vencido"
+    } else if (statusContrato === "suspenso") {
+      situacaoContrato = "A vencer"
+    } else if (dataTermino) {
+      const hoje = new Date()
+      hoje.setHours(0, 0, 0, 0)
+      const fim = new Date(`${dataTermino}T00:00:00`)
+      const diffDays = Math.floor((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+      if (diffDays < 0) situacaoContrato = "Vencido"
+      else if (diffDays <= 30) situacaoContrato = "A vencer"
+      else situacaoContrato = "Em dia"
+    } else {
+      situacaoContrato = "Em dia"
+    }
+
     const contratoPayload = {
+      id: contratoEmEdicao?.id,
+      expectedUpdatedAt: contratoEmEdicao?.updatedAt,
       clienteId: clienteSelecionado.id,
-      numero: `CONT-${ano}-${sequencial}`,
+      numero: contratoEmEdicao?.numero || `CONT-${ano}-${sequencial}`,
       descricao: `${tipoContrato === "recorrente" ? "Contrato Recorrente" : "Contrato Avulso"} - ${itensValidos[0]?.nome || "Servicos"}`,
       status: statusContrato as "ativo" | "suspenso" | "encerrado",
       tipoContrato: tipoContrato as "recorrente" | "avulso",
       dataInicio,
       dataTermino,
-      itens: itensValidos,
+      diaVencimento,
+      valorMensal,
+      reajusteAnual,
+      multaContratual,
+      exigeAprovacao,
+      adicionalDescricao,
+      observacoesContratuais,
+      observacoesInternas,
+      situacaoCliente: situacaoContrato,
+      itens: itensDetalhados,
     }
 
     const nomeClienteSeguro = clienteSelecionado.nome
@@ -547,32 +650,6 @@ export default function NovoContratoPage() {
 
     const contratoSalvo = await upsertContratoSupabase(contratoPayload)
 
-    let situacaoContrato = clienteCompleto.situacaoContrato || ""
-    if (statusContrato === "encerrado") {
-      situacaoContrato = "Vencido"
-    } else if (statusContrato === "suspenso") {
-      situacaoContrato = "A vencer"
-    } else if (dataTermino) {
-      const hoje = new Date()
-      hoje.setHours(0, 0, 0, 0)
-      const fim = new Date(`${dataTermino}T00:00:00`)
-      const diffDays = Math.floor((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-      if (diffDays < 0) situacaoContrato = "Vencido"
-      else if (diffDays <= 30) situacaoContrato = "A vencer"
-      else situacaoContrato = "Em dia"
-    } else {
-      situacaoContrato = "Em dia"
-    }
-
-    await upsertClienteSupabase({
-      ...clienteCompleto,
-      possuiContrato: true,
-      tipoContrato: tipoContrato === "recorrente" ? "Recorrente" : "Avulso",
-      dataInicioContrato: dataInicio || clienteCompleto.dataInicioContrato || "",
-      dataFimContrato: dataTermino || clienteCompleto.dataFimContrato || "",
-      situacaoContrato,
-    })
-
     await addClienteArquivoContratoSupabase({
       clienteId: clienteSelecionado.id,
       contratoId: contratoSalvo.id,
@@ -609,6 +686,10 @@ export default function NovoContratoPage() {
     return contratoFlow
   }
   const handleOpenConfirmContrato = (afterSave: "listar" | "servico") => {
+    if (contratoIdParam && !contratoEmEdicao) {
+      setPageError("Não foi possível carregar o contrato solicitado para edição.")
+      return
+    }
     if (!clienteSelecionado) {
       setPageError("Selecione um cliente antes de salvar o contrato.")
       return
@@ -625,10 +706,10 @@ export default function NovoContratoPage() {
       if (!contrato) return
       setConfirmContrato({ open: false, afterSave: null })
       if (confirmContrato.afterSave === "servico") {
-        alert("Contrato salvo e anexado ao cliente. Redirecionando para cadastro de servico...")
+        alert(`${contratoEmEdicao ? "Contrato atualizado" : "Contrato salvo"} e anexado ao cliente. Redirecionando para cadastro de servico...`)
         router.push(`/dashboard/servicos?clienteId=${contrato.clienteId}`)
       } else {
-        alert("Contrato salvo com sucesso e anexado ao cliente.")
+        alert(contratoEmEdicao ? "Contrato atualizado com sucesso." : "Contrato salvo com sucesso e anexado ao cliente.")
         router.push(`/dashboard/clientes`)
       }
     } catch (error) {
@@ -643,6 +724,7 @@ export default function NovoContratoPage() {
   const handleSalvar = () => handleOpenConfirmContrato("listar")
   const handleSalvarECadastrarServico = () => handleOpenConfirmContrato("servico")
   const clienteData = clienteSelecionado || { nome: "", cpfCnpj: "", tipo: "", status: "" }
+  const contratoIndisponivel = Boolean(contratoIdParam) && !contratoEmEdicao
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -657,19 +739,28 @@ export default function NovoContratoPage() {
           <ChevronRight className="h-4 w-4" />
           <span className="text-foreground">Detalhes do Cliente</span>
           <ChevronRight className="h-4 w-4" />
-          <span className="text-foreground font-medium">Novo Contrato</span>
+          <span className="text-foreground font-medium">{contratoEmEdicao ? "Editar Contrato" : "Novo Contrato"}</span>
         </nav>
 
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Cadastro de Contrato</h1>
-          <p className="text-muted-foreground">Definição de contrato recorrente ou avulso</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            {contratoEmEdicao ? `Editar Contrato ${contratoEmEdicao.numero}` : "Cadastro de Contrato"}
+          </h1>
+          <p className="text-muted-foreground">
+            {contratoEmEdicao ? "Atualize os dados do contrato selecionado" : "Definição de contrato recorrente ou avulso"}
+          </p>
         </div>
 
         <div className="space-y-6">
           {pageError ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {pageError}
+            </div>
+          ) : null}
+          {isLoadingContrato ? (
+            <div className="rounded-lg border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+              Carregando contrato...
             </div>
           ) : null}
           {/* BLOCO 1 ??" Seleção/Identificação do Cliente */}
@@ -761,15 +852,17 @@ export default function NovoContratoPage() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setClienteSelecionado(null)}
-                    className="bg-transparent"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Alterar cliente
-                  </Button>
+                  {!contratoEmEdicao ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setClienteSelecionado(null)}
+                      className="bg-transparent"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Alterar cliente
+                    </Button>
+                  ) : null}
                 </div>
               )}
             </CardContent>
@@ -1103,18 +1196,18 @@ export default function NovoContratoPage() {
               variant="outline"
               onClick={handleSalvarECadastrarServico}
               className="sm:order-3 bg-transparent"
-              disabled={isSavingContrato}
+              disabled={isSavingContrato || isLoadingContrato || contratoIndisponivel}
             >
               <ClipboardList className="h-4 w-4 mr-2" />
-              Salvar e Cadastrar Serviço
+              {contratoEmEdicao ? "Atualizar e Cadastrar Serviço" : "Salvar e Cadastrar Serviço"}
             </Button>
             <Button
               onClick={handleSalvar}
               className="sm:order-4"
-              disabled={isSavingContrato}
+              disabled={isSavingContrato || isLoadingContrato || contratoIndisponivel}
             >
               <Save className="h-4 w-4 mr-2" />
-              Salvar Contrato
+              {contratoEmEdicao ? "Atualizar Contrato" : "Salvar Contrato"}
             </Button>
           </div>
         </div>
@@ -1123,8 +1216,11 @@ export default function NovoContratoPage() {
       {/* Diálogo de confirmação de contrato */}
       <ConfirmActionDialog
         open={confirmContrato.open}
-        title="Confirmar cadastro do contrato"
-        description="Revise os dados abaixo antes de salvar o contrato."
+        title={contratoEmEdicao ? "Confirmar edição do contrato" : "Confirmar cadastro do contrato"}
+        description={contratoEmEdicao
+          ? "Revise os dados abaixo antes de atualizar o contrato."
+          : "Revise os dados abaixo antes de salvar o contrato."
+        }
         details={[
           { label: "Cliente", value: clienteSelecionado?.nome || "" },
           { label: "Documento", value: clienteSelecionado?.cpfCnpj || "" },

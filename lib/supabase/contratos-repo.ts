@@ -3,14 +3,18 @@
 import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
+import { buildContratoItensPayload } from "@/lib/contratos-items"
 
 export type ContratoSupabaseItemInput = {
   id?: string
   nome: string
+  frequencia?: string
+  limites?: string
 }
 
 export type ContratoSupabaseInput = {
   id?: string
+  expectedUpdatedAt?: string
   clienteId: string
   numero: string
   descricao: string
@@ -18,11 +22,21 @@ export type ContratoSupabaseInput = {
   tipoContrato: "recorrente" | "avulso"
   dataInicio: string
   dataTermino: string
+  diaVencimento: string
+  valorMensal: string
+  reajusteAnual: string
+  multaContratual: string
+  exigeAprovacao: boolean
+  adicionalDescricao: string
+  observacoesContratuais: string
+  observacoesInternas: string
+  situacaoCliente: string
   itens: ContratoSupabaseItemInput[]
 }
 
 export type ContratoSupabaseItem = {
   id: string
+  updatedAt: string
   clienteId: string
   numero: string
   descricao: string
@@ -30,7 +44,15 @@ export type ContratoSupabaseItem = {
   tipoContrato: "recorrente" | "avulso"
   dataInicio: string
   dataTermino: string
-  itens: Array<{ id: string; nome: string }>
+  diaVencimento: string
+  valorMensal: string
+  reajusteAnual: string
+  multaContratual: string
+  exigeAprovacao: boolean
+  adicionalDescricao: string
+  observacoesContratuais: string
+  observacoesInternas: string
+  itens: Array<{ id: string; nome: string; frequencia: string; limites: string }>
 }
 
 export type ClienteArquivoContratoInput = {
@@ -49,6 +71,7 @@ function sanitizeFileName(value: string): string {
 function mapDbToContrato(row: any): ContratoSupabaseItem {
   return {
     id: String(row.id),
+    updatedAt: row.updated_at || "",
     clienteId: row.cliente_id ? String(row.cliente_id) : "",
     numero: row.numero || "",
     descricao: row.descricao || "",
@@ -56,75 +79,115 @@ function mapDbToContrato(row: any): ContratoSupabaseItem {
     tipoContrato: (row.tipo_contrato || "recorrente") as ContratoSupabaseItem["tipoContrato"],
     dataInicio: row.data_inicio || "",
     dataTermino: row.data_termino || "",
+    diaVencimento: row.dia_vencimento == null ? "" : String(row.dia_vencimento),
+    valorMensal: row.valor_mensal || "",
+    reajusteAnual: row.reajuste_anual || "",
+    multaContratual: row.multa_contratual || "",
+    exigeAprovacao: Boolean(row.exige_aprovacao),
+    adicionalDescricao: row.adicional_descricao || "",
+    observacoesContratuais: row.observacoes_contratuais || "",
+    observacoesInternas: row.observacoes_internas || "",
     itens: Array.isArray(row.contrato_itens)
       ? row.contrato_itens.map((item: any) => ({
           id: String(item.id),
           nome: item.nome || "",
+          frequencia: item.frequencia || "",
+          limites: item.limites || "",
         }))
       : [],
   }
 }
 
-export async function listContratosSupabase(): Promise<ContratoSupabaseItem[]> {
+export async function listContratosSupabase(
+  options: { clienteIds?: string[] } = {},
+): Promise<ContratoSupabaseItem[]> {
+  if (options.clienteIds && options.clienteIds.length === 0) return []
+
   const supabase = getSupabaseBrowserClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from("contratos")
     .select("*, contrato_itens(*)")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(200)
+
+  if (options.clienteIds) {
+    query = query.in("cliente_id", options.clienteIds)
+  } else {
+    query = query.limit(200)
+  }
+
+  const { data, error } = await query
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
   return (data || []).map(mapDbToContrato)
 }
 
+export async function getContratoSupabase(id: string): Promise<ContratoSupabaseItem> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("contratos")
+    .select("*, contrato_itens(*)")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .single()
+
+  if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
+  return mapDbToContrato(data)
+}
+
+export async function assertContratoSavePermissionsSupabase(isEditing: boolean): Promise<void> {
+  await Promise.all([
+    assertPermissionSupabase(
+      isEditing ? "contratos.edit" : "contratos.create",
+      "Voce nao possui permissao para salvar contratos.",
+    ),
+    assertPermissionSupabase(
+      "clientes.edit",
+      "Voce nao possui permissao para atualizar o resumo contratual do cliente.",
+    ),
+    assertPermissionSupabase(
+      "contratos.generate",
+      "Voce nao possui permissao para gerar documentos de contrato.",
+    ),
+  ])
+}
+
 export async function upsertContratoSupabase(input: ContratoSupabaseInput): Promise<ContratoSupabaseItem> {
   const isEditing = Boolean(input.id)
-  await assertPermissionSupabase(
-    isEditing ? "contratos.edit" : "contratos.create",
-    "Voce nao possui permissao para salvar contratos.",
-  )
+  await assertContratoSavePermissionsSupabase(isEditing)
 
   const supabase = getSupabaseBrowserClient()
 
-  const payload = {
-    id: input.id,
-    cliente_id: input.clienteId,
-    numero: input.numero,
-    descricao: input.descricao,
-    status: input.status,
-    tipo_contrato: input.tipoContrato,
-    data_inicio: input.dataInicio,
-    data_termino: input.dataTermino,
-    deleted_at: null,
+  const { data: savedId, error: saveError } = await supabase.rpc("upsert_contrato_com_itens", {
+    p_id: input.id || null,
+    p_expected_updated_at: input.expectedUpdatedAt || null,
+    p_cliente_id: input.clienteId,
+    p_numero: input.numero,
+    p_descricao: input.descricao,
+    p_status: input.status,
+    p_tipo_contrato: input.tipoContrato,
+    p_data_inicio: input.dataInicio,
+    p_data_termino: input.dataTermino,
+    p_dia_vencimento: input.diaVencimento ? Number(input.diaVencimento) : null,
+    p_valor_mensal: input.valorMensal || null,
+    p_reajuste_anual: input.reajusteAnual || null,
+    p_multa_contratual: input.multaContratual || null,
+    p_exige_aprovacao: input.exigeAprovacao,
+    p_adicional_descricao: input.adicionalDescricao || null,
+    p_observacoes_contratuais: input.observacoesContratuais || null,
+    p_observacoes_internas: input.observacoesInternas || null,
+    p_situacao_cliente: input.situacaoCliente || null,
+    p_itens: buildContratoItensPayload(input.itens),
+  })
+
+  if (saveError) {
+    if (String((saveError as any).message || "").includes("CONTRATO_CONFLICT")) {
+      throw new Error("Este contrato foi alterado por outro usuário. Recarregue a página antes de salvar novamente.")
+    }
+    throw saveError
   }
 
-  const { data: saved, error: saveError } = await supabase
-    .from("contratos")
-    .upsert(payload)
-    .select("id")
-    .single()
-
-  if (saveError) throw saveError
-
-  const contratoId = String(saved.id)
-
-  const { error: deleteItemsError } = await supabase
-    .from("contrato_itens")
-    .delete()
-    .eq("contrato_id", contratoId)
-
-  if (deleteItemsError) throw deleteItemsError
-
-  const itensRows = input.itens.map((item) => ({
-    contrato_id: contratoId,
-    nome: item.nome,
-  }))
-
-  if (itensRows.length > 0) {
-    const { error: itensError } = await supabase.from("contrato_itens").insert(itensRows)
-    if (itensError) throw itensError
-  }
+  const contratoId = String(savedId)
 
   const { data, error } = await supabase
     .from("contratos")
