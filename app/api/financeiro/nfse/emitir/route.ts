@@ -108,6 +108,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Configure o servico municipal em Config. NFS-e antes de emitir." }, { status: 400 })
       }
 
+      // Valida e sincroniza o cliente (CPF/CNPJ e endereco) antes de gravar qualquer coisa.
+      await garantirClienteAsaas(admin, corpo.clienteId)
+
       const calculo = calcularNfse(entrada)
       const lancamentoId = await obterLancamento(admin, { ...corpo, valor: entrada.valor }, user.id, dataEfetiva)
 

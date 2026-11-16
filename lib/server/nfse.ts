@@ -1,19 +1,17 @@
 // Regras da NFS-e no servidor: cliente no Asaas, reconciliacao e aplicacao do status.
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { asaasFetch, resolverAmbienteAsaas, type AsaasInvoice } from "@/lib/server/asaas"
-import { statusDocumentoPorAsaas } from "@/lib/nfse-calculos"
+import { enderecoAsaasDoCliente, statusDocumentoPorAsaas } from "@/lib/nfse-calculos"
 
 const somenteDigitos = (v: string | null | undefined) => String(v || "").replace(/\D/g, "")
 
-/** Cliente do ERP no Asaas: vinculo salvo -> busca por referencia externa/CPF-CNPJ -> cria. */
+/**
+ * Cliente do ERP no Asaas: vinculo salvo -> busca por referencia externa/CPF-CNPJ -> cria.
+ * Sempre envia os dados atuais do ERP (nome, contato e endereco), inclusive para
+ * clientes que ja existiam no Asaas: a NFS-e exige o endereco do tomador.
+ */
 export async function garantirClienteAsaas(admin: SupabaseClient, clienteId: string): Promise<string> {
   const { ambiente } = resolverAmbienteAsaas()
-  const { data: vinculo } = await admin
-    .from("financeiro_asaas_clientes")
-    .select("asaas_customer_id, ambiente")
-    .eq("cliente_id", clienteId)
-    .maybeSingle()
-  if (vinculo?.asaas_customer_id && vinculo.ambiente === ambiente) return String(vinculo.asaas_customer_id)
 
   const { data: cliente, error } = await admin
     .from("clientes")
@@ -28,31 +26,56 @@ export async function garantirClienteAsaas(admin: SupabaseClient, clienteId: str
     throw new Error(`O cliente "${cliente.nome}" precisa ter CPF ou CNPJ valido para receber NFS-e.`)
   }
 
-  const referencia = `erp-cliente-${cliente.id}`
-  // A API do Asaas aceita clientes duplicados: sempre procurar antes de criar.
-  let asaasId = ""
-  const porReferencia = await asaasFetch<{ data: Array<{ id: string; deleted?: boolean }> }>(
-    `/customers?externalReference=${encodeURIComponent(referencia)}&limit=1`,
-  )
-  asaasId = porReferencia.data?.find((c) => !c.deleted)?.id || ""
-  if (!asaasId) {
-    const porDocumento = await asaasFetch<{ data: Array<{ id: string; deleted?: boolean }> }>(
-      `/customers?cpfCnpj=${cpfCnpj}&limit=1`,
+  const { data: locais } = await admin
+    .from("cliente_locais")
+    .select("cep, endereco, numero, complemento, bairro, created_at")
+    .eq("cliente_id", cliente.id)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+  const { endereco, faltando } = enderecoAsaasDoCliente(locais || [])
+  if (!endereco) {
+    throw new Error(
+      `O cliente "${cliente.nome}" precisa de endereco completo para receber NFS-e. Falta: ${faltando.join(", ")}. Cadastre em Clientes > Locais.`,
     )
-    asaasId = porDocumento.data?.find((c) => !c.deleted)?.id || ""
+  }
+
+  const telefone = somenteDigitos(cliente.telefone)
+  const dados = {
+    name: cliente.nome,
+    cpfCnpj,
+    email: cliente.email || undefined,
+    mobilePhone: telefone.length >= 10 ? telefone : undefined,
+    ...endereco,
+  }
+
+  const referencia = `erp-cliente-${cliente.id}`
+  const { data: vinculo } = await admin
+    .from("financeiro_asaas_clientes")
+    .select("asaas_customer_id, ambiente")
+    .eq("cliente_id", clienteId)
+    .maybeSingle()
+
+  let asaasId = vinculo?.asaas_customer_id && vinculo.ambiente === ambiente ? String(vinculo.asaas_customer_id) : ""
+  if (!asaasId) {
+    // A API do Asaas aceita clientes duplicados: sempre procurar antes de criar.
+    const porReferencia = await asaasFetch<{ data: Array<{ id: string; deleted?: boolean }> }>(
+      `/customers?externalReference=${encodeURIComponent(referencia)}&limit=1`,
+    )
+    asaasId = porReferencia.data?.find((c) => !c.deleted)?.id || ""
   }
   if (!asaasId) {
-    const telefone = somenteDigitos(cliente.telefone)
+    const porDocumento = await asaasFetch<{ data: Array<{ id: string; deleted?: boolean }> }>(`/customers?cpfCnpj=${cpfCnpj}&limit=1`)
+    asaasId = porDocumento.data?.find((c) => !c.deleted)?.id || ""
+  }
+
+  if (asaasId) {
+    // Atualiza com os dados atuais do ERP (ex.: endereco cadastrado depois).
+    // PUT /customers/{id}: campos undefined nao vao no JSON, entao nao apagam dados no Asaas.
+    await asaasFetch(`/customers/${encodeURIComponent(asaasId)}`, { method: "PUT", body: { ...dados, externalReference: referencia } })
+  } else {
     const criado = await asaasFetch<{ id: string }>("/customers", {
       method: "POST",
-      body: {
-        name: cliente.nome,
-        cpfCnpj,
-        email: cliente.email || undefined,
-        mobilePhone: telefone.length >= 10 ? telefone : undefined,
-        externalReference: referencia,
-        notificationDisabled: true,
-      },
+      body: { ...dados, externalReference: referencia, notificationDisabled: true },
     })
     asaasId = criado.id
   }

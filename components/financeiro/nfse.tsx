@@ -243,8 +243,10 @@ export function NfseSection({
   const sincronizar = async (nota: NotaFiscalItem) => {
     setSincronizando(nota.id)
     try {
-      await sincronizarNfseSupabase(nota.id)
+      const { nota: atualizada, aviso } = await sincronizarNfseSupabase(nota.id)
       await recarregarNotas()
+      if (aviso) onErro(`Nota ainda nao emitida: ${aviso}`)
+      else if (atualizada.asaasStatus === "AUTHORIZED") onAviso("Nota autorizada pela prefeitura.")
     } catch (error) {
       onErro(error instanceof Error ? error.message : "Falha ao atualizar o status.")
     } finally {
@@ -501,6 +503,9 @@ export function NfseSection({
                     <TableCell>
                       <StatusNota nota={nota} />
                       {nota.erroMotivo ? <p className="text-xs text-red-600 mt-1 max-w-[260px]">{nota.erroMotivo}</p> : null}
+                      {!nota.erroMotivo && nota.asaasStatusDescricao && nota.asaasStatus !== "AUTHORIZED" ? (
+                        <p className="text-xs text-amber-700 mt-1 max-w-[260px]">{nota.asaasStatusDescricao}</p>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <div className="flex items-center justify-end gap-1">
