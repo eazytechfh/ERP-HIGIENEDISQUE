@@ -3,6 +3,7 @@
 import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
+import { descricaoParcela, planejarCobranca } from "@/lib/financeiro-calculos"
 
 export type FinanceiroLancamentoTipo = "receita" | "despesa" | "investimento"
 export type FinanceiroLancamentoStatus = "programado" | "realizado" | "cancelado"
@@ -55,7 +56,58 @@ export type FinanceiroLancamentoItem = {
   apiIntegracaoStatus: FinanceiroApiIntegracaoStatus
   apiIntegracaoReferencia: string
   observacoes: string
+  liquidadoPor: string
+  liquidadoEm: string
+  valorBruto: number | null
+  valorLiquido: number | null
+  taxaModalidade: string
+  cartaoParcelas: number | null
+  taxaPercentual: number | null
+  taxaValor: number | null
+  /** Valor que efetivamente entra/sai do caixa: liquido quando realizado, senao o valor. */
+  valorCaixa: number
+  /** Data que conta no periodo: liquidacao se realizado, vencimento se programado. */
+  dataReferencia: string
+  parcelaGrupoId: string
+  parcelaNumero: number | null
+  parcelaTotal: number | null
   createdAt: string
+}
+
+export type FinanceiroBaixaSolicitacaoStatus = "pendente" | "aprovada" | "rejeitada" | "cancelada"
+
+export type FinanceiroBaixaSolicitacaoItem = {
+  id: string
+  lancamentoId: string
+  status: FinanceiroBaixaSolicitacaoStatus
+  valor: number
+  dataLiquidacao: string
+  formaPagamento: string
+  observacoes: string
+  solicitadoPor: string
+  solicitadoPorNome: string
+  solicitadoEm: string
+  decididoPor: string
+  decididoPorNome: string
+  decididoEm: string
+  motivoDecisao: string
+  taxaModalidade: string
+  cartaoParcelas: number | null
+  taxaPercentual: number | null
+  taxaValor: number | null
+  valorLiquido: number | null
+  lancamento: FinanceiroLancamentoItem | null
+}
+
+export type FinanceiroTaxaCartaoModalidade = "cartao_credito" | "cartao_debito"
+
+export type FinanceiroTaxaCartaoItem = {
+  id: string
+  modalidade: FinanceiroTaxaCartaoModalidade
+  parcelas: number
+  percentual: number
+  vigenteDesde: string
+  definidoPorNome: string
 }
 
 export type FinanceiroLancamentoInput = {
@@ -82,6 +134,11 @@ export type FinanceiroLancamentoInput = {
   apiIntegracaoStatus?: FinanceiroApiIntegracaoStatus
   apiIntegracaoReferencia?: string
   observacoes?: string
+  parcelaGrupoId?: string
+  parcelaNumero?: number
+  parcelaTotal?: number
+  /** Parcelas planejadas da venda no cartao (definem a taxa na baixa). */
+  cartaoParcelas?: number
 }
 
 export type FinanceiroDocumentoItem = {
@@ -108,6 +165,8 @@ export type FinanceiroDocumentoItem = {
   apiIntegracaoStatus: FinanceiroApiIntegracaoStatus
   apiIntegracaoReferencia: string
   observacoes: string
+  parcelaNumero: number | null
+  parcelaTotal: number | null
   createdAt: string
 }
 
@@ -136,6 +195,12 @@ export type FinanceiroDocumentoInput = {
 
 function asNumber(value: unknown): number {
   return typeof value === "number" ? value : Number(value) || 0
+}
+
+function asNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function mapDbToCategoria(row: any): FinanceiroCategoriaItem {
@@ -188,9 +253,58 @@ function mapDbToLancamento(row: any): FinanceiroLancamentoItem {
     apiIntegracaoStatus: row.api_integracao_status || "nao_enviado",
     apiIntegracaoReferencia: row.api_integracao_referencia || "",
     observacoes: row.observacoes || "",
+    liquidadoPor: row.liquidado_por ? String(row.liquidado_por) : "",
+    liquidadoEm: row.liquidado_em || "",
+    valorBruto: asNullableNumber(row.valor_bruto),
+    valorLiquido: asNullableNumber(row.valor_liquido),
+    taxaModalidade: row.taxa_modalidade || "",
+    cartaoParcelas: asNullableNumber(row.cartao_parcelas),
+    taxaPercentual: asNullableNumber(row.taxa_percentual),
+    taxaValor: asNullableNumber(row.taxa_valor),
+    valorCaixa:
+      row.status === "realizado" && asNullableNumber(row.valor_liquido) !== null
+        ? asNumber(row.valor_liquido)
+        : asNumber(row.valor),
+    dataReferencia: row.data_referencia || (row.status === "realizado" ? row.data_liquidacao : row.data_vencimento) || "",
+    parcelaGrupoId: row.parcela_grupo_id ? String(row.parcela_grupo_id) : "",
+    parcelaNumero: asNullableNumber(row.parcela_numero),
+    parcelaTotal: asNullableNumber(row.parcela_total),
     createdAt: row.created_at || "",
   }
 }
+
+function mapDbToBaixaSolicitacao(row: any): FinanceiroBaixaSolicitacaoItem {
+  return {
+    id: String(row.id),
+    lancamentoId: String(row.lancamento_id),
+    status: row.status || "pendente",
+    valor: asNumber(row.valor),
+    dataLiquidacao: row.data_liquidacao || "",
+    formaPagamento: row.forma_pagamento || "",
+    observacoes: row.observacoes || "",
+    solicitadoPor: row.solicitado_por ? String(row.solicitado_por) : "",
+    solicitadoPorNome: row.solicitado_por_nome || "",
+    solicitadoEm: row.solicitado_em || "",
+    decididoPor: row.decidido_por ? String(row.decidido_por) : "",
+    decididoPorNome: row.decidido_por_nome || "",
+    decididoEm: row.decidido_em || "",
+    motivoDecisao: row.motivo_decisao || "",
+    taxaModalidade: row.taxa_modalidade || "",
+    cartaoParcelas: asNullableNumber(row.cartao_parcelas),
+    taxaPercentual: asNullableNumber(row.taxa_percentual),
+    taxaValor: asNullableNumber(row.taxa_valor),
+    valorLiquido: asNullableNumber(row.valor_liquido),
+    lancamento: row.financeiro_lancamentos ? mapDbToLancamento(row.financeiro_lancamentos) : null,
+  }
+}
+
+function toError(error: unknown): Error {
+  const e = error as { message?: string; code?: string } | null
+  return new Error(e?.message || e?.code || JSON.stringify(error))
+}
+
+const LANCAMENTO_SELECT =
+  "*, clientes(id,nome), fornecedores(id,razao_social), servicos(id,os_number), contratos(id,numero), financeiro_categorias(id,nome)"
 
 function mapLancamentoToDb(input: FinanceiroLancamentoInput) {
   return {
@@ -204,7 +318,6 @@ function mapLancamentoToDb(input: FinanceiroLancamentoInput) {
     valor: input.valor,
     data_competencia: input.dataCompetencia,
     data_vencimento: input.dataVencimento,
-    data_liquidacao: input.dataLiquidacao || null,
     cliente_id: input.clienteId || null,
     fornecedor_id: input.fornecedorId || null,
     servico_id: input.servicoId || null,
@@ -216,6 +329,14 @@ function mapLancamentoToDb(input: FinanceiroLancamentoInput) {
     notificacao_whatsapp: Boolean(input.notificacaoWhatsapp),
     observacoes: input.observacoes || null,
     deleted_at: null,
+    cartao_parcelas: input.cartaoParcelas ?? null,
+    ...(input.parcelaGrupoId
+      ? {
+          parcela_grupo_id: input.parcelaGrupoId,
+          parcela_numero: input.parcelaNumero ?? null,
+          parcela_total: input.parcelaTotal ?? null,
+        }
+      : {}),
   }
 }
 
@@ -244,9 +365,14 @@ function mapDbToDocumento(row: any): FinanceiroDocumentoItem {
     apiIntegracaoStatus: row.api_integracao_status || "nao_enviado",
     apiIntegracaoReferencia: row.api_integracao_referencia || "",
     observacoes: row.observacoes || "",
+    parcelaNumero: asNullableNumber(row.financeiro_lancamentos?.parcela_numero),
+    parcelaTotal: asNullableNumber(row.financeiro_lancamentos?.parcela_total),
     createdAt: row.created_at || "",
   }
 }
+
+const DOCUMENTO_SELECT =
+  "*, contratos(numero), financeiro_lancamentos(descricao, cliente_id, contrato_id, parcela_numero, parcela_total, clientes(nome), contratos(numero))"
 
 function mapDocumentoToDb(input: FinanceiroDocumentoInput) {
   return {
@@ -319,7 +445,7 @@ export async function deleteFinanceiroCategoriaSupabase(id: string): Promise<voi
   await assertPermissionSupabase("financeiro.delete", "Voce nao possui permissao para excluir categorias financeiras.")
 
   const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("financeiro_categorias")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
@@ -394,8 +520,15 @@ export async function deleteFinanceiroLancamentoSupabase(id: string): Promise<vo
   await assertPermissionSupabase("financeiro.delete", "Voce nao possui permissao para excluir lancamentos financeiros.")
 
   const supabase = getSupabaseBrowserClient()
-  const { error } = await supabase.from("financeiro_lancamentos").delete().eq("id", id)
+  const { data, error } = await supabase
+    .from("financeiro_lancamentos")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle()
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
+  if (!data) throw new Error("O lancamento nao foi excluido. Atualize a pagina e confira suas permissoes.")
 
   await safeAuditLogSupabase({
     action: "delete",
@@ -410,7 +543,7 @@ export async function listFinanceiroDocumentosSupabase(tipo?: FinanceiroDocument
   const supabase = getSupabaseBrowserClient()
   let query = supabase
     .from("financeiro_documentos")
-    .select("*, contratos(numero), financeiro_lancamentos(descricao, cliente_id, contrato_id, clientes(nome), contratos(numero))")
+    .select(DOCUMENTO_SELECT)
     .is("deleted_at", null)
     .order("data_emissao", { ascending: false })
     .order("created_at", { ascending: false })
@@ -443,7 +576,7 @@ export async function upsertFinanceiroDocumentoSupabase(input: FinanceiroDocumen
 
   const { data, error } = await supabase
     .from("financeiro_documentos")
-    .select("*, contratos(numero), financeiro_lancamentos(descricao, cliente_id, contrato_id, clientes(nome), contratos(numero))")
+    .select(DOCUMENTO_SELECT)
     .eq("id", saved.id)
     .single()
 
@@ -492,43 +625,112 @@ export async function upsertReceitaServicoSupabase(input: {
   dataCompetencia: string
   dataVencimento: string
   formaPagamento?: string
+  /** Parcelas da cobranca (qualquer forma). Cartao = lancamento unico; demais = 1 lancamento por parcela. */
+  quantidadeParcelas?: number
   documentoTipo?: string
   notificacaoEmail?: boolean
   notificacaoWhatsapp?: boolean
   observacoes?: string
-  status?: FinanceiroLancamentoStatus
-}): Promise<FinanceiroLancamentoItem> {
+}): Promise<{ lancamentos: FinanceiroLancamentoItem[]; alterado: boolean; bloqueado: boolean }> {
   const supabase = getSupabaseBrowserClient()
-  const { data: existente, error: existenteError } = await supabase
+  const { data: existentes, error: existenteError } = await supabase
     .from("financeiro_lancamentos")
-    .select("id")
+    .select(`${LANCAMENTO_SELECT}, financeiro_baixa_solicitacoes(status)`)
     .eq("servico_id", input.servicoId)
     .eq("tipo", "receita")
     .is("deleted_at", null)
-    .maybeSingle()
+    .order("created_at", { ascending: true })
 
-  if (existenteError) throw new Error((existenteError as any).message || (existenteError as any).code || JSON.stringify(existenteError))
+  if (existenteError) throw toError(existenteError)
 
-  return upsertFinanceiroLancamentoSupabase({
-    id: existente?.id ? String(existente.id) : undefined,
+  const ativos = (existentes || []).filter((row: any) => row.status !== "cancelado")
+  const ativosItens = ativos.map(mapDbToLancamento)
+  const existente = ativos.find(
+    (row: any) => row.status === "realizado" || (row.financeiro_baixa_solicitacoes || []).some((s: any) => s.status === "pendente"),
+  )
+  const temBaixaPendente = Boolean(existente && existente.status !== "realizado")
+
+  // Receita ja recebida ou aguardando aprovacao (mesmo que so uma parcela) nao e reescrita pela OS.
+  if (existente && (existente.status === "realizado" || temBaixaPendente)) {
+    return { lancamentos: ativosItens, alterado: false, bloqueado: true }
+  }
+
+  const plano = planejarCobranca({
+    total: input.valor,
+    quantidade: Math.max(1, input.quantidadeParcelas || 1),
+    primeiroVencimento: input.dataVencimento,
+    formaPagamento: input.formaPagamento || "",
+  })
+  const varias = plano.lancamentos.length > 1
+  const grupoAtual = ativosItens[0]?.parcelaGrupoId || ""
+  const grupoId = varias ? grupoAtual || crypto.randomUUID() : undefined
+
+  const desejados: FinanceiroLancamentoInput[] = plano.lancamentos.map((parcela) => ({
     tipo: "receita",
-    status: input.status || "programado",
+    status: "programado",
     origem: "servico",
-    descricao: input.descricao,
+    descricao: descricaoParcela(input.descricao, parcela.numero, parcela.total),
     categoriaId: input.categoriaId,
     categoria: input.categoria,
-    valor: input.valor,
+    valor: parcela.valor,
     dataCompetencia: input.dataCompetencia,
-    dataVencimento: input.dataVencimento,
+    dataVencimento: parcela.dataVencimento,
     clienteId: input.clienteId,
     contratoId: input.contratoId,
     servicoId: input.servicoId,
     formaPagamento: input.formaPagamento,
+    cartaoParcelas: plano.cartaoParcelas ?? undefined,
     documentoTipo: input.documentoTipo,
     notificacaoEmail: input.notificacaoEmail,
     notificacaoWhatsapp: input.notificacaoWhatsapp,
     observacoes: input.observacoes,
-  })
+    parcelaGrupoId: grupoId,
+    parcelaNumero: grupoId ? parcela.numero : undefined,
+    parcelaTotal: grupoId ? parcela.total : undefined,
+  }))
+
+  // Mesmo plano (quantidade, valores, vencimentos, forma): atualiza so os textos, mantendo os ids.
+  const mesmaEstrutura =
+    ativosItens.length === desejados.length &&
+    desejados.every((d) => {
+      const atual = ativosItens.find((l) => (l.parcelaNumero ?? 1) === (d.parcelaNumero ?? 1))
+      return (
+        atual &&
+        Math.round(atual.valor * 100) === Math.round(d.valor * 100) &&
+        atual.dataVencimento === d.dataVencimento &&
+        (atual.formaPagamento || "") === (d.formaPagamento || "") &&
+        (atual.cartaoParcelas ?? null) === (d.cartaoParcelas ?? null) &&
+        (atual.parcelaTotal ?? null) === (d.parcelaTotal ?? null)
+      )
+    })
+
+  if (mesmaEstrutura) {
+    const atualizados: FinanceiroLancamentoItem[] = []
+    for (const d of desejados) {
+      const atual = ativosItens.find((l) => (l.parcelaNumero ?? 1) === (d.parcelaNumero ?? 1))!
+      atualizados.push(await upsertFinanceiroLancamentoSupabase({ ...d, id: atual.id, parcelaGrupoId: atual.parcelaGrupoId || undefined }))
+    }
+    return { lancamentos: atualizados, alterado: false, bloqueado: false }
+  }
+
+  // Lancamento unico continua unico: atualiza o mesmo registro.
+  if (ativosItens.length === 1 && desejados.length === 1 && !ativosItens[0].parcelaGrupoId) {
+    const salvo = await upsertFinanceiroLancamentoSupabase({ ...desejados[0], id: ativosItens[0].id })
+    return { lancamentos: [salvo], alterado: true, bloqueado: false }
+  }
+
+  // Plano mudou: cancela as receitas programadas antigas e cria as novas.
+  if (ativosItens.length > 0) {
+    const { error } = await supabase
+      .from("financeiro_lancamentos")
+      .update({ status: "cancelado", observacoes: "Substituido por novo parcelamento da OS." })
+      .in("id", ativosItens.map((l) => l.id))
+      .eq("status", "programado")
+    if (error) throw toError(error)
+  }
+  const novoGrupo = varias ? crypto.randomUUID() : undefined
+  const novos = await criarLancamentosSupabase(desejados.map((d) => ({ ...d, parcelaGrupoId: novoGrupo })))
+  return { lancamentos: novos, alterado: true, bloqueado: false }
 }
 
 export async function upsertDespesaNotaFiscalSupabase(input: {
@@ -571,6 +773,7 @@ export async function cancelLancamentoServicoSupabase(servicoId: string, observa
     })
     .eq("servico_id", servicoId)
     .eq("tipo", "receita")
+    .eq("status", "programado")
     .is("deleted_at", null)
 
   if (error) throw new Error((error as any).message || (error as any).code || JSON.stringify(error))
@@ -583,4 +786,470 @@ export async function cancelLancamentoServicoSupabase(servicoId: string, observa
     description: "Lancamento financeiro de servico cancelado.",
     metadata: { observacao: observacao || "" },
   })
+}
+
+/**
+ * OS coberta pelo contrato nao gera receita propria. Se a OS ja teve cobranca
+ * adicional e voltou para contrato, a receita ainda programada e cancelada.
+ */
+export async function cancelReceitaProgramadaServicoSupabase(servicoId: string): Promise<number> {
+  const supabase = getSupabaseBrowserClient()
+  const { data: pendentes, error: listError } = await supabase
+    .from("financeiro_lancamentos")
+    .select("id")
+    .eq("servico_id", servicoId)
+    .eq("tipo", "receita")
+    .eq("status", "programado")
+    .is("deleted_at", null)
+
+  if (listError) throw toError(listError)
+  if (!pendentes?.length) return 0
+
+  await cancelLancamentoServicoSupabase(servicoId, "OS coberta pelo contrato: cobranca adicional removida.")
+  return pendentes.length
+}
+
+export async function cancelarLancamentoSupabase(id: string): Promise<FinanceiroLancamentoItem> {
+  await assertPermissionSupabase("financeiro.edit", "Voce nao possui permissao para cancelar lancamentos.")
+
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("financeiro_lancamentos")
+    .update({ status: "cancelado" })
+    .eq("id", id)
+    .eq("status", "programado")
+    .select(LANCAMENTO_SELECT)
+    .maybeSingle()
+
+  if (error) throw toError(error)
+  if (!data) throw new Error("Somente lancamentos programados podem ser cancelados.")
+  const lancamento = mapDbToLancamento(data)
+
+  await safeAuditLogSupabase({
+    action: "cancel",
+    entity: "financeiro_lancamento",
+    entityId: lancamento.id,
+    entityLabel: lancamento.descricao,
+    description: "Lancamento financeiro cancelado.",
+    metadata: { valor: lancamento.valor },
+  })
+
+  return lancamento
+}
+
+export async function isAprovadorFinanceiroSupabase(): Promise<boolean> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("is_aprovador_financeiro")
+  if (error) {
+    console.warn("Nao foi possivel verificar o aprovador do financeiro:", error)
+    return false
+  }
+  return data === true
+}
+
+export async function listFinanceiroBaixaSolicitacoesSupabase(options: {
+  status?: FinanceiroBaixaSolicitacaoStatus | "decididas"
+  limit?: number
+} = {}): Promise<FinanceiroBaixaSolicitacaoItem[]> {
+  const supabase = getSupabaseBrowserClient()
+  let query = supabase
+    .from("financeiro_baixa_solicitacoes")
+    .select(`*, financeiro_lancamentos(${LANCAMENTO_SELECT})`, { count: "exact" })
+
+  if (options.status === "decididas") {
+    query = query.neq("status", "pendente").order("decidido_em", { ascending: false, nullsFirst: false })
+  } else {
+    if (options.status) query = query.eq("status", options.status)
+    query = query.order("solicitado_em", { ascending: true })
+  }
+
+  const pageSize = options.limit ?? 200
+  const rows: FinanceiroBaixaSolicitacaoItem[] = []
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await query.range(from, from + pageSize - 1)
+    if (error) throw toError(error)
+    const page = (data || []).map(mapDbToBaixaSolicitacao)
+    rows.push(...page)
+    if (page.length < pageSize) break
+  }
+  return rows
+}
+
+export async function solicitarBaixaLancamentoSupabase(input: {
+  lancamentoId: string
+  dataLiquidacao: string
+  formaPagamento?: string
+  observacoes?: string
+  /** Taxa mostrada na tela; o banco recusa se a vigente for outra. */
+  taxaEsperada?: number | null
+  /** Parcelas da venda no credito (define a taxa). */
+  cartaoParcelas?: number | null
+}): Promise<string> {
+  await assertPermissionSupabase("financeiro.edit", "Voce nao possui permissao para solicitar baixas.")
+
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("financeiro_solicitar_baixa", {
+    p_lancamento_id: input.lancamentoId,
+    p_data_liquidacao: input.dataLiquidacao,
+    p_forma_pagamento: input.formaPagamento || null,
+    p_observacoes: input.observacoes || null,
+    p_taxa_esperada: input.taxaEsperada ?? null,
+    p_cartao_parcelas: input.cartaoParcelas ?? null,
+  })
+  if (error) throw toError(error)
+
+  await safeAuditLogSupabase({
+    action: "request",
+    entity: "financeiro_baixa",
+    entityId: String(data),
+    entityLabel: input.lancamentoId,
+    description: "Baixa de lancamento solicitada.",
+    metadata: { lancamentoId: input.lancamentoId, dataLiquidacao: input.dataLiquidacao },
+  })
+
+  return String(data)
+}
+
+export async function decidirBaixaSolicitacaoSupabase(input: {
+  solicitacaoId: string
+  aprovar: boolean
+  motivo?: string
+}): Promise<FinanceiroBaixaSolicitacaoStatus> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("financeiro_decidir_baixa", {
+    p_solicitacao_id: input.solicitacaoId,
+    p_aprovar: input.aprovar,
+    p_motivo: input.motivo || null,
+  })
+  if (error) throw toError(error)
+
+  await safeAuditLogSupabase({
+    action: input.aprovar ? "approve" : "reject",
+    entity: "financeiro_baixa",
+    entityId: input.solicitacaoId,
+    entityLabel: input.solicitacaoId,
+    description: input.aprovar ? "Baixa aprovada." : "Baixa rejeitada.",
+    metadata: { motivo: input.motivo || "" },
+  })
+
+  return data as FinanceiroBaixaSolicitacaoStatus
+}
+
+export async function cancelarSolicitacaoBaixaSupabase(solicitacaoId: string): Promise<void> {
+  const supabase = getSupabaseBrowserClient()
+  const { error } = await supabase.rpc("financeiro_cancelar_solicitacao_baixa", { p_solicitacao_id: solicitacaoId })
+  if (error) throw toError(error)
+
+  await safeAuditLogSupabase({
+    action: "cancel",
+    entity: "financeiro_baixa",
+    entityId: solicitacaoId,
+    entityLabel: solicitacaoId,
+    description: "Solicitacao de baixa cancelada.",
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Fase 2: taxas de cartao, forma de pagamento e parcelas
+// ---------------------------------------------------------------------------
+
+export async function listTaxasCartaoSupabase(): Promise<FinanceiroTaxaCartaoItem[]> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("financeiro_taxas_cartao")
+    .select("id, modalidade, parcelas, percentual, vigente_desde, definido_por_nome")
+    .order("vigente_desde", { ascending: false })
+    .limit(500)
+
+  if (error) throw toError(error)
+  return (data || []).map((row: any) => ({
+    id: String(row.id),
+    modalidade: row.modalidade,
+    parcelas: asNumber(row.parcelas) || 1,
+    percentual: asNumber(row.percentual),
+    vigenteDesde: row.vigente_desde || "",
+    definidoPorNome: row.definido_por_nome || "",
+  }))
+}
+
+/**
+ * Taxa vigente por chave `modalidade:parcelas` (a mais recente do historico).
+ * Combinacao ausente = nao configurada (o banco recusa a baixa).
+ */
+export function taxasVigentes(historico: FinanceiroTaxaCartaoItem[]): Record<string, number> {
+  const vigentes: Record<string, { percentual: number; vigenteDesde: string }> = {}
+  for (const item of historico) {
+    const chave = `${item.modalidade}:${item.parcelas}`
+    const atual = vigentes[chave]
+    if (!atual || item.vigenteDesde > atual.vigenteDesde) vigentes[chave] = { percentual: item.percentual, vigenteDesde: item.vigenteDesde }
+  }
+  return Object.fromEntries(Object.entries(vigentes).map(([chave, v]) => [chave, v.percentual]))
+}
+
+export async function definirTaxaCartaoSupabase(
+  modalidade: FinanceiroTaxaCartaoModalidade,
+  percentual: number,
+  parcelas = 1,
+): Promise<void> {
+  const supabase = getSupabaseBrowserClient()
+  const { error } = await supabase.rpc("financeiro_definir_taxa_cartao", {
+    p_modalidade: modalidade,
+    p_percentual: percentual,
+    p_parcelas: modalidade === "cartao_debito" ? 1 : parcelas,
+  })
+  if (error) throw toError(error)
+
+  await safeAuditLogSupabase({
+    action: "update",
+    entity: "financeiro_taxa_cartao",
+    entityLabel: `${modalidade}:${parcelas}`,
+    description: `Taxa de ${modalidade === "cartao_credito" ? `credito ${parcelas}x` : "debito"} alterada para ${percentual}%.`,
+    metadata: { modalidade, parcelas, percentual },
+  })
+}
+
+export async function atualizarFormaPagamentoLancamentoSupabase(id: string, formaPagamento: string): Promise<FinanceiroLancamentoItem> {
+  await assertPermissionSupabase("financeiro.edit", "Voce nao possui permissao para editar lancamentos.")
+
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("financeiro_lancamentos")
+    .update({ forma_pagamento: formaPagamento || null })
+    .eq("id", id)
+    .eq("status", "programado")
+    .select(LANCAMENTO_SELECT)
+    .maybeSingle()
+
+  if (error) throw toError(error)
+  if (!data) throw new Error("Somente lancamentos programados podem ter a forma de pagamento alterada.")
+  const lancamento = mapDbToLancamento(data)
+
+  await safeAuditLogSupabase({
+    action: "update",
+    entity: "financeiro_lancamento",
+    entityId: lancamento.id,
+    entityLabel: lancamento.descricao,
+    description: "Forma de pagamento alterada.",
+    metadata: { formaPagamento },
+  })
+
+  return lancamento
+}
+
+/**
+ * Cria varios lancamentos (ex.: parcelas) numa unica insercao: ou todos sao
+ * gravados, ou nenhum.
+ */
+export async function criarLancamentosSupabase(inputs: FinanceiroLancamentoInput[]): Promise<FinanceiroLancamentoItem[]> {
+  if (inputs.length === 0) return []
+  await assertPermissionSupabase("financeiro.create", "Voce nao possui permissao para salvar lancamentos financeiros.")
+
+  const supabase = getSupabaseBrowserClient()
+  const rows = inputs.map((input) => {
+    const { id: _ignored, ...row } = mapLancamentoToDb({ ...input, id: undefined })
+    return row
+  })
+  const { data, error } = await supabase.from("financeiro_lancamentos").insert(rows).select(LANCAMENTO_SELECT)
+  if (error) throw toError(error)
+
+  const lancamentos = (data || []).map(mapDbToLancamento)
+  lancamentos.sort((a, b) => (a.parcelaNumero ?? 0) - (b.parcelaNumero ?? 0))
+
+  await safeAuditLogSupabase({
+    action: "create",
+    entity: "financeiro_lancamento",
+    entityId: lancamentos[0]?.parcelaGrupoId || lancamentos[0]?.id,
+    entityLabel: inputs[0]?.descricao || "",
+    description: lancamentos.length > 1 ? `${lancamentos.length} parcelas criadas.` : "Lancamento financeiro criado.",
+    metadata: { quantidade: lancamentos.length, total: lancamentos.reduce((s, l) => s + l.valor, 0) },
+  })
+
+  return lancamentos
+}
+
+export async function criarDocumentosSupabase(inputs: FinanceiroDocumentoInput[]): Promise<FinanceiroDocumentoItem[]> {
+  if (inputs.length === 0) return []
+  await assertPermissionSupabase("financeiro.create", "Voce nao possui permissao para salvar documentos financeiros.")
+
+  const supabase = getSupabaseBrowserClient()
+  const rows = inputs.map((input) => {
+    const { id: _ignored, ...row } = mapDocumentoToDb({ ...input, id: undefined })
+    return row
+  })
+  const { data, error } = await supabase.from("financeiro_documentos").insert(rows).select(DOCUMENTO_SELECT)
+  if (error) throw toError(error)
+  return (data || []).map(mapDbToDocumento)
+}
+
+/** Registra o resultado do envio do boleto para a integracao (n8n). Nao lanca erro. */
+export async function registrarIntegracaoDocumentoSupabase(id: string, status: FinanceiroApiIntegracaoStatus, referencia?: string): Promise<void> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    const { error } = await supabase
+      .from("financeiro_documentos")
+      .update({ api_integracao_status: status, api_integracao_referencia: referencia || null })
+      .eq("id", id)
+    if (error) console.warn("Nao foi possivel registrar o status da integracao do boleto:", error)
+  } catch (err) {
+    console.warn("Nao foi possivel registrar o status da integracao do boleto:", err)
+  }
+}
+
+/** Registra o resultado do envio do boleto de um lancamento (fluxo de caixa). Nao lanca erro. */
+export async function registrarIntegracaoLancamentoSupabase(id: string, status: FinanceiroApiIntegracaoStatus): Promise<void> {
+  try {
+    const supabase = getSupabaseBrowserClient()
+    const { error } = await supabase.from("financeiro_lancamentos").update({ api_integracao_status: status }).eq("id", id)
+    if (error) console.warn("Nao foi possivel registrar o status da integracao do boleto:", error)
+  } catch (err) {
+    console.warn("Nao foi possivel registrar o status da integracao do boleto:", err)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fase 3: periodo, consultas paginadas e agregacoes no banco
+// ---------------------------------------------------------------------------
+
+export type FiltrosLancamentos = {
+  dataInicio?: string
+  dataFim?: string
+  tipo?: FinanceiroLancamentoTipo | ""
+  status?: FinanceiroLancamentoStatus | ""
+  origem?: string
+  categoriaId?: string
+  busca?: string
+}
+
+export type TotaisLancamentos = {
+  entradasRealizadas: number
+  saidasRealizadas: number
+  entradasProgramadas: number
+  saidasProgramadas: number
+  quantidade: number
+  quantidadeEntradasRealizadas: number
+  quantidadeSaidasRealizadas: number
+}
+
+function filtrosParaRpc(filtros: FiltrosLancamentos) {
+  return {
+    p_inicio: filtros.dataInicio || null,
+    p_fim: filtros.dataFim || null,
+    p_tipo: filtros.tipo || null,
+    p_status: filtros.status || null,
+    p_origem: filtros.origem || null,
+    p_categoria_id: filtros.categoriaId || null,
+    p_busca: filtros.busca?.trim() || null,
+  }
+}
+
+/** Uma pagina de lancamentos filtrados, mais recentes primeiro. */
+export async function buscarLancamentosPaginaSupabase(
+  filtros: FiltrosLancamentos,
+  pagina: number,
+  tamanhoPagina: number,
+): Promise<{ data: FinanceiroLancamentoItem[]; count: number }> {
+  const supabase = getSupabaseBrowserClient()
+  const inicio = (Math.max(1, pagina) - 1) * tamanhoPagina
+  const { data, error, count } = await supabase
+    .rpc("financeiro_lancamentos_filtrados", filtrosParaRpc(filtros), { count: "exact" })
+    .select(LANCAMENTO_SELECT)
+    .order("data_referencia", { ascending: false })
+    .order("id", { ascending: true })
+    .range(inicio, inicio + tamanhoPagina - 1)
+
+  if (error) throw toError(error)
+  return { data: (data || []).map(mapDbToLancamento), count: count ?? 0 }
+}
+
+/** Todos os lancamentos do filtro, em lotes (sem limite fixo). Usado na exportacao. */
+export async function listarTodosLancamentosSupabase(
+  filtros: FiltrosLancamentos,
+  onProgresso?: (carregados: number, total: number) => void,
+): Promise<FinanceiroLancamentoItem[]> {
+  const LOTE = 1000
+  const todos: FinanceiroLancamentoItem[] = []
+  let pagina = 1
+  let total = Infinity
+  while (todos.length < total) {
+    const { data, count } = await buscarLancamentosPaginaSupabase(filtros, pagina, LOTE)
+    total = count
+    todos.push(...data)
+    onProgresso?.(todos.length, total)
+    if (data.length < LOTE) break
+    pagina += 1
+  }
+  return todos
+}
+
+export async function totaisLancamentosSupabase(filtros: FiltrosLancamentos): Promise<TotaisLancamentos> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("financeiro_totais_filtrados", filtrosParaRpc(filtros))
+  if (error) throw toError(error)
+
+  const totais: TotaisLancamentos = {
+    entradasRealizadas: 0,
+    saidasRealizadas: 0,
+    entradasProgramadas: 0,
+    saidasProgramadas: 0,
+    quantidade: 0,
+    quantidadeEntradasRealizadas: 0,
+    quantidadeSaidasRealizadas: 0,
+  }
+  for (const row of (data || []) as any[]) {
+    const total = asNumber(row.total)
+    const quantidade = asNumber(row.quantidade)
+    const entrada = row.tipo === "receita"
+    totais.quantidade += quantidade
+    if (row.status === "realizado") {
+      if (entrada) { totais.entradasRealizadas += total; totais.quantidadeEntradasRealizadas += quantidade }
+      else { totais.saidasRealizadas += total; totais.quantidadeSaidasRealizadas += quantidade }
+    } else if (row.status === "programado") {
+      if (entrada) totais.entradasProgramadas += total
+      else totais.saidasProgramadas += total
+    }
+  }
+  return totais
+}
+
+export type ResumoPeriodoLinha = { periodo: string; tipo: FinanceiroLancamentoTipo; status: FinanceiroLancamentoStatus; total: number; quantidade: number }
+export type ResumoCategoriaLinha = { tipo: FinanceiroLancamentoTipo; categoria: string; total: number }
+
+export async function resumoPeriodoSupabase(inicio: string, fim: string, agrupamento: "mes" | "dia"): Promise<ResumoPeriodoLinha[]> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("financeiro_resumo_periodo", { p_inicio: inicio, p_fim: fim, p_agrupamento: agrupamento })
+  if (error) throw toError(error)
+  return ((data || []) as any[]).map((row) => ({
+    periodo: String(row.periodo),
+    tipo: row.tipo,
+    status: row.status,
+    total: asNumber(row.total),
+    quantidade: asNumber(row.quantidade),
+  }))
+}
+
+export async function resumoCategoriasSupabase(inicio: string, fim: string): Promise<ResumoCategoriaLinha[]> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("financeiro_resumo_categorias", { p_inicio: inicio, p_fim: fim })
+  if (error) throw toError(error)
+  return ((data || []) as any[]).map((row) => ({ tipo: row.tipo, categoria: String(row.categoria), total: asNumber(row.total) }))
+}
+
+export async function listProximosVencimentosSupabase(limite = 8): Promise<FinanceiroLancamentoItem[]> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase
+    .from("financeiro_lancamentos")
+    .select(LANCAMENTO_SELECT)
+    .is("deleted_at", null)
+    .eq("status", "programado")
+    .order("data_vencimento", { ascending: true })
+    .limit(limite)
+  if (error) throw toError(error)
+  return (data || []).map(mapDbToLancamento)
+}
+
+export async function getLancamentoSupabase(id: string): Promise<FinanceiroLancamentoItem | null> {
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.from("financeiro_lancamentos").select(LANCAMENTO_SELECT).eq("id", id).maybeSingle()
+  if (error) throw toError(error)
+  return data ? mapDbToLancamento(data) : null
 }
