@@ -224,9 +224,9 @@ export async function emitirNfseSupabase(input: EmitirNfseInput): Promise<NotaFi
   return mapNota(documento)
 }
 
-export async function sincronizarNfseSupabase(documentoId: string): Promise<NotaFiscalItem> {
-  const { documento } = await chamarRota<{ documento: any }>("/api/financeiro/nfse/sincronizar", { documentoId })
-  return mapNota(documento)
+export async function sincronizarNfseSupabase(documentoId: string): Promise<{ nota: NotaFiscalItem; aviso: string }> {
+  const { documento, aviso } = await chamarRota<{ documento: any; aviso?: string }>("/api/financeiro/nfse/sincronizar", { documentoId })
+  return { nota: mapNota(documento), aviso: aviso || "" }
 }
 
 export type ContaAsaasFiscal = {

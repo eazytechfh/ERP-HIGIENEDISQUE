@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 
-import { calcularNfse, hojeSaoPaulo, resolverDataEfetiva, statusDocumentoPorAsaas, validarEntradaNfse } from "./nfse-calculos.ts"
+import { calcularNfse, enderecoAsaasDoCliente, hojeSaoPaulo, resolverDataEfetiva, statusDocumentoPorAsaas, validarEntradaNfse } from "./nfse-calculos.ts"
 
 test("deducoes reduzem a base do ISS, nao o valor da nota", () => {
   const c = calcularNfse({ valor: 1000, deducoes: 200, issAliquota: 5, issRetido: false, inssAliquota: 0, irAliquota: 0 })
@@ -46,4 +46,20 @@ test("so AUTHORIZED conta como emitida", () => {
   assert.equal(statusDocumentoPorAsaas("ERROR"), "pendente")
   assert.equal(statusDocumentoPorAsaas("AUTHORIZED"), "emitido")
   assert.equal(statusDocumentoPorAsaas("CANCELED"), "cancelado")
+})
+
+test("endereco do tomador vem do primeiro local completo", () => {
+  const r = enderecoAsaasDoCliente([
+    { cep: "", endereco: "Rua A", numero: "1", bairro: "Centro" },
+    { cep: "20.040-002", endereco: " Av. Rio Branco ", numero: "156", complemento: "", bairro: "Centro" },
+  ])
+  assert.deepEqual(r.endereco, { postalCode: "20040002", address: "Av. Rio Branco", addressNumber: "156", complement: undefined, province: "Centro" })
+  assert.deepEqual(r.faltando, [])
+})
+
+test("sem local completo informa o que falta", () => {
+  assert.deepEqual(enderecoAsaasDoCliente([]).faltando, ["CEP", "rua", "numero", "bairro"])
+  const r = enderecoAsaasDoCliente([{ cep: "123", endereco: "Rua A", numero: "", bairro: "X" }])
+  assert.equal(r.endereco, null)
+  assert.deepEqual(r.faltando, ["CEP", "numero"])
 })

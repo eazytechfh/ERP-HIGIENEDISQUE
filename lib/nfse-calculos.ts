@@ -96,3 +96,51 @@ export function rotuloStatusAsaas(status: string): string {
   }
   return mapa[status] || status || "-"
 }
+
+export type LocalCliente = {
+  cep?: string | null
+  endereco?: string | null
+  numero?: string | null
+  complemento?: string | null
+  bairro?: string | null
+}
+
+export type EnderecoAsaas = {
+  postalCode: string
+  address: string
+  addressNumber: string
+  complement?: string
+  province: string
+}
+
+/**
+ * Endereco do tomador para a NFS-e (o Asaas recusa a nota sem ele).
+ * Usa o primeiro local do cliente com CEP, rua, numero e bairro; o Asaas
+ * deduz cidade/UF pelo CEP. Sem local completo, devolve o que falta.
+ */
+export function enderecoAsaasDoCliente(locais: LocalCliente[]): { endereco: EnderecoAsaas | null; faltando: string[] } {
+  const limpo = (v: string | null | undefined) => String(v || "").trim()
+  let melhorFaltando: string[] | null = null
+  for (const local of locais) {
+    const cep = limpo(local.cep).replace(/\D/g, "")
+    const faltando: string[] = []
+    if (cep.length !== 8) faltando.push("CEP")
+    if (!limpo(local.endereco)) faltando.push("rua")
+    if (!limpo(local.numero)) faltando.push("numero")
+    if (!limpo(local.bairro)) faltando.push("bairro")
+    if (faltando.length === 0) {
+      return {
+        endereco: {
+          postalCode: cep,
+          address: limpo(local.endereco),
+          addressNumber: limpo(local.numero),
+          complement: limpo(local.complemento) || undefined,
+          province: limpo(local.bairro),
+        },
+        faltando: [],
+      }
+    }
+    if (!melhorFaltando || faltando.length < melhorFaltando.length) melhorFaltando = faltando
+  }
+  return { endereco: null, faltando: melhorFaltando || ["CEP", "rua", "numero", "bairro"] }
+}
