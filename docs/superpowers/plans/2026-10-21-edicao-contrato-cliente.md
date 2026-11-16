@@ -45,7 +45,7 @@ Adicionar `tests/contratos-edit.test.js` ao script `test` do `package.json`.
 **Files:**
 - Modify: `lib/supabase/contratos-repo.ts`
 - Modify: `app/dashboard/clientes/contratos/page.tsx`
-- Create: `supabase/migrations/20261021_001_expand_contratos_editable_fields.sql`
+- Create: `supabase/migrations/20261021_029_expand_contratos_editable_fields.sql`
 
 **Interfaces:**
 - Consumes: `contratoId` da query string.

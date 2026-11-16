@@ -134,6 +134,96 @@ O sistema usa permissões customizadas em `profiles.permissions` (array de strin
 
 ## Histórico de alterações
 
+### 2026-11-16 — Financeiro: emissão de NFS-e pelo Asaas (Fases 4 e 5)
+
+**Problema identificado:** a aba Emitir NF só registrava número, chave e série digitados à mão; não havia emissão real, retenções nem acompanhamento da autorização pela prefeitura.
+
+**Alterações realizadas:**
+
+| Arquivo | O que mudou |
+|---|---|
+| `supabase/migrations/20261116_037_financeiro_nfse_asaas.sql` | `financeiro_nfse_config` (+ histórico; só o aprovador altera via `financeiro_salvar_nfse_config`); campos Asaas/NFS-e em `financeiro_documentos` (`numero` opcional); `financeiro_asaas_clientes`; `financeiro_asaas_eventos` (webhooks, id único) |
+| `lib/server/asaas.ts` | Cliente HTTP do Asaas (servidor). Ambiente pelo prefixo da chave; **chave de produção é recusada sem `ASAAS_AMBIENTE=producao`** |
+| `lib/server/financeiro-auth.ts`, `lib/server/nfse.ts` | Autenticação das rotas (token + permissão) e regras: cliente no Asaas sem duplicar, reconciliação por `externalReference`, aplicação do status |
+| `app/api/financeiro/nfse/emitir` | Grava o documento → procura no Asaas por referência → cria a nota → "Agora" chama `/authorize` |
+| `app/api/financeiro/nfse/sincronizar` | Botão "Atualizar status": consulta o Asaas e grava |
+| `app/api/financeiro/nfse/webhook` | Webhook (header `asaas-access-token`), grava o evento antes de processar, ignora repetidos, aplica o estado atual consultado no Asaas |
+| `lib/nfse-calculos.ts` | Base do ISS (deduções), retenções ISS/INSS/IR, líquido a receber, Agora/Agendar (com testes) |
+| `components/financeiro/nfse.tsx` | Telas Emissão de NFS-e (OS ou avulsa) e Config. NFS-e |
+
+**Cuidados para futuras alterações nesta área:**
+- Variáveis no servidor (Vercel e `.env.local`): `ASAAS_API_KEY`, `ASAAS_WEBHOOK_TOKEN` e, só em produção, `ASAAS_AMBIENTE=producao`. Nunca usar `NEXT_PUBLIC_` para elas.
+- Webhook no painel do Asaas: URL `https://<domínio>/api/financeiro/nfse/webhook`, eventos de **Nota fiscal**, token de autenticação = `ASAAS_WEBHOOK_TOKEN`. Localhost não recebe webhook: usar "Atualizar status".
+- Nota só é "emitida" com status `AUTHORIZED`. `SCHEDULED` = agendada/processando.
+- A referência `erp-nfse-<chave>` identifica a nota nos dois sistemas; reenviar uma nota com falha reaproveita a chave e confere no Asaas antes de criar outra.
+- Inscrição municipal, regime, certificado e acesso à prefeitura ficam no painel do Asaas, não no ERP.
+
+### 2026-11-16 — Financeiro: período no dashboard, exportação CSV/PDF e fim do limite de 500 (Fase 3)
+
+**Problema identificado:** a página carregava no máximo 500 lançamentos e calculava indicadores, gráficos e filtros no navegador. Acima disso, os totais ficavam errados sem aviso. O dashboard não tinha filtro de período, e não havia exportação.
+
+**Alterações realizadas:**
+
+| Arquivo | O que mudou |
+|---|---|
+| `supabase/migrations/20261116_035_financeiro_periodo_consultas.sql` | Colunas geradas `data_referencia` (liquidação se realizado, vencimento se programado) e `valor_caixa` (líquido se realizado); funções `financeiro_lancamentos_filtrados`, `financeiro_totais_filtrados`, `financeiro_resumo_periodo`, `financeiro_resumo_categorias` (todas `SECURITY INVOKER`) |
+| `supabase/migrations/20261116_036_financeiro_indice_data_referencia.sql` | Índice `CONCURRENTLY` em `data_referencia` — rodar sozinho |
+| `lib/financeiro-periodo.ts` | Intervalos (ano, mês atual, anual, Jan–Dez) e CSV para Excel pt-BR, com testes |
+| `lib/supabase/financeiro-repo.ts` | Listagem paginada no servidor, totais agregados, exportação em lotes de 1000, resumo do dashboard; `listFinanceiroLancamentosSupabase` (limite 500) não é mais usada pela página |
+| `components/financeiro/dashboard-financeiro.tsx` | Dashboard com seletor de ano e período; KPIs, gráficos e distribuições vindos do banco; cancelados fora |
+| `components/financeiro/lancamentos-explorer.tsx` | Filtros + totais + paginação no servidor + exportação CSV/PDF de todas as linhas do filtro |
+| `app/dashboard/financeiro/page.tsx` | Fluxo (Movimentações) e Relatórios usam o explorador; a página não guarda mais a lista de lançamentos (`versaoLancamentos` dispara o recarregamento) |
+
+**Cuidados para futuras alterações nesta área:**
+- Lista, totais e exportação usam o **mesmo** filtro (`financeiro_lancamentos_filtrados`); um filtro novo deve ser adicionado na função SQL e em `FiltrosLancamentos`.
+- Não somar lançamentos no navegador para indicadores: usar as funções de resumo/totais (o navegador só vê uma página).
+- Após criar/alterar lançamentos, chamar `atualizarLancamentos()` na página para as telas recarregarem.
+- O PDF é gerado pela impressão do navegador (janela com a tabela + totais → "Salvar como PDF"); exige permitir pop-up.
+
+### 2026-11-16 — Financeiro: taxa de cartão, forma de pagamento e parcelas de boleto (Fase 2)
+
+**Problema identificado:** recebimentos no cartão entravam no caixa pelo valor bruto, sem descontar a taxa da maquininha. Não havia como corrigir a forma de pagamento de um lançamento, nem parcelar um boleto.
+
+**Alterações realizadas:**
+
+| Arquivo | O que mudou |
+|---|---|
+| `supabase/migrations/20261116_031_financeiro_cartao_parcelas.sql` | Tabela `financeiro_taxas_cartao` (histórico; só o aprovador altera via `financeiro_definir_taxa_cartao`); colunas de taxa/líquido e de parcela em `financeiro_lancamentos`; taxa gravada na solicitação e copiada na aprovação; trava ampliada para os campos de taxa |
+| `lib/financeiro-calculos.ts` | Rateio de parcelas sem diferença de centavos, vencimentos mensais e cálculo da taxa (com testes) |
+| `lib/supabase/financeiro-repo.ts` | `valorCaixa` (líquido quando realizado), criação de parcelas numa única inserção, edição da forma de pagamento, taxas |
+| `components/financeiro/taxas-cartao.tsx` | Aba Taxas de cartão e diálogo de forma de pagamento |
+| `components/financeiro/aprovacoes-baixa.tsx` | Solicitação mostra bruto, taxa e líquido; envia a taxa vista para o banco conferir |
+| `app/dashboard/financeiro/page.tsx` | Parcelas no Fluxo (forma boleto) e na Emissão de Boleto; webhook por parcela com status registrado; totais pelo líquido |
+
+**Cuidados para futuras alterações nesta área:**
+- **Parcelas em qualquer forma de pagamento (migration 034):** a OS (Financeiro do Serviço) e o Fluxo de Caixa têm o campo Parcelas para todas as formas. A regra fica em `planejarCobranca` (`lib/financeiro-calculos.ts`): **cartão** = um lançamento com baixa única, as parcelas só escolhem a taxa (`cartao_parcelas`, débito sempre 1x); **demais formas** = um lançamento mensal por parcela, cada um com baixa própria. A quantidade da OS fica em `os_form_data.serviceRequest.billing.installments` (sem coluna nova em `servicos`; OS antigas = 1x). Ao salvar a OS, `upsertReceitaServicoSupabase` sincroniza: mesmo plano → só atualiza textos; plano mudou → cancela as receitas programadas e recria; se alguma parcela já foi baixada ou está em aprovação, a OS não mexe no financeiro.
+- Aplicar as migrations 031, 033 e 034 **antes** de publicar o front: a tela chama `financeiro_solicitar_baixa` com os parâmetros novos `p_taxa_esperada` e `p_cartao_parcelas`.
+- **Taxa por parcelas (migration 033):** a taxa é por modalidade + parcelas da venda (`financeiro_taxas_cartao.parcelas`; débito sempre 1x, crédito 1x–21x). A venda no cartão continua sendo um lançamento único; as parcelas só escolhem a taxa e ficam em `cartao_parcelas`. Combinação sem taxa cadastrada **bloqueia** a baixa (não vale mais 0%). A migration traz carga inicial com as taxas da maquininha (débito 1,64%; crédito à vista 3,53% até 10x 13,17%) sem sobrescrever taxas já cadastradas.
+- `valor` continua sendo o bruto. Para somar o que entrou no caixa use `valorCaixa` (ou `valor_liquido` no banco, preenchido em todo lançamento realizado).
+- A regra de arredondamento da taxa existe em dois lugares (`lib/financeiro-calculos.ts` e `financeiro_solicitar_baixa`); se mudar uma, mude a outra. O banco recusa a solicitação se a taxa vigente for diferente da mostrada na tela.
+- Cartão nunca é parcelado: parcelas só existem para boleto. Cada parcela é um lançamento com baixa própria, ligado pelo `parcela_grupo_id`.
+- O webhook do n8n agora recebe `parcelaGrupoId`, `parcelaNumero`, `parcelaTotal` e `valorTotal`; o fluxo do n8n deve usar `lancamentoId`/`documentoId` para identificar cada cobrança.
+
+### 2026-11-16 — Financeiro: baixa somente com aprovação (Fase 1 do plano de evolução)
+
+**Problema identificado:** qualquer usuário do financeiro marcava receitas e despesas como realizadas direto na tela (botão "Dar Baixa" ou status "Já realizado"), sem conferência. O cancelamento de OS também tentava cancelar receitas já recebidas, e a edição de uma OS podia sobrescrever uma receita já baixada.
+
+**Alterações realizadas:**
+
+| Arquivo | O que mudou |
+|---|---|
+| `supabase/migrations/20261116_030_financeiro_aprovacao_baixa.sql` | Tabelas `financeiro_aprovadores` e `financeiro_baixa_solicitacoes`; funções `financeiro_solicitar_baixa`, `financeiro_decidir_baixa`, `financeiro_cancelar_solicitacao_baixa`, `is_aprovador_financeiro`; trigger que bloqueia status `realizado` fora da aprovação; colunas `liquidado_por` e `liquidado_em` |
+| `lib/supabase/financeiro-repo.ts` | Funções de solicitação/decisão/cancelamento; `upsertReceitaServicoSupabase` não reescreve receita realizada ou com baixa pendente; `cancelLancamentoServicoSupabase` só cancela programados; cliente não envia mais `data_liquidacao` |
+| `components/financeiro/aprovacoes-baixa.tsx` | Nova aba Aprovações e diálogo "Solicitar baixa" |
+| `app/dashboard/financeiro/page.tsx` | "Dar Baixa" virou "Solicitar baixa"; opção "Já realizado" removida; aba Aprovações com contador; cancelamento usa update dirigido |
+| `app/dashboard/servicos/page.tsx` | OS coberta pelo contrato cancela receita adicional ainda programada |
+
+**Cuidados para futuras alterações nesta área:**
+- Depois de aplicar a migration, cadastrar o e-mail da aprovadora: `insert into public.financeiro_aprovadores (email) values ('<email>');` (minúsculo). Sem isso ninguém consegue aprovar.
+- A trava está no banco: qualquer código novo que tente gravar `status = 'realizado'` ou `data_liquidacao` vai falhar. O caminho correto é `financeiro_solicitar_baixa` → `financeiro_decidir_baixa`.
+- Chamadas com service role (sem `auth.uid()`) passam pela trava. Rotas de servidor que usem service role precisam validar o usuário antes.
+- Lançamentos já realizados antes da migration foram preservados e ficam imutáveis pela tela.
+
 ### 2026-07-08 — Certificado de garantia na geração de OS
 
 **Problema identificado:** Serviços de controle de vetores precisavam emitir certificado de garantia separado da OS, com possibilidade de impressão imediata e registro junto aos serviços agendados.

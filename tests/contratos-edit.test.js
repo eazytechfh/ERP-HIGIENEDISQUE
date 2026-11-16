@@ -49,7 +49,7 @@ test("persiste e restaura todos os campos editáveis do contrato", () => {
   const migrationSource = readSource(
     "supabase",
     "migrations",
-    "20261021_001_expand_contratos_editable_fields.sql",
+    "20261021_029_expand_contratos_editable_fields.sql",
   )
 
   for (const column of [
@@ -80,7 +80,7 @@ test("sincroniza somente o resumo contratual do cliente sem regravar anexos", ()
   const migrationSource = readSource(
     "supabase",
     "migrations",
-    "20261021_001_expand_contratos_editable_fields.sql",
+    "20261021_029_expand_contratos_editable_fields.sql",
   )
 
   assert.doesNotMatch(pageSource, /upsertClienteSupabase/)
@@ -118,7 +118,7 @@ test("salva contrato, cliente e itens em uma transação com controle de concorr
   const migrationSource = readSource(
     "supabase",
     "migrations",
-    "20261021_001_expand_contratos_editable_fields.sql",
+    "20261021_029_expand_contratos_editable_fields.sql",
   )
 
   assert.match(migrationSource, /create or replace function public\.upsert_contrato_com_itens/)

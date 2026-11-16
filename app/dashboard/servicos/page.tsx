@@ -63,8 +63,9 @@ import { setFlowServicos, toIsoDate, type FlowServico } from "@/lib/flow-store"
 import { formatDateOnlyBR, parseDateOnlyLocal } from "@/lib/date-only"
 import { listContratosSupabase } from "@/lib/supabase/contratos-repo"
 import { listEquipeMembrosSupabase, type EquipeMembroInput } from "@/lib/supabase/equipe-repo"
-import { cancelLancamentoServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
+import { cancelLancamentoServicoSupabase, cancelReceitaProgramadaServicoSupabase, listFinanceiroCategoriasSupabase, type FinanceiroCategoriaItem, upsertReceitaServicoSupabase } from "@/lib/supabase/financeiro-repo"
 import { listProdutosSupabase } from "@/lib/supabase/estoque-repo"
+import { MAX_PARCELAS, MAX_PARCELAS_CARTAO, isFormaCartao } from "@/lib/financeiro-calculos"
 import { listServicosSupabase, upsertServicoSupabase, deleteServicoSupabase, uploadOSAssinadaServicoSupabase, listTiposServicoSupabase, upsertTipoServicoSupabase, deleteTipoServicoSupabase, type ServicoSupabaseItem, type TipoServico } from "@/lib/supabase/servicos-repo"
 import { deleteServicoRascunhoSupabase, listServicosRascunhosSupabase, upsertServicoRascunhoSupabase, type ServicoRascunho } from "@/lib/supabase/servicos-rascunhos-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
@@ -138,6 +139,8 @@ type ServiceRequest = {
     contractItemId?: string
     price?: string
     paymentMethod?: string
+    /** Quantidade de parcelas (qualquer forma de pagamento). */
+    installments?: string
     billingDocument?: "recibo" | "nota_fiscal"
     additionalReason?: string
     approved?: boolean
@@ -237,6 +240,7 @@ type ServicoAgendado = {
   contractItemId?: string
   billingValue?: number
   paymentMethod?: string
+  billingInstallments?: number
   billingDocument?: string
   additionalReason?: string
   billingApproved?: boolean
@@ -384,6 +388,13 @@ function mapEquipeTipo(value: string): Equipe["tipo"] {
   return "tecnico_individual"
 }
 
+/** Parcelas da cobranca guardadas no formulario da OS (os_form_data). OS antigas = 1. */
+function parcelasDaOS(osFormData: Record<string, unknown> | null | undefined): number {
+  const billing = (osFormData as any)?.serviceRequest?.billing
+  const parsed = Number.parseInt(String(billing?.installments ?? "1"), 10)
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1
+}
+
 function mapServicoSupabaseToAgendado(servico: ServicoSupabaseItem): ServicoAgendado {
   return {
     id: servico.id,
@@ -413,6 +424,7 @@ function mapServicoSupabaseToAgendado(servico: ServicoSupabaseItem): ServicoAgen
     contractItemId: servico.contratoItemId || undefined,
     billingValue: servico.valorCobranca || 0,
     paymentMethod: servico.formaPagamento || undefined,
+    billingInstallments: parcelasDaOS(servico.osFormData),
     billingDocument: servico.tipoDocumentoCobranca || undefined,
     additionalReason: servico.motivoAdicional || undefined,
     billingApproved: servico.cobrancaAprovada,
@@ -1732,6 +1744,7 @@ export default function ServicosPage() {
       mode: "contrato",
       price: "",
       paymentMethod: "",
+      installments: "1",
       registerRevenueInCashFlow: false,
       notifyEmail: false,
     notifyWhatsapp: false,
@@ -2096,7 +2109,11 @@ export default function ServicosPage() {
 
       return {
         ...prev,
-        billing: { ...prev.billing, [field]: value },
+        billing: {
+          ...prev.billing,
+          [field]: value,
+          ...(field === "paymentMethod" && value === "cartao_debito" ? { installments: "1" } : {}),
+        },
       }
     })
 
@@ -2165,6 +2182,13 @@ export default function ServicosPage() {
       if (!serviceRequest.billing.price) newErrors["billing.price"] = "Informe o valor"
       if (!serviceRequest.billing.paymentMethod) newErrors["billing.paymentMethod"] = "Selecione a forma de pagamento"
       if (!serviceRequest.billing.billingDocument) newErrors["billing.billingDocument"] = "Selecione o documento de cobrança"
+      const parcelas = Number.parseInt(serviceRequest.billing.installments || "1", 10)
+      const maxParcelas = isFormaCartao(serviceRequest.billing.paymentMethod) ? MAX_PARCELAS_CARTAO : MAX_PARCELAS
+      if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > maxParcelas) {
+        newErrors["billing.installments"] = `Informe de 1 a ${maxParcelas} parcelas`
+      } else if (serviceRequest.billing.paymentMethod === "cartao_debito" && parcelas > 1) {
+        newErrors["billing.installments"] = "Debito e sempre 1x"
+      }
     }
     if (serviceRequest.billing.mode === "contrato") {
       if (!serviceRequest.billing.contractId) newErrors["billing.contractId"] = "Selecione o contrato"
@@ -2733,12 +2757,21 @@ export default function ServicosPage() {
           dataCompetencia: saved.data,
           dataVencimento: saved.data,
           formaPagamento: saved.formaPagamento || undefined,
+          quantidadeParcelas: servico.billingInstallments || 1,
           documentoTipo: saved.tipoDocumentoCobranca || undefined,
           observacoes: saved.motivoAdicional || undefined,
         })
       } catch (err) {
         console.error("Falha ao registrar cobrança no Financeiro", err)
         return { saved, financeiroErro: "A cobrança não foi registrada. Abra o Financeiro e tente novamente." }
+      }
+    } else if (saved.cobrancaModo === "contrato" && servico.id) {
+      // OS coberta pelo contrato não gera receita própria.
+      try {
+        await cancelReceitaProgramadaServicoSupabase(saved.id)
+      } catch (err) {
+        console.error("Falha ao remover cobrança adicional da OS coberta pelo contrato", err)
+        return { saved, financeiroErro: "A OS foi salva, mas a cobrança adicional anterior continua programada no Financeiro." }
       }
     }
 
@@ -3028,6 +3061,7 @@ const handleConfirmarAgendamentoFinal = async () => {
       contractItemId: serviceRequest.billing.mode === "contrato" ? serviceRequest.billing.contractItemId : "",
       billingValue: Number(String(serviceRequest.billing.price || "0").replace(/\./g, "").replace(",", ".")) || 0,
       paymentMethod: serviceRequest.billing.paymentMethod,
+      billingInstallments: Math.max(1, Number.parseInt(serviceRequest.billing.installments || "1", 10) || 1),
       billingDocument: isBillingDireto(serviceRequest.billing.mode)
         ? serviceRequest.billing.billingDocument === "nota_fiscal"
           ? "nota_fiscal"
@@ -3852,7 +3886,7 @@ const handleConfirmarAgendamentoFinal = async () => {
 
                   {isBillingDireto(serviceRequest.billing.mode) && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="price">Valor do Serviço *</Label>
                           <Input
@@ -3877,12 +3911,41 @@ const handleConfirmarAgendamentoFinal = async () => {
                             <SelectContent>
                               <SelectItem value="pix">Pix</SelectItem>
                               <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                              <SelectItem value="cartao">Cartão</SelectItem>
+                              <SelectItem value="cartao_credito">Cartão de crédito</SelectItem>
+                              <SelectItem value="cartao_debito">Cartão de débito</SelectItem>
+                              {serviceRequest.billing.paymentMethod === "cartao" ? (
+                                <SelectItem value="cartao">Cartão (não especificado)</SelectItem>
+                              ) : null}
                               <SelectItem value="boleto">Boleto</SelectItem>
                               <SelectItem value="transferencia">Transferência</SelectItem>
                             </SelectContent>
                           </Select>
                           {errors["billing.paymentMethod"] && <p className="text-sm text-destructive">{errors["billing.paymentMethod"]}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="installments">Parcelas *</Label>
+                          <Input
+                            id="installments"
+                            type="number"
+                            min={1}
+                            max={isFormaCartao(serviceRequest.billing.paymentMethod) ? MAX_PARCELAS_CARTAO : MAX_PARCELAS}
+                            value={serviceRequest.billing.installments || "1"}
+                            disabled={serviceRequest.billing.paymentMethod === "cartao_debito"}
+                            onChange={(e) => handleBillingChange("installments", e.target.value)}
+                            className={errors["billing.installments"] ? "border-destructive" : ""}
+                          />
+                          {errors["billing.installments"] ? (
+                            <p className="text-sm text-destructive">{errors["billing.installments"]}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {isFormaCartao(serviceRequest.billing.paymentMethod)
+                                ? "Cartão: um lançamento com baixa única; as parcelas definem a taxa."
+                                : Number.parseInt(serviceRequest.billing.installments || "1", 10) > 1
+                                  ? "Cada parcela entra no financeiro com vencimento mensal e baixa própria."
+                                  : "Pagamento à vista."}
+                            </p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="billingDocument">Documento de cobrança *</Label>
