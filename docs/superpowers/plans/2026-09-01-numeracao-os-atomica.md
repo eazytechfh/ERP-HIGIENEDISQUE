@@ -36,7 +36,7 @@
 ### Task 2: Reserva atomica no Supabase
 
 **Files:**
-- Create: `supabase/migrations/20260901_001_atomic_os_number.sql`
+- Create: `supabase/migrations/20260901_021_atomic_os_number.sql`
 - Modify: `lib/supabase/servicos-repo.ts`
 
 **Interfaces:**
