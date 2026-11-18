@@ -55,3 +55,14 @@ test("OS não reescreve receita recebida e contrato não gera receita própria",
   assert.match(repo, /export async function cancelLancamentoServicoSupabase[\s\S]{0,700}\.eq\("status", "programado"\)/)
   assert.match(servicos, /saved\.cobrancaModo === "contrato" && servico\.id[\s\S]{0,200}cancelReceitaProgramadaServicoSupabase\(saved\.id\)/)
 })
+
+test("importacao de despesas baixa direto, mas so para o aprovador e numa transacao", () => {
+  const sql = readSource("supabase", "migrations", "20261118_038_financeiro_importar_despesas.sql")
+
+  assert.match(sql, /if auth\.uid\(\) is null or not public\.is_aprovador_financeiro\(\) then/)
+  assert.match(sql, /set_config\('app\.financeiro_baixa_aprovada', 'on', true\)/)
+  assert.match(sql, /set_config\('app\.financeiro_baixa_aprovada', '', true\)/)
+  assert.match(sql, /'despesa', 'realizado'/)
+  assert.match(sql, /r\.data > current_date/)
+  assert.match(sql, /revoke all on function public\.financeiro_importar_despesas\(jsonb\) from public, anon/)
+})

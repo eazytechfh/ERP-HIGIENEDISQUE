@@ -4,6 +4,7 @@ import { safeAuditLogSupabase } from "@/lib/supabase/audit-log-repo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { assertPermissionSupabase } from "@/lib/supabase/profiles-repo"
 import { descricaoParcela, planejarCobranca } from "@/lib/financeiro-calculos"
+import { normalizarTexto, type LinhaDespesaImportada } from "@/lib/financeiro-importacao"
 
 export type FinanceiroLancamentoTipo = "receita" | "despesa" | "investimento"
 export type FinanceiroLancamentoStatus = "programado" | "realizado" | "cancelado"
@@ -1065,6 +1066,85 @@ export async function criarLancamentosSupabase(inputs: FinanceiroLancamentoInput
   })
 
   return lancamentos
+}
+
+export type ResultadoImportacaoDespesas = {
+  criadas: number
+  categoriasCriadas: FinanceiroCategoriaItem[]
+}
+
+/**
+ * Importa despesas de planilha ja revisada: entram direto como "realizado", na
+ * data de pagamento da planilha. Quem importa precisa ser o aprovador do
+ * financeiro (a funcao financeiro_importar_despesas confere no banco); a
+ * importacao equivale a aprovacao das baixas.
+ */
+export async function importarDespesasSupabase(input: {
+  linhas: LinhaDespesaImportada[]
+  categorias: FinanceiroCategoriaItem[]
+  arquivo: string
+  onProgresso?: (etapa: string) => void
+}): Promise<ResultadoImportacaoDespesas> {
+  await assertPermissionSupabase("financeiro.create", "Voce nao possui permissao para importar despesas.")
+  if (input.linhas.length === 0) return { criadas: 0, categoriasCriadas: [] }
+
+  // 1) Categorias de despesa: usa a existente (ignora acento/maiuscula) ou cria.
+  const porNome = new Map<string, FinanceiroCategoriaItem>()
+  for (const categoria of input.categorias) {
+    if (categoria.tipo === "despesa") porNome.set(normalizarTexto(categoria.nome), categoria)
+  }
+  const categoriasCriadas: FinanceiroCategoriaItem[] = []
+  for (const linha of input.linhas) {
+    const chave = normalizarTexto(linha.categoria)
+    if (porNome.has(chave)) continue
+    input.onProgresso?.(`Criando categoria ${linha.categoria}...`)
+    const criada = await upsertFinanceiroCategoriaSupabase({
+      nome: linha.categoria,
+      tipo: "despesa",
+      descricao: "Criada na importacao de despesas",
+      ativo: true,
+    })
+    porNome.set(chave, criada)
+    categoriasCriadas.push(criada)
+  }
+
+  // 2) Todas as despesas numa unica chamada (tudo-ou-nada).
+  input.onProgresso?.(`Gravando ${input.linhas.length} despesas...`)
+  const payload = input.linhas.map((linha) => {
+    const categoria = porNome.get(normalizarTexto(linha.categoria))
+    return {
+      descricao: linha.descricao,
+      categoria_id: categoria?.id ?? null,
+      categoria: categoria?.nome || linha.categoria,
+      valor: linha.valor,
+      data: linha.dataPagamento,
+      forma_pagamento: linha.formaPagamento || null,
+      observacoes: [
+        `Importado da planilha "${input.arquivo}" (linha ${linha.linhaPlanilha}).`,
+        linha.recebedor ? `Quem recebeu: ${linha.recebedor}.` : "",
+      ].filter(Boolean).join(" "),
+    }
+  })
+
+  const supabase = getSupabaseBrowserClient()
+  const { data, error } = await supabase.rpc("financeiro_importar_despesas", { p_linhas: payload })
+  if (error) throw toError(error)
+  const criadas = Number(data) || 0
+
+  await safeAuditLogSupabase({
+    action: "create",
+    entity: "financeiro_lancamento",
+    entityId: input.arquivo,
+    entityLabel: input.arquivo,
+    description: `${criadas} despesas importadas da planilha ja baixadas.`,
+    metadata: {
+      quantidade: criadas,
+      total: input.linhas.reduce((soma, l) => soma + l.valor, 0),
+      categoriasCriadas: categoriasCriadas.map((c) => c.nome),
+    },
+  })
+
+  return { criadas, categoriasCriadas }
 }
 
 export async function criarDocumentosSupabase(inputs: FinanceiroDocumentoInput[]): Promise<FinanceiroDocumentoItem[]> {

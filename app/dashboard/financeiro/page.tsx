@@ -30,6 +30,7 @@ import { useAccess } from "@/components/access-provider"
 import { AprovacoesSection, SolicitarBaixaDialog, formaPagamentoLabel, type SolicitarBaixaPayload } from "@/components/financeiro/aprovacoes-baixa"
 import { AlterarFormaPagamentoDialog, TaxasCartaoSection, formatPercent } from "@/components/financeiro/taxas-cartao"
 import { DashboardFinanceiro } from "@/components/financeiro/dashboard-financeiro"
+import { ImportarDespesasButton } from "@/components/financeiro/importar-despesas"
 import { LancamentosExplorer } from "@/components/financeiro/lancamentos-explorer"
 import { NfseConfigSection, NfseSection } from "@/components/financeiro/nfse"
 import { MAX_PARCELAS, MAX_PARCELAS_CARTAO, descricaoParcela, isFormaCartao, isModalidadeCartao, planejarCobranca, rotuloTaxaCartao, planejarParcelas, type ParcelaPlanejada } from "@/lib/financeiro-calculos"
@@ -707,6 +708,8 @@ type FluxoCaixaSectionProps = {
   onExcluir: (id: string) => Promise<void>
   onDarBaixa: (item: FinanceiroLancamentoItem) => Promise<void>
   onCancelar: (item: FinanceiroLancamentoItem) => Promise<void>
+  isAprovador: boolean
+  onImportacaoConcluida: () => void
 }
 
 function ClienteSearchInput({
@@ -932,6 +935,8 @@ function FluxoCaixaSection({
   onExcluir,
   onDarBaixa,
   onCancelar,
+  isAprovador,
+  onImportacaoConcluida,
 }: FluxoCaixaSectionProps) {
   const isTipoEntrada = fluxoForm.tipo === "receita"
 
@@ -943,14 +948,17 @@ function FluxoCaixaSection({
   return (
     <>
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-primary/10 p-2">
-          <Wallet className="h-5 w-5 text-primary" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-primary/10 p-2">
+            <Wallet className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Fluxo de Caixa</h1>
+            <p className="text-sm text-muted-foreground">Registre entradas e saidas e acompanhe todas as movimentacoes do sistema.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Fluxo de Caixa</h1>
-          <p className="text-sm text-muted-foreground">Registre entradas e saidas e acompanhe todas as movimentacoes do sistema.</p>
-        </div>
+        <ImportarDespesasButton categorias={categorias} isAprovador={isAprovador} onConcluido={onImportacaoConcluida} />
       </div>
 
       {/* KPIs */}
@@ -1635,6 +1643,13 @@ export default function FinanceiroPage() {
     await carregarAprovacoes()
   }
 
+  const handleImportacaoConcluida = () => {
+    setPageError("")
+    setPageNotice("Despesas importadas e baixadas.")
+    atualizarLancamentos()
+    void listFinanceiroCategoriasSupabase().then(setCategorias).catch((error) => console.warn("Falha ao recarregar categorias:", error))
+  }
+
   const recarregarLancamento = async (_lancamentoId: string) => {
     atualizarLancamentos()
   }
@@ -1959,6 +1974,8 @@ export default function FinanceiroPage() {
               onExcluir={handleExcluirLancamento}
               onDarBaixa={handleDarBaixa}
               onCancelar={handleCancelarLancamento}
+              isAprovador={isAprovador}
+              onImportacaoConcluida={handleImportacaoConcluida}
             />
           ) : null}
 
