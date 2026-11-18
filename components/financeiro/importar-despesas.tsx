@@ -157,7 +157,7 @@ export function ImportarDespesasButton({ categorias, isAprovador, onConcluido }:
       </Button>
 
       <Dialog open={aberto} onOpenChange={fechar}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5 text-primary" />
@@ -170,7 +170,7 @@ export function ImportarDespesasButton({ categorias, isAprovador, onConcluido }:
           </DialogHeader>
 
           {!resultado ? (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <input
                 ref={inputRef}
                 type="file"
@@ -197,7 +197,7 @@ export function ImportarDespesasButton({ categorias, isAprovador, onConcluido }:
 
               {previa ? (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <div className="rounded-md border p-3">
                       <p className="text-xs text-muted-foreground">A importar</p>
                       <p className="text-lg font-bold">{previa.novas.length}</p>
@@ -234,7 +234,7 @@ export function ImportarDespesasButton({ categorias, isAprovador, onConcluido }:
                   ) : null}
 
                   {previa.novas.length > 0 ? (
-                    <div className="max-h-64 overflow-auto rounded-md border">
+                    <div className="max-h-[40vh] overflow-auto rounded-md border">
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-muted text-left text-xs uppercase text-muted-foreground">
                           <tr>
@@ -248,7 +248,7 @@ export function ImportarDespesasButton({ categorias, isAprovador, onConcluido }:
                           {previa.novas.map((l) => (
                             <tr key={l.linhaPlanilha} className="border-t">
                               <td className="whitespace-nowrap px-3 py-1.5">{dataBr(l.dataPagamento)}</td>
-                              <td className="px-3 py-1.5">{l.descricao}</td>
+                              <td className="px-3 py-1.5 break-words">{l.descricao}</td>
                               <td className="whitespace-nowrap px-3 py-1.5">{l.categoria}</td>
                               <td className="whitespace-nowrap px-3 py-1.5 text-right">{moeda(l.valor)}</td>
                             </tr>
